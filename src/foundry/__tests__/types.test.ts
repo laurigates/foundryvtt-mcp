@@ -3,7 +3,6 @@ import type {
   FoundryActor,
   FoundryItem,
   FoundryScene,
-  FoundryToken,
   FoundryCombat,
   FoundryUser,
   FoundryAPIResponse,

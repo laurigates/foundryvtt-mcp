@@ -361,7 +361,7 @@ export class CombatManager extends EventEmitter {
     return combatants;
   }
 
-  private getInitiativeModifier(combatant: CombatantState): number {
+  private getInitiativeModifier(_combatant: CombatantState): number {
     // Simplified initiative modifier calculation
     // In a real implementation, this would pull from the actual character sheet
     return Math.floor(Math.random() * 6) - 1; // -1 to +4
@@ -418,7 +418,9 @@ export class CombatManager extends EventEmitter {
 
   private calculateAverageTurnTime(): number {
     const turnEvents = this.combatHistory.filter(e => e.type === 'turn_start');
-    if (turnEvents.length < 2) return 0;
+    if (turnEvents.length < 2) {
+      return 0;
+    }
 
     let totalTime = 0;
     for (let i = 1; i < turnEvents.length; i++) {

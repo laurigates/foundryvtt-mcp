@@ -8,10 +8,10 @@
  * @author FoundryVTT MCP Team
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import WebSocket from 'ws';
 import { logger } from '../utils/logger.js';
-import { FoundryActor, FoundryItem, FoundryScene, FoundryWorld, DiceRoll, ActorSearchResult, ItemSearchResult } from './types.js';
+import { FoundryActor, FoundryScene, FoundryWorld, DiceRoll, ActorSearchResult, ItemSearchResult } from './types.js';
 
 /**
  * Configuration interface for FoundryVTT client connection settings
@@ -121,7 +121,7 @@ export class FoundryClient {
   private ws: WebSocket | null = null;
   private config: FoundryClientConfig;
   private sessionToken?: string;
-  private isConnected = false;
+  private _isConnected = false;
   private connectionMethod: 'rest' | 'websocket' | 'hybrid' = 'websocket';
 
   /**
@@ -191,7 +191,7 @@ export class FoundryClient {
       async (error) => {
         if (error.response?.status === 401) {
           logger.warn('Authentication failed, connection may need to be re-established');
-          this.isConnected = false;
+          this._isConnected = false;
         }
         return Promise.reject(error);
       }
@@ -274,7 +274,7 @@ export class FoundryClient {
       this.ws.close();
       this.ws = null;
     }
-    this.isConnected = false;
+    this._isConnected = false;
     logger.info('FoundryVTT client disconnected');
   }
 
@@ -290,7 +290,7 @@ export class FoundryClient {
    * ```
    */
   isConnected(): boolean {
-    return this.isConnected;
+    return this._isConnected;
   }
 
   /**
@@ -310,8 +310,8 @@ export class FoundryClient {
     if (this.config.useRestModule) {
       // For REST API, just test the connection
       try {
-        const response = await this.http.get('/api/status');
-        this.isConnected = true;
+        await this.http.get('/api/status');
+        this._isConnected = true;
         logger.info('Connected to FoundryVTT via REST API');
       } catch (error) {
         logger.error('Failed to connect via REST API:', error);
@@ -493,9 +493,15 @@ export class FoundryClient {
       
       if (this.config.useRestModule) {
         const queryParams = new URLSearchParams();
-        if (params.query) queryParams.append('search', params.query);
-        if (params.type) queryParams.append('type', params.type);
-        if (params.limit) queryParams.append('limit', params.limit.toString());
+        if (params.query) {
+          queryParams.append('search', params.query);
+        }
+        if (params.type) {
+          queryParams.append('type', params.type);
+        }
+        if (params.limit) {
+          queryParams.append('limit', params.limit.toString());
+        }
 
         const response = await this.http.get(`/api/actors`, { params });
         return response.data;
@@ -699,7 +705,7 @@ export class FoundryClient {
       this.ws.on('close', () => {
         logger.info('WebSocket disconnected');
         this.ws = null;
-        this.isConnected = false;
+        this._isConnected = false;
       });
     } catch (error) {
       logger.error('WebSocket connection failed:', error);

@@ -649,7 +649,7 @@ class FoundryMCPServer {
    * @returns MCP response with rule information
    */
   private async handleLookupRule(args: any) {
-    const { query, category, system } = args;
+    const { query, category } = args;
     
     const ruleInfo = await this.lookupGameRule(query, category);
     
@@ -893,7 +893,9 @@ class FoundryMCPServer {
    * @returns Formatted abilities string
    */
   private formatAbilities(abilities: any): string {
-    if (!abilities) return 'No ability scores available';
+    if (!abilities) {
+      return 'No ability scores available';
+    }
     
     return Object.entries(abilities)
       .map(([key, ability]: [string, any]) => 
@@ -907,7 +909,9 @@ class FoundryMCPServer {
    * @returns Formatted skills string
    */
   private formatSkills(skills: any): string {
-    if (!skills) return 'No skills available';
+    if (!skills) {
+      return 'No skills available';
+    }
     
     const proficientSkills = Object.entries(skills)
       .filter(([_, skill]: [string, any]) => skill.proficient)
@@ -1067,7 +1071,7 @@ class FoundryMCPServer {
    * @param category - Optional category
    * @returns Rule information
    */
-  private async lookupGameRule(query: string, category?: string): Promise<string> {
+  private async lookupGameRule(query: string, _category?: string): Promise<string> {
     const commonRules = {
       'grappling': 'To grapple, make an Athletics check contested by the target\'s Athletics or Acrobatics. Success restrains the target.',
       'opportunity attack': 'When a creature moves out of your reach, you can use your reaction to make one melee attack.',

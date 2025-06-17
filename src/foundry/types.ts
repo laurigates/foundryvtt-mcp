@@ -133,7 +133,7 @@ export interface FoundryItem {
     value: number;
     units: string;
   };
-  range?: {
+  itemRange?: {
     value: number;
     units: string;
   };
@@ -502,7 +502,7 @@ export interface FoundryUser {
  * @example
  * ```typescript
  * const searchResult: ActorSearchResult = {
- *   actors: [/* array of FoundryActor objects */],
+ *   actors: [],
  *   total: 25,
  *   page: 1,
  *   limit: 10
@@ -526,7 +526,7 @@ export interface ActorSearchResult {
  * @example
  * ```typescript
  * const searchResult: ItemSearchResult = {
- *   items: [/* array of FoundryItem objects */],
+ *   items: [],
  *   total: 42,
  *   page: 1,
  *   limit: 20
@@ -553,7 +553,7 @@ export interface ItemSearchResult {
  * ```typescript
  * const response: FoundryAPIResponse<FoundryActor[]> = {
  *   success: true,
- *   data: [/* actor objects */],
+ *   data: [],
  *   message: 'Actors retrieved successfully'
  * };
  * ```

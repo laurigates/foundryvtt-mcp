@@ -183,10 +183,8 @@ describe('Integration Tests', () => {
       });
 
       // Mock connection, disconnection, and reconnection
-      let connectionAttempts = 0;
       mockWs.on.mockImplementation((event: string, callback: Function) => {
         if (event === 'open') {
-          connectionAttempts++;
           setTimeout(() => callback(), 0);
         } else if (event === 'close') {
           setTimeout(() => callback(), 10);

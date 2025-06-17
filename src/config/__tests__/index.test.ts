@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { z } from 'zod';
 
 // Mock process.env before importing the config
 const mockEnv = {
