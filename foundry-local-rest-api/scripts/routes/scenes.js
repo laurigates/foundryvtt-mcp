@@ -3,7 +3,7 @@
  */
 
 export class ScenesAPI {
-  
+
   /**
    * Get current active scene information
    * GET /api/scenes/current
@@ -11,7 +11,7 @@ export class ScenesAPI {
   getCurrentScene(req, res) {
     try {
       const currentScene = game.scenes.active;
-      
+
       if (!currentScene) {
         return res.json({
           success: true,
@@ -19,14 +19,14 @@ export class ScenesAPI {
           message: 'No active scene'
         });
       }
-      
+
       const sceneData = this.formatSceneDetail(currentScene);
-      
+
       res.json({
         success: true,
         data: sceneData
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error getting current scene:', error);
       res.status(500).json({
@@ -45,7 +45,7 @@ export class ScenesAPI {
     try {
       const { id } = req.params;
       const scene = game.scenes.get(id);
-      
+
       if (!scene) {
         return res.status(404).json({
           success: false,
@@ -53,14 +53,14 @@ export class ScenesAPI {
           message: `Scene with ID ${id} does not exist`
         });
       }
-      
+
       const sceneData = this.formatSceneDetail(scene);
-      
+
       res.json({
         success: true,
         data: sceneData
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error getting scene:', error);
       res.status(500).json({
@@ -78,9 +78,9 @@ export class ScenesAPI {
   searchScenes(req, res) {
     try {
       const { query, limit = 50 } = req.query;
-      
+
       let scenes = Array.from(game.scenes.values());
-      
+
       // Filter by query if specified (search in name and navigation name)
       if (query) {
         const searchQuery = query.toLowerCase();
@@ -90,20 +90,20 @@ export class ScenesAPI {
           return name.includes(searchQuery) || navName.includes(searchQuery);
         });
       }
-      
+
       // Limit results
       scenes = scenes.slice(0, parseInt(limit));
-      
+
       // Format response
       const results = scenes.map(scene => this.formatSceneSummary(scene));
-      
+
       res.json({
         success: true,
         data: results,
         total: results.length,
         query: { query, limit }
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error searching scenes:', error);
       res.status(500).json({
@@ -144,7 +144,7 @@ export class ScenesAPI {
    */
   formatSceneDetail(scene) {
     const summary = this.formatSceneSummary(scene);
-    
+
     return {
       ...summary,
       // Additional detailed information

@@ -44,7 +44,7 @@ describe('FoundryClient', () => {
         },
       },
     };
-    
+
     mockAxios.create = vi.fn().mockReturnValue(mockAxiosInstance);
     mockWebSocket.mockImplementation(() => ({
       on: vi.fn(),
@@ -80,7 +80,6 @@ describe('FoundryClient', () => {
         timeout: 5000,
         retryAttempts: 5,
         retryDelay: 500,
-        useRestModule: true,
       });
 
       expect(mockAxios.create).toHaveBeenCalledWith({
@@ -121,7 +120,6 @@ describe('FoundryClient', () => {
     it('should determine connection method based on config', () => {
       const restClient = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
       });
 
       expect(restClient).toBeDefined();
@@ -134,9 +132,9 @@ describe('FoundryClient', () => {
         close: vi.fn(),
         readyState: WebSocket.OPEN,
       };
-      
+
       mockWebSocket.mockImplementation(() => mockWs);
-      
+
       // Mock successful connection
       mockWs.on.mockImplementation((event: string, callback: Function) => {
         if (event === 'open') {
@@ -152,7 +150,6 @@ describe('FoundryClient', () => {
     beforeEach(() => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
       });
     });
 
@@ -167,7 +164,7 @@ describe('FoundryClient', () => {
       });
 
       const result = await client.searchActors({ query: 'Hero' });
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
         params: { query: 'Hero' },
       });
@@ -184,12 +181,12 @@ describe('FoundryClient', () => {
         data: { items: mockItems },
       });
 
-      const result = await client.searchItems({ 
-        query: 'Sword', 
+      const result = await client.searchItems({
+        query: 'Sword',
         type: 'weapon',
-        limit: 10 
+        limit: 10
       });
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/items', {
         params: { query: 'Sword', type: 'weapon', limit: 10 },
       });
@@ -209,7 +206,7 @@ describe('FoundryClient', () => {
       });
 
       const result = await client.getWorldInfo();
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
       expect(result).toEqual(mockWorld);
     });
@@ -226,7 +223,6 @@ describe('FoundryClient', () => {
     beforeEach(() => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
         retryAttempts: 3,
         retryDelay: 100,
       });
@@ -239,7 +235,7 @@ describe('FoundryClient', () => {
         .mockResolvedValueOnce({ data: { actors: [] } });
 
       const result = await client.searchActors({ query: 'test' });
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
       expect(result.actors).toEqual([]);
     });
@@ -249,7 +245,7 @@ describe('FoundryClient', () => {
 
       await expect(client.searchActors({ query: 'test' }))
         .rejects.toThrow('Persistent error');
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(4); // Initial + 3 retries
     });
   });
@@ -264,12 +260,11 @@ describe('FoundryClient', () => {
         close: vi.fn(),
         readyState: WebSocket.OPEN,
       };
-      
+
       mockWebSocket.mockImplementation(() => mockWs);
-      
+
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: false,
       });
     });
 
@@ -282,16 +277,16 @@ describe('FoundryClient', () => {
       });
 
       await client.connect();
-      
+
       const message = { type: 'test', data: { hello: 'world' } };
       client.sendMessage(message);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(message));
     });
 
     it('should handle WebSocket events', async () => {
       const eventHandler = vi.fn();
-      
+
       // Mock successful connection and message
       mockWs.on.mockImplementation((event: string, callback: Function) => {
         if (event === 'open') {
@@ -303,10 +298,10 @@ describe('FoundryClient', () => {
 
       await client.connect();
       client.onMessage('test', eventHandler);
-      
+
       // Wait for message to be processed
       await new Promise(resolve => setTimeout(resolve, 20));
-      
+
       expect(eventHandler).toHaveBeenCalled();
     });
 

@@ -3,7 +3,7 @@
  */
 
 export class WorldAPI {
-  
+
   /**
    * Get world information and statistics
    * GET /api/world
@@ -11,12 +11,12 @@ export class WorldAPI {
   getWorldInfo(req, res) {
     try {
       const worldData = this.formatWorldInfo();
-      
+
       res.json({
         success: true,
         data: worldData
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error getting world info:', error);
       res.status(500).json({
@@ -33,7 +33,7 @@ export class WorldAPI {
   formatWorldInfo() {
     const world = game.world;
     const settings = game.settings;
-    
+
     return {
       // Basic world information
       id: world.id,
@@ -45,7 +45,7 @@ export class WorldAPI {
       version: world.version,
       compatibility: world.compatibility,
       authors: world.authors || [],
-      
+
       // System information
       gameSystem: {
         id: game.system.id,
@@ -57,10 +57,10 @@ export class WorldAPI {
         license: game.system.license,
         compatibility: game.system.compatibility
       },
-      
+
       // Foundry VTT version
       foundryVersion: game.version,
-      
+
       // World statistics
       statistics: {
         actors: {
@@ -93,7 +93,7 @@ export class WorldAPI {
           gm: game.users.filter(u => u.isGM).length
         }
       },
-      
+
       // Current session information
       session: {
         userId: game.user.id,
@@ -103,10 +103,10 @@ export class WorldAPI {
         currentTime: new Date().toISOString(),
         paused: game.paused
       },
-      
+
       // Combat information
       combat: this.getCombatInfo(),
-      
+
       // Active modules
       modules: Array.from(game.modules.entries())
         .filter(([id, module]) => module.active)
@@ -116,10 +116,10 @@ export class WorldAPI {
           version: module.version,
           author: module.author
         })),
-      
+
       // World settings (safe subset)
       settings: this.getSafeWorldSettings(),
-      
+
       // Folder structure
       folders: {
         actors: this.getFolderStructure(game.folders.filter(f => f.type === 'Actor')),
@@ -130,7 +130,7 @@ export class WorldAPI {
         macros: this.getFolderStructure(game.folders.filter(f => f.type === 'Macro')),
         playlists: this.getFolderStructure(game.folders.filter(f => f.type === 'Playlist'))
       },
-      
+
       // Compendium packs information
       compendiums: Array.from(game.packs.entries()).map(([key, pack]) => ({
         name: pack.metadata.name,
@@ -150,7 +150,7 @@ export class WorldAPI {
    */
   getActorStatsByType() {
     const stats = {};
-    
+
     game.actors.forEach(actor => {
       const type = actor.type;
       if (!stats[type]) {
@@ -158,7 +158,7 @@ export class WorldAPI {
       }
       stats[type]++;
     });
-    
+
     return stats;
   }
 
@@ -167,7 +167,7 @@ export class WorldAPI {
    */
   getItemStatsByType() {
     const stats = {};
-    
+
     // Count world items
     game.items.forEach(item => {
       const type = item.type;
@@ -176,7 +176,7 @@ export class WorldAPI {
       }
       stats[type]++;
     });
-    
+
     // Count actor items
     game.actors.forEach(actor => {
       actor.items.forEach(item => {
@@ -187,7 +187,7 @@ export class WorldAPI {
         stats[type]++;
       });
     });
-    
+
     return stats;
   }
 
@@ -201,9 +201,9 @@ export class WorldAPI {
         combatId: null
       };
     }
-    
+
     const combat = game.combat;
-    
+
     return {
       active: true,
       combatId: combat.id,
@@ -237,7 +237,7 @@ export class WorldAPI {
    */
   getSafeWorldSettings() {
     const safeSettings = {};
-    
+
     // Get commonly requested game settings that are safe to expose
     const safeKeys = [
       'core.animateRollTable',
@@ -249,7 +249,7 @@ export class WorldAPI {
       'core.time',
       'core.tokenDragPreview'
     ];
-    
+
     safeKeys.forEach(key => {
       try {
         const value = game.settings.get('core', key.replace('core.', ''));
@@ -258,7 +258,7 @@ export class WorldAPI {
         // Setting doesn't exist or isn't accessible
       }
     });
-    
+
     return safeSettings;
   }
 

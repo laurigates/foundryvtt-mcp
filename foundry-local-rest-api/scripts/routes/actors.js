@@ -3,7 +3,7 @@
  */
 
 export class ActorsAPI {
-  
+
   /**
    * Search for actors based on query parameters
    * GET /api/actors?query=name&type=character&limit=10
@@ -11,35 +11,35 @@ export class ActorsAPI {
   searchActors(req, res) {
     try {
       const { query, type, limit = 50 } = req.query;
-      
+
       let actors = Array.from(game.actors.values());
-      
+
       // Filter by type if specified
       if (type) {
         actors = actors.filter(actor => actor.type === type);
       }
-      
+
       // Filter by query if specified (search in name)
       if (query) {
         const searchQuery = query.toLowerCase();
-        actors = actors.filter(actor => 
+        actors = actors.filter(actor =>
           actor.name.toLowerCase().includes(searchQuery)
         );
       }
-      
+
       // Limit results
       actors = actors.slice(0, parseInt(limit));
-      
+
       // Format response
       const results = actors.map(actor => this.formatActorSummary(actor));
-      
+
       res.json({
         success: true,
         data: results,
         total: results.length,
         query: { query, type, limit }
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error searching actors:', error);
       res.status(500).json({
@@ -58,7 +58,7 @@ export class ActorsAPI {
     try {
       const { id } = req.params;
       const actor = game.actors.get(id);
-      
+
       if (!actor) {
         return res.status(404).json({
           success: false,
@@ -66,14 +66,14 @@ export class ActorsAPI {
           message: `Actor with ID ${id} does not exist`
         });
       }
-      
+
       const actorData = this.formatActorDetail(actor);
-      
+
       res.json({
         success: true,
         data: actorData
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error getting actor:', error);
       res.status(500).json({
@@ -89,7 +89,7 @@ export class ActorsAPI {
    */
   formatActorSummary(actor) {
     const system = actor.system || {};
-    
+
     return {
       id: actor.id,
       name: actor.name,
@@ -114,7 +114,7 @@ export class ActorsAPI {
   formatActorDetail(actor) {
     const system = actor.system || {};
     const summary = this.formatActorSummary(actor);
-    
+
     return {
       ...summary,
       // Additional detailed information
@@ -152,7 +152,7 @@ export class ActorsAPI {
    */
   formatAbilities(abilities) {
     const formatted = {};
-    
+
     for (const [key, ability] of Object.entries(abilities)) {
       if (ability && typeof ability === 'object') {
         formatted[key] = {
@@ -163,7 +163,7 @@ export class ActorsAPI {
         };
       }
     }
-    
+
     return formatted;
   }
 
@@ -172,7 +172,7 @@ export class ActorsAPI {
    */
   formatSkills(skills) {
     const formatted = {};
-    
+
     for (const [key, skill] of Object.entries(skills)) {
       if (skill && typeof skill === 'object') {
         formatted[key] = {
@@ -183,7 +183,7 @@ export class ActorsAPI {
         };
       }
     }
-    
+
     return formatted;
   }
 
@@ -193,11 +193,11 @@ export class ActorsAPI {
   formatSpells(actor) {
     const spells = Array.from(actor.items.values())
       .filter(item => item.type === 'spell');
-    
+
     if (spells.length === 0) {
       return null;
     }
-    
+
     // Group spells by level
     const spellsByLevel = {};
     spells.forEach(spell => {
@@ -205,7 +205,7 @@ export class ActorsAPI {
       if (!spellsByLevel[level]) {
         spellsByLevel[level] = [];
       }
-      
+
       spellsByLevel[level].push({
         id: spell.id,
         name: spell.name,
@@ -223,7 +223,7 @@ export class ActorsAPI {
         }
       });
     });
-    
+
     // Get spell slots if available
     const spellcasting = actor.system?.spells || {};
     const slots = {};
@@ -236,7 +236,7 @@ export class ActorsAPI {
         };
       }
     }
-    
+
     return {
       spells: spellsByLevel,
       slots: slots,

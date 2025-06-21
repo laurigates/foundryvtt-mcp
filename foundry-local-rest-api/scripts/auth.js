@@ -16,13 +16,13 @@ export class AuthManager {
     // Generate a cryptographically secure random string
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
-    
+
     // Convert to base64 and make URL-safe
     const apiKey = btoa(String.fromCharCode.apply(null, array))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=/g, '');
-    
+
     this.currentApiKey = apiKey;
     return apiKey;
   }
@@ -44,7 +44,7 @@ export class AuthManager {
     if (!providedKey || !this.currentApiKey) {
       return false;
     }
-    
+
     // Use constant-time comparison to prevent timing attacks
     return this.constantTimeEquals(providedKey, this.currentApiKey);
   }
@@ -59,12 +59,12 @@ export class AuthManager {
     if (a.length !== b.length) {
       return false;
     }
-    
+
     let result = 0;
     for (let i = 0; i < a.length; i++) {
       result |= a.charCodeAt(i) ^ b.charCodeAt(i);
     }
-    
+
     return result === 0;
   }
 

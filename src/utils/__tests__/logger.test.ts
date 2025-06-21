@@ -50,7 +50,7 @@ class Logger {
 
   error(message: string, error?: any): void {
     if (this.shouldLog('error')) {
-      const errorDetails = error instanceof Error 
+      const errorDetails = error instanceof Error
         ? { message: error.message, stack: error.stack }
         : error;
       console.error(this.formatMessage('error', message, errorDetails));
@@ -110,7 +110,7 @@ describe('Logger', () => {
     it('should format messages with timestamp and level', () => {
       const logger = new Logger('debug');
       logger.info('test message');
-      
+
       const call = consoleSpy.info.mock.calls[0][0];
       expect(call).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] INFO: test message$/);
     });
@@ -119,7 +119,7 @@ describe('Logger', () => {
       const logger = new Logger('debug');
       const metadata = { key: 'value', number: 42 };
       logger.info('test message', metadata);
-      
+
       const call = consoleSpy.info.mock.calls[0][0];
       expect(call).toContain('test message');
       expect(call).toContain(JSON.stringify(metadata));
@@ -129,7 +129,7 @@ describe('Logger', () => {
       const logger = new Logger('debug');
       const error = new Error('test error');
       logger.error('test message', error);
-      
+
       const call = consoleSpy.error.mock.calls[0][0];
       expect(call).toContain('test message');
       expect(call).toContain('"message":"test error"');
@@ -142,7 +142,7 @@ describe('Logger', () => {
       const logger = new Logger();
       logger.debug('debug message');
       logger.info('info message');
-      
+
       expect(consoleSpy.debug).not.toHaveBeenCalled();
       expect(consoleSpy.info).toHaveBeenCalledOnce();
     });

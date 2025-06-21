@@ -3,7 +3,7 @@
  */
 
 export class DiceAPI {
-  
+
   /**
    * Roll dice using FoundryVTT's native dice system
    * POST /api/dice/roll
@@ -12,7 +12,7 @@ export class DiceAPI {
   async rollDice(req, res) {
     try {
       const { formula, reason, advantage, disadvantage } = req.body;
-      
+
       if (!formula) {
         return res.status(400).json({
           success: false,
@@ -20,7 +20,7 @@ export class DiceAPI {
           message: 'Formula is required'
         });
       }
-      
+
       // Validate dice formula
       if (!this.isValidDiceFormula(formula)) {
         return res.status(400).json({
@@ -29,23 +29,23 @@ export class DiceAPI {
           message: 'Dice formula contains invalid characters or syntax'
         });
       }
-      
+
       let rollFormula = formula;
-      
+
       // Handle advantage/disadvantage for d20 rolls
       if (advantage && formula.includes('d20')) {
         rollFormula = formula.replace(/(\d*)d20/g, '2d20kh1');
       } else if (disadvantage && formula.includes('d20')) {
         rollFormula = formula.replace(/(\d*)d20/g, '2d20kl1');
       }
-      
+
       // Create and evaluate the roll
       const roll = new Roll(rollFormula);
       await roll.evaluate({ async: true });
-      
+
       // Format the result
       const result = this.formatRollResult(roll, formula, reason, { advantage, disadvantage });
-      
+
       // Optionally send to chat (if requested)
       if (req.body.sendToChat) {
         const chatData = {
@@ -65,15 +65,15 @@ export class DiceAPI {
           type: CONST.CHAT_MESSAGE_TYPES.ROLL,
           roll: roll
         };
-        
+
         ChatMessage.create(chatData);
       }
-      
+
       res.json({
         success: true,
         data: result
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error rolling dice:', error);
       res.status(400).json({
@@ -90,11 +90,11 @@ export class DiceAPI {
   isValidDiceFormula(formula) {
     // Allow only dice notation, numbers, basic math operators, and common keywords
     const validPattern = /^[0-9dDkKlLhH+\-*/() ]+$/;
-    
+
     if (!validPattern.test(formula)) {
       return false;
     }
-    
+
     // Check for basic dice notation
     const dicePattern = /\d*d\d+/i;
     if (!dicePattern.test(formula)) {
@@ -102,7 +102,7 @@ export class DiceAPI {
       const mathPattern = /^[0-9+\-*/() ]+$/;
       return mathPattern.test(formula);
     }
-    
+
     return true;
   }
 
@@ -120,7 +120,7 @@ export class DiceAPI {
       timestamp: new Date().toISOString(),
       options: options
     };
-    
+
     // Process roll terms
     roll.terms.forEach(term => {
       if (term instanceof Die) {
@@ -138,7 +138,7 @@ export class DiceAPI {
           expression: `${term.number}d${term.faces}`,
           modifiers: term.modifiers || []
         };
-        
+
         result.dice.push(dieData);
         result.terms.push({
           type: 'die',
@@ -163,14 +163,14 @@ export class DiceAPI {
         });
       }
     });
-    
+
     // Add roll breakdown for complex rolls
     if (roll.dice.length > 0) {
       result.breakdown = roll.dice.map(die => {
         const results = die.results
           .filter(r => r.active)
           .map(r => r.result);
-        
+
         return {
           dice: `${die.number}d${die.faces}`,
           results: results,
@@ -178,20 +178,20 @@ export class DiceAPI {
         };
       });
     }
-    
+
     // Add critical success/failure information for d20 rolls
     if (roll.dice.some(d => d.faces === 20)) {
       const d20Results = roll.dice
         .filter(d => d.faces === 20)
         .flatMap(d => d.results.filter(r => r.active).map(r => r.result));
-      
+
       result.critical = {
         success: d20Results.some(r => r === 20),
         failure: d20Results.some(r => r === 1),
         naturalRolls: d20Results
       };
     }
-    
+
     return result;
   }
 }

@@ -3,7 +3,7 @@
  */
 
 export class ItemsAPI {
-  
+
   /**
    * Search for items based on query parameters
    * GET /api/items?query=sword&type=weapon&rarity=rare&limit=20
@@ -11,13 +11,13 @@ export class ItemsAPI {
   searchItems(req, res) {
     try {
       const { query, type, rarity, limit = 50 } = req.query;
-      
+
       // Collect items from both world items and actor items
       let items = [];
-      
+
       // Add world items
       items.push(...Array.from(game.items.values()));
-      
+
       // Add items from all actors
       game.actors.forEach(actor => {
         actor.items.forEach(item => {
@@ -28,22 +28,22 @@ export class ItemsAPI {
           });
         });
       });
-      
+
       // Filter by type if specified
       if (type) {
         items = items.filter(item => item.type === type);
       }
-      
+
       // Filter by rarity if specified
       if (rarity) {
         items = items.filter(item => {
-          const itemRarity = item.system?.rarity?.toLowerCase() || 
-                           item.system?.details?.rarity?.toLowerCase() || 
+          const itemRarity = item.system?.rarity?.toLowerCase() ||
+                           item.system?.details?.rarity?.toLowerCase() ||
                            'common';
           return itemRarity === rarity.toLowerCase();
         });
       }
-      
+
       // Filter by query if specified (search in name and description)
       if (query) {
         const searchQuery = query.toLowerCase();
@@ -53,11 +53,11 @@ export class ItemsAPI {
           return name.includes(searchQuery) || description.includes(searchQuery);
         });
       }
-      
+
       // Remove duplicates based on name and type
       const uniqueItems = [];
       const seen = new Set();
-      
+
       items.forEach(item => {
         const key = `${item.name}-${item.type}`;
         if (!seen.has(key)) {
@@ -65,20 +65,20 @@ export class ItemsAPI {
           uniqueItems.push(item);
         }
       });
-      
+
       // Limit results
       const limitedItems = uniqueItems.slice(0, parseInt(limit));
-      
+
       // Format response
       const results = limitedItems.map(item => this.formatItemSummary(item));
-      
+
       res.json({
         success: true,
         data: results,
         total: results.length,
         query: { query, type, rarity, limit }
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error searching items:', error);
       res.status(500).json({
@@ -96,11 +96,11 @@ export class ItemsAPI {
   getItem(req, res) {
     try {
       const { id } = req.params;
-      
+
       // First check world items
       let item = game.items.get(id);
       let owner = null;
-      
+
       // If not found in world items, search actor items
       if (!item) {
         for (const actor of game.actors.values()) {
@@ -112,7 +112,7 @@ export class ItemsAPI {
           }
         }
       }
-      
+
       if (!item) {
         return res.status(404).json({
           success: false,
@@ -120,14 +120,14 @@ export class ItemsAPI {
           message: `Item with ID ${id} does not exist`
         });
       }
-      
+
       const itemData = this.formatItemDetail(item, owner);
-      
+
       res.json({
         success: true,
         data: itemData
       });
-      
+
     } catch (error) {
       console.error('Foundry Local REST API | Error getting item:', error);
       res.status(500).json({
@@ -143,7 +143,7 @@ export class ItemsAPI {
    */
   formatItemSummary(item) {
     const system = item.system || {};
-    
+
     return {
       id: item.id,
       name: item.name,
@@ -174,12 +174,12 @@ export class ItemsAPI {
   formatItemDetail(item, owner = null) {
     const system = item.system || {};
     const summary = this.formatItemSummary(item);
-    
+
     // Override owner if provided
     if (owner) {
       summary.owner = owner;
     }
-    
+
     return {
       ...summary,
       // Additional detailed information
@@ -243,7 +243,7 @@ export class ItemsAPI {
   formatItemProperties(item) {
     const system = item.system || {};
     const properties = {};
-    
+
     // Weapon properties
     if (system.properties) {
       Object.keys(system.properties).forEach(prop => {
@@ -252,22 +252,22 @@ export class ItemsAPI {
         }
       });
     }
-    
+
     // Armor properties
     if (system.armor) {
       properties.armor = true;
     }
-    
+
     // Magic item properties
     if (system.rarity && system.rarity !== 'common') {
       properties.magical = true;
     }
-    
+
     // Consumable properties
     if (item.type === 'consumable') {
       properties.consumable = true;
     }
-    
+
     return properties;
   }
 
@@ -276,10 +276,10 @@ export class ItemsAPI {
    */
   formatDamage(system) {
     if (!system.damage) return null;
-    
+
     const parts = system.damage.parts || [];
     const versatile = system.damage.versatile || '';
-    
+
     return {
       parts: parts.map(([formula, type]) => ({
         formula,
@@ -295,7 +295,7 @@ export class ItemsAPI {
    */
   formatArmor(system) {
     if (!system.armor) return null;
-    
+
     return {
       type: system.armor.type || '',
       value: system.armor.value || 0,
@@ -309,7 +309,7 @@ export class ItemsAPI {
    */
   formatWeapon(system) {
     if (system.weaponType === undefined && system.actionType === undefined) return null;
-    
+
     return {
       weaponType: system.weaponType || '',
       actionType: system.actionType || '',
@@ -327,7 +327,7 @@ export class ItemsAPI {
    */
   formatConsumable(system) {
     if (!system.consumableType && !system.consume) return null;
-    
+
     return {
       type: system.consumableType || '',
       subtype: system.consumableSubtype || '',
@@ -341,7 +341,7 @@ export class ItemsAPI {
    */
   formatSpell(system) {
     if (!system.level && system.level !== 0) return null;
-    
+
     return {
       level: system.level,
       school: system.school || '',

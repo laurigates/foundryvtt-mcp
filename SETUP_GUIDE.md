@@ -42,7 +42,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 
 **Features Available**:
 - ✅ Search actors, items, scenes
-- ✅ Get detailed actor/item information  
+- ✅ Get detailed actor/item information
 - ✅ Dice rolling with FoundryVTT engine
 - ✅ World and scene information
 - ✅ Real-time data access
@@ -87,7 +87,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 
 #### For REST API Module:
 1. Go to **Add-on Modules** in FoundryVTT
-2. Install **"Foundry REST API"** 
+2. Install **"Foundry REST API"**
 3. Enable the module in your world
 4. Configure module settings with your API key
 5. Restart FoundryVTT

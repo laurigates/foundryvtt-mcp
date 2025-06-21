@@ -215,7 +215,7 @@ export class CharacterManager extends EventEmitter {
 
     const resources = this.resourceTracking.get(actorId)!;
     const existingIndex = resources.findIndex(r => r.resource === resourceName);
-    
+
     if (existingIndex >= 0) {
       resources[existingIndex] = resource;
     } else {
@@ -228,10 +228,14 @@ export class CharacterManager extends EventEmitter {
 
   async useResource(actorId: string, resourceName: string, amount: number = 1): Promise<ResourceManagement | null> {
     const resources = this.resourceTracking.get(actorId);
-    if (!resources) return null;
+    if (!resources) {
+      return null;
+    }
 
     const resource = resources.find(r => r.resource === resourceName);
-    if (!resource) return null;
+    if (!resource) {
+      return null;
+    }
 
     if (resource.currentValue >= amount) {
       resource.currentValue -= amount;
@@ -249,7 +253,7 @@ export class CharacterManager extends EventEmitter {
     const restoredResources: ResourceManagement[] = [];
 
     for (const resource of resources) {
-      if (resource.resetType === restType || 
+      if (resource.resetType === restType ||
           (restType === 'long_rest' && resource.resetType === 'short_rest')) {
         resource.currentValue = resource.maxValue;
         resource.lastReset = new Date();
@@ -259,4 +263,46 @@ export class CharacterManager extends EventEmitter {
 
     if (restoredResources.length > 0) {
       this.emit('resources_restored', { actorId, restType, resources: restoredResources });
-      logger.info(`Restored ${restoredResources.length} resources for ${actorId} after ${
+      logger.info(`Restored ${restoredResources.length} resources for ${actorId} after ${restType} rest`);
+    }
+  }
+
+  // Helper methods for the character advancement system
+  private calculateHitPointGain(actor: FoundryActor, method: 'roll' | 'average' | 'max'): number {
+    const hitDie = 8; // Default d8, would be determined by class
+    switch (method) {
+      case 'roll':
+        return Math.floor(Math.random() * hitDie) + 1;
+      case 'average':
+        return Math.floor(hitDie / 2) + 1;
+      case 'max':
+        return hitDie;
+      default:
+        return Math.floor(hitDie / 2) + 1;
+    }
+  }
+
+  private suggestAbilityImprovements(_actor: FoundryActor): Array<{ ability: string; increase: number }> {
+    // Simple suggestion logic - would be more sophisticated in practice
+    return [{ ability: 'strength', increase: 1 }, { ability: 'constitution', increase: 1 }];
+  }
+
+  private determineNewSpells(_actor: FoundryActor, _level: number): string[] {
+    // Would integrate with spell system
+    return [];
+  }
+
+  private determineNewFeatures(_actor: FoundryActor, _level: number): string[] {
+    // Would integrate with class feature system
+    return [];
+  }
+
+  private determineNewSkills(_actor: FoundryActor, _level: number): string[] {
+    // Would integrate with skill system
+    return [];
+  }
+
+  private generateItemId(): string {
+    return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}

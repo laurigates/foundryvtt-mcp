@@ -45,7 +45,7 @@ This repository includes several GitHub Actions workflows for automated document
 1. Run the setup workflow manually:
    - Go to **Actions** → **Setup Documentation Site** → **Run workflow**
 2. Enable GitHub Pages:
-   - Go to **Settings** → **Pages** 
+   - Go to **Settings** → **Pages**
    - Set Source to "GitHub Actions"
 3. Documentation will be available at `https://[username].github.io/[repository]/`
 
@@ -99,7 +99,7 @@ npm run docs:serve  # Generate and serve locally
 .github/
 ├── workflows/
 │   ├── docs.yml           # GitHub Pages deployment
-│   ├── update-docs.yml    # Repository commit workflow  
+│   ├── update-docs.yml    # Repository commit workflow
 │   └── setup-docs.yml     # One-time setup helper
 └── DOCUMENTATION.md       # This file
 
