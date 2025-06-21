@@ -1,10 +1,10 @@
 /**
  * @fileoverview TypeScript type definitions for FoundryVTT data structures
- * 
+ *
  * This module contains comprehensive type definitions for all FoundryVTT entities
  * including actors, items, scenes, tokens, and other game objects. These types
  * provide type safety and intellisense when working with FoundryVTT data.
- * 
+ *
  * @version 0.1.0
  * @author FoundryVTT MCP Team
  * @see {@link https://foundryvtt.com/api/} FoundryVTT API Documentation
@@ -14,11 +14,11 @@
 
 /**
  * Represents an actor (character, NPC, or creature) in FoundryVTT
- * 
+ *
  * Actors are the primary entities that represent characters, NPCs, monsters,
  * and other creatures in the game world. This interface covers the common
  * properties shared across different game systems.
- * 
+ *
  * @interface FoundryActor
  * @example
  * ```typescript
@@ -70,10 +70,10 @@ export interface FoundryActor {
 
 /**
  * Represents an item (weapon, armor, spell, etc.) in FoundryVTT
- * 
+ *
  * Items represent equipment, spells, features, and other objects that can be
  * owned by actors or exist independently in the game world.
- * 
+ *
  * @interface FoundryItem
  * @example
  * ```typescript
@@ -141,10 +141,10 @@ export interface FoundryItem {
 
 /**
  * Represents a scene (map/battleground) in FoundryVTT
- * 
+ *
  * Scenes are the visual environments where gameplay takes place, containing
  * background images, tokens, lighting, walls, and other elements.
- * 
+ *
  * @interface FoundryScene
  * @example
  * ```typescript
@@ -201,10 +201,10 @@ export interface FoundryScene {
 
 /**
  * Represents a token on a scene in FoundryVTT
- * 
+ *
  * Tokens are the visual representations of actors placed on scenes.
  * They contain position, appearance, and gameplay-related information.
- * 
+ *
  * @interface FoundryToken
  * @example
  * ```typescript
@@ -248,10 +248,10 @@ export interface FoundryToken {
 
 /**
  * Represents a wall segment in a FoundryVTT scene
- * 
+ *
  * Walls control movement, vision, and sound propagation in scenes.
  * They define the physical boundaries and obstacles in the environment.
- * 
+ *
  * @interface FoundryWall
  */
 export interface FoundryWall {
@@ -266,10 +266,10 @@ export interface FoundryWall {
 
 /**
  * Represents a light source in a FoundryVTT scene
- * 
+ *
  * Light sources provide illumination and create atmospheric effects
  * in scenes, affecting token vision and creating ambiance.
- * 
+ *
  * @interface FoundryLight
  */
 export interface FoundryLight {
@@ -294,10 +294,10 @@ export interface FoundryLight {
 
 /**
  * Represents an ambient sound in a FoundryVTT scene
- * 
+ *
  * Sound objects provide audio atmosphere and effects in scenes,
  * with positional audio and volume controls.
- * 
+ *
  * @interface FoundrySound
  */
 export interface FoundrySound {
@@ -313,10 +313,10 @@ export interface FoundrySound {
 
 /**
  * Represents a drawing/annotation in a FoundryVTT scene
- * 
+ *
  * Drawings allow GMs and players to add visual annotations,
  * shapes, and text directly onto scenes.
- * 
+ *
  * @interface FoundryDrawing
  */
 export interface FoundryDrawing {
@@ -342,10 +342,10 @@ export interface FoundryDrawing {
 
 /**
  * Represents world information in FoundryVTT
- * 
+ *
  * Contains metadata about the current game world including
  * system information, modules, and world settings.
- * 
+ *
  * @interface FoundryWorld
  * @example
  * ```typescript
@@ -455,10 +455,10 @@ export interface FoundryCombat {
 
 /**
  * Represents the result of a dice roll in FoundryVTT
- * 
+ *
  * Contains all information about a completed dice roll including
  * the formula used, total result, breakdown, and metadata.
- * 
+ *
  * @interface DiceRoll
  * @example
  * ```typescript
@@ -494,10 +494,10 @@ export interface FoundryUser {
 // Search and filter interfaces
 /**
  * Result structure for actor search operations
- * 
+ *
  * Contains paginated search results for actor queries
  * along with metadata about the search.
- * 
+ *
  * @interface ActorSearchResult
  * @example
  * ```typescript
@@ -518,10 +518,10 @@ export interface ActorSearchResult {
 
 /**
  * Result structure for item search operations
- * 
+ *
  * Contains paginated search results for item queries
  * along with metadata about the search.
- * 
+ *
  * @interface ItemSearchResult
  * @example
  * ```typescript
@@ -543,10 +543,10 @@ export interface ItemSearchResult {
 // API Response types
 /**
  * Generic API response structure for FoundryVTT REST API
- * 
+ *
  * Standardized response format for API calls including
  * success status, data payload, and error information.
- * 
+ *
  * @interface FoundryAPIResponse
  * @template T - Type of the response data
  * @example
@@ -568,10 +568,10 @@ export interface FoundryAPIResponse<T = any> {
 // WebSocket message types
 /**
  * Structure for WebSocket messages exchanged with FoundryVTT
- * 
+ *
  * Defines the format for real-time communication messages
  * between the MCP server and FoundryVTT.
- * 
+ *
  * @interface FoundryWebSocketMessage
  * @example
  * ```typescript
@@ -593,10 +593,10 @@ export interface FoundryWebSocketMessage {
 // Content generation types
 /**
  * Structure for AI-generated NPC data
- * 
+ *
  * Contains all information needed to create a complete NPC
  * including personality, appearance, and background details.
- * 
+ *
  * @interface GeneratedNPC
  * @example
  * ```typescript

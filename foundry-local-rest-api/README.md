@@ -60,7 +60,7 @@ All endpoints (except `/api/status`) require authentication via API key:
 # Header method (recommended)
 curl -H "x-api-key: YOUR_API_KEY" http://localhost:30000/api/actors
 
-# Bearer token method  
+# Bearer token method
 curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:30000/api/actors
 ```
 
@@ -261,7 +261,7 @@ async function rollInitiative() {
       reason: 'Initiative'
     })
   });
-  
+
   const result = await response.json();
   console.log(`Initiative: ${result.data.total}`);
 }
@@ -276,12 +276,12 @@ class FoundryAPI:
     def __init__(self, base_url, api_key):
         self.base_url = base_url
         self.headers = {'x-api-key': api_key}
-    
+
     def search_actors(self, query, actor_type=None):
         params = {'query': query}
         if actor_type:
             params['type'] = actor_type
-            
+
         response = requests.get(
             f"{self.base_url}/actors",
             headers=self.headers,

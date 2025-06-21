@@ -9,6 +9,7 @@ import { ItemsAPI } from './routes/items.js';
 import { DiceAPI } from './routes/dice.js';
 import { ScenesAPI } from './routes/scenes.js';
 import { WorldAPI } from './routes/world.js';
+import { DiagnosticsAPI } from './routes/diagnostics.js';
 
 class FoundryLocalRestAPI {
   constructor() {
@@ -22,13 +23,13 @@ class FoundryLocalRestAPI {
    */
   static initialize() {
     console.log('Foundry Local REST API | Initializing module');
-    
+
     // Create global instance
     window.foundryLocalRestAPI = new FoundryLocalRestAPI();
-    
+
     // Register module settings
     window.foundryLocalRestAPI.registerSettings();
-    
+
     // Start API server if enabled
     Hooks.once('ready', () => {
       window.foundryLocalRestAPI.onReady();
@@ -82,16 +83,16 @@ class FoundryLocalRestAPI {
    */
   onReady() {
     console.log('Foundry Local REST API | FoundryVTT ready');
-    
+
     // Initialize auth manager
     const apiKey = game.settings.get('foundry-local-rest-api', 'api-key');
     this.authManager.setApiKey(apiKey);
-    
+
     // Generate API key if none exists
     if (!apiKey) {
       this.generateApiKey();
     }
-    
+
     // Start server if enabled
     const isEnabled = game.settings.get('foundry-local-rest-api', 'enable-api');
     if (isEnabled) {
@@ -105,11 +106,11 @@ class FoundryLocalRestAPI {
   generateApiKey() {
     const apiKey = this.authManager.generateApiKey();
     game.settings.set('foundry-local-rest-api', 'api-key', apiKey);
-    
+
     ui.notifications.info(
       game.i18n.format('foundry-local-rest-api.notifications.api-key-generated', { key: apiKey })
     );
-    
+
     console.log('Foundry Local REST API | Generated new API key:', apiKey);
   }
 
@@ -123,17 +124,17 @@ class FoundryLocalRestAPI {
     }
 
     console.log('Foundry Local REST API | Starting server...');
-    
+
     try {
       // Hook into FoundryVTT's Express server
       this.setupRoutes();
       this.isEnabled = true;
-      
+
       const port = game.socket.socket.io.engine.port;
       ui.notifications.info(
         game.i18n.format('foundry-local-rest-api.notifications.api-enabled', { port })
       );
-      
+
       console.log(`Foundry Local REST API | Server started on port ${port}`);
     } catch (error) {
       console.error('Foundry Local REST API | Failed to start server:', error);
@@ -152,7 +153,7 @@ class FoundryLocalRestAPI {
 
     console.log('Foundry Local REST API | Stopping server...');
     this.isEnabled = false;
-    
+
     ui.notifications.info(
       game.i18n.localize('foundry-local-rest-api.notifications.api-disabled')
     );
@@ -164,7 +165,7 @@ class FoundryLocalRestAPI {
   setupRoutes() {
     // Access FoundryVTT's Express app
     const app = game.socket.socket.io.httpServer;
-    
+
     if (!app) {
       throw new Error('Cannot access FoundryVTT HTTP server');
     }
@@ -172,19 +173,19 @@ class FoundryLocalRestAPI {
     // Middleware for API authentication
     const authenticate = (req, res, next) => {
       const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-      
+
       if (!this.authManager.validateApiKey(apiKey)) {
         const logRequests = game.settings.get('foundry-local-rest-api', 'log-requests');
         if (logRequests) {
           console.log('Foundry Local REST API | Unauthorized request:', req.url);
         }
-        
-        return res.status(401).json({ 
-          error: 'Unauthorized', 
-          message: 'Valid API key required' 
+
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Valid API key required'
         });
       }
-      
+
       next();
     };
 
@@ -208,6 +209,7 @@ class FoundryLocalRestAPI {
     const diceAPI = new DiceAPI();
     const scenesAPI = new ScenesAPI();
     const worldAPI = new WorldAPI();
+    const diagnosticsAPI = new DiagnosticsAPI();
 
     // Status endpoint (no auth required)
     app.get('/api/status', (req, res) => {
@@ -224,7 +226,7 @@ class FoundryLocalRestAPI {
     app.get('/api/actors', (req, res) => actorsAPI.searchActors(req, res));
     app.get('/api/actors/:id', (req, res) => actorsAPI.getActor(req, res));
 
-    // Items endpoints  
+    // Items endpoints
     app.get('/api/items', (req, res) => itemsAPI.searchItems(req, res));
     app.get('/api/items/:id', (req, res) => itemsAPI.getItem(req, res));
 
@@ -238,6 +240,12 @@ class FoundryLocalRestAPI {
 
     // World endpoints
     app.get('/api/world', (req, res) => worldAPI.getWorldInfo(req, res));
+
+    // Diagnostics endpoints
+    app.get('/api/diagnostics/logs', (req, res) => diagnosticsAPI.getRecentLogs(req, res));
+    app.get('/api/diagnostics/search', (req, res) => diagnosticsAPI.searchLogs(req, res));
+    app.get('/api/diagnostics/health', (req, res) => diagnosticsAPI.getSystemHealth(req, res));
+    app.get('/api/diagnostics/errors', (req, res) => diagnosticsAPI.diagnoseErrors(req, res));
 
     console.log('Foundry Local REST API | Routes registered');
   }

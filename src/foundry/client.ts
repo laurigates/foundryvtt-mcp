@@ -1,9 +1,9 @@
 /**
  * @fileoverview FoundryVTT client for API communication and WebSocket connections
- * 
+ *
  * This module provides a comprehensive client for interacting with FoundryVTT instances
  * through both REST API (via optional module) and WebSocket connections.
- * 
+ *
  * @version 0.1.0
  * @author FoundryVTT MCP Team
  */
@@ -15,13 +15,12 @@ import { FoundryActor, FoundryScene, FoundryWorld, DiceRoll, ActorSearchResult, 
 
 /**
  * Configuration interface for FoundryVTT client connection settings
- * 
+ *
  * @interface FoundryClientConfig
  * @example
  * ```typescript
  * const config: FoundryClientConfig = {
  *   baseUrl: 'http://localhost:30000',
- *   useRestModule: true,
  *   apiKey: 'your-api-key',
  *   timeout: 10000
  * };
@@ -42,15 +41,13 @@ export interface FoundryClientConfig {
   retryAttempts?: number;
   /** Delay between retry attempts in milliseconds (default: 1000) */
   retryDelay?: number;
-  /** Whether to use the Foundry REST API module (default: false) */
-  useRestModule?: boolean;
   /** Custom WebSocket path (default: '/socket.io/') */
   socketPath?: string;
 }
 
 /**
  * Parameters for searching actors in FoundryVTT
- * 
+ *
  * @interface SearchActorsParams
  * @example
  * ```typescript
@@ -72,7 +69,7 @@ export interface SearchActorsParams {
 
 /**
  * Parameters for searching items in FoundryVTT
- * 
+ *
  * @interface SearchItemsParams
  * @example
  * ```typescript
@@ -97,20 +94,19 @@ export interface SearchItemsParams {
 
 /**
  * Client for communicating with FoundryVTT instances
- * 
+ *
  * This class provides methods for interacting with FoundryVTT through both REST API
  * and WebSocket connections. It supports dice rolling, actor/item searching,
  * scene management, and real-time updates.
- * 
+ *
  * @class FoundryClient
  * @example
  * ```typescript
  * const client = new FoundryClient({
  *   baseUrl: 'http://localhost:30000',
- *   useRestModule: true,
  *   apiKey: 'your-api-key'
  * });
- * 
+ *
  * await client.connect();
  * const actors = await client.searchActors({ query: 'Hero' });
  * const diceResult = await client.rollDice('1d20+5', 'Attack roll');
@@ -126,13 +122,13 @@ export class FoundryClient {
 
   /**
    * Creates a new FoundryClient instance
-   * 
+   *
    * @param config - Configuration object for the client
    * @example
    * ```typescript
    * const client = new FoundryClient({
    *   baseUrl: 'http://localhost:30000',
-   *   useRestModule: true,
+   *   apiKey: 'your-api-key',
    *   timeout: 15000
    * });
    * ```
@@ -142,13 +138,12 @@ export class FoundryClient {
       timeout: 10000,
       retryAttempts: 3,
       retryDelay: 1000,
-      useRestModule: false,
       socketPath: '/socket.io/',
       ...config,
     };
 
     // Determine connection method based on configuration
-    if (this.config.useRestModule && this.config.apiKey) {
+    if (this.config.apiKey) {
       this.connectionMethod = 'rest';
     } else if (this.config.username && this.config.password) {
       this.connectionMethod = 'hybrid'; // WebSocket + potential auth
@@ -176,8 +171,8 @@ export class FoundryClient {
   private setupHttpInterceptors(): void {
     // Request interceptor for authentication
     this.http.interceptors.request.use((config) => {
-      if (this.config.useRestModule && this.config.apiKey) {
-        // Use x-api-key header for REST API module
+      if (this.config.apiKey) {
+        // Use x-api-key header for local REST API module
         config.headers['x-api-key'] = this.config.apiKey;
       } else if (this.sessionToken) {
         config.headers.Authorization = `Bearer ${this.sessionToken}`;
@@ -200,7 +195,7 @@ export class FoundryClient {
 
   /**
    * Tests the connection to FoundryVTT server
-   * 
+   *
    * @returns Promise that resolves to true if connection is successful
    * @throws {Error} If connection fails
    * @example
@@ -216,7 +211,7 @@ export class FoundryClient {
   async testConnection(): Promise<boolean> {
     try {
       logger.debug('Testing connection to FoundryVTT...');
-      
+
       // Try to authenticate if we have credentials
       if (this.config.username && this.config.password) {
         await this.authenticate();
@@ -234,13 +229,13 @@ export class FoundryClient {
 
   /**
    * Handles incoming WebSocket messages from FoundryVTT
-   * 
+   *
    * @param message - The WebSocket message object
    * @private
    */
   private handleWebSocketMessage(message: any): void {
     logger.debug('WebSocket message received:', message);
-    
+
     // Handle different message types
     switch (message.type) {
       case 'combatUpdate':
@@ -259,9 +254,9 @@ export class FoundryClient {
 
   /**
    * Disconnects from FoundryVTT server
-   * 
+   *
    * Closes WebSocket connection and resets connection state.
-   * 
+   *
    * @returns Promise that resolves when disconnection is complete
    * @example
    * ```typescript
@@ -280,7 +275,7 @@ export class FoundryClient {
 
   /**
    * Checks if client is currently connected to FoundryVTT
-   * 
+   *
    * @returns True if connected, false otherwise
    * @example
    * ```typescript
@@ -295,9 +290,9 @@ export class FoundryClient {
 
   /**
    * Establishes connection to FoundryVTT server
-   * 
+   *
    * Uses either REST API or WebSocket connection based on configuration.
-   * 
+   *
    * @returns Promise that resolves when connection is established
    * @throws {Error} If connection fails
    * @example
@@ -307,14 +302,14 @@ export class FoundryClient {
    * ```
    */
   async connect(): Promise<void> {
-    if (this.config.useRestModule) {
-      // For REST API, just test the connection
+    if (this.config.apiKey) {
+      // For local REST API module, test the connection
       try {
         await this.http.get('/api/status');
         this._isConnected = true;
-        logger.info('Connected to FoundryVTT via REST API');
+        logger.info('Connected to FoundryVTT via local REST API module');
       } catch (error) {
-        logger.error('Failed to connect via REST API:', error);
+        logger.error('Failed to connect via local REST API module:', error);
         throw error;
       }
     } else {
@@ -325,7 +320,7 @@ export class FoundryClient {
 
   /**
    * Sends a message via WebSocket connection
-   * 
+   *
    * @param message - Message object to send
    * @example
    * ```typescript
@@ -345,7 +340,7 @@ export class FoundryClient {
 
   /**
    * Registers a message handler for specific WebSocket message types
-   * 
+   *
    * @param type - Message type to handle
    * @param handler - Function to call when message is received
    * @example
@@ -367,7 +362,7 @@ export class FoundryClient {
 
   /**
    * Authenticates with FoundryVTT using username and password
-   * 
+   *
    * @private
    * @returns Promise that resolves when authentication is complete
    * @throws {Error} If authentication fails or credentials are missing
@@ -393,7 +388,7 @@ export class FoundryClient {
 
   /**
    * Rolls dice using FoundryVTT's dice system
-   * 
+   *
    * @param formula - Dice formula in standard notation (e.g., '1d20+5', '3d6')
    * @param reason - Optional reason for the roll
    * @returns Promise resolving to dice roll result
@@ -406,8 +401,8 @@ export class FoundryClient {
   async rollDice(formula: string, reason?: string): Promise<DiceRoll> {
     try {
       logger.debug('Rolling dice', { formula, reason });
-      
-      if (this.config.useRestModule) {
+
+      if (this.config.apiKey) {
         // Use REST API module if available
         const response = await this.http.post('/api/dice/roll', {
           formula,
@@ -433,7 +428,7 @@ export class FoundryClient {
 
   /**
    * Performs fallback dice rolling when REST API is unavailable
-   * 
+   *
    * @private
    * @param formula - Dice formula to roll
    * @param reason - Optional reason for the roll
@@ -444,22 +439,22 @@ export class FoundryClient {
     const diceRegex = /(\d+)d(\d+)([+\-]\d+)?/g;
     let total = 0;
     const breakdown: string[] = [];
-    
+
     let match;
     while ((match = diceRegex.exec(formula)) !== null) {
       const [, numDice, numSides, modifier] = match;
       const diceCount = parseInt(numDice);
       const sides = parseInt(numSides);
       const mod = modifier ? parseInt(modifier) : 0;
-      
+
       const rolls: number[] = [];
       for (let i = 0; i < diceCount; i++) {
         rolls.push(Math.floor(Math.random() * sides) + 1);
       }
-      
+
       const rollSum = rolls.reduce((sum, roll) => sum + roll, 0) + mod;
       total += rollSum;
-      
+
       breakdown.push(`${rolls.join(', ')}${mod !== 0 ? ` ${modifier}` : ''} = ${rollSum}`);
     }
 
@@ -474,7 +469,7 @@ export class FoundryClient {
 
   /**
    * Searches for actors in FoundryVTT
-   * 
+   *
    * @param params - Search parameters
    * @returns Promise resolving to search results
    * @example
@@ -490,8 +485,8 @@ export class FoundryClient {
   async searchActors(params: SearchActorsParams): Promise<ActorSearchResult> {
     try {
       logger.debug('Searching actors', params);
-      
-      if (this.config.useRestModule) {
+
+      if (this.config.apiKey) {
         const queryParams = new URLSearchParams();
         if (params.query) {
           queryParams.append('search', params.query);
@@ -518,7 +513,7 @@ export class FoundryClient {
 
   /**
    * Retrieves detailed information about a specific actor
-   * 
+   *
    * @param actorId - The ID of the actor to retrieve
    * @returns Promise resolving to actor data
    * @throws {Error} If actor is not found
@@ -530,7 +525,7 @@ export class FoundryClient {
    */
   async getActor(actorId: string): Promise<FoundryActor> {
     try {
-      if (this.config.useRestModule) {
+      if (this.config.apiKey) {
         const response = await this.http.get(`/api/actors/${actorId}`);
         return response.data;
       } else {
@@ -544,7 +539,7 @@ export class FoundryClient {
 
   /**
    * Searches for items in FoundryVTT
-   * 
+   *
    * @param params - Search parameters
    * @returns Promise resolving to search results
    * @example
@@ -560,8 +555,8 @@ export class FoundryClient {
   async searchItems(params: SearchItemsParams): Promise<ItemSearchResult> {
     try {
       logger.debug('Searching items', params);
-      
-      if (this.config.useRestModule) {
+
+      if (this.config.apiKey) {
         const response = await this.http.get(`/api/items`, { params });
         return response.data;
       } else {
@@ -576,7 +571,7 @@ export class FoundryClient {
 
   /**
    * Retrieves the current active scene or a specific scene by ID
-   * 
+   *
    * @param sceneId - Optional scene ID. If not provided, returns current scene
    * @returns Promise resolving to scene data
    * @throws {Error} If scene is not found
@@ -584,13 +579,13 @@ export class FoundryClient {
    * ```typescript
    * const currentScene = await client.getCurrentScene();
    * console.log(`Current scene: ${currentScene.name}`);
-   * 
+   *
    * const specificScene = await client.getCurrentScene('scene-id-123');
    * ```
    */
   async getCurrentScene(sceneId?: string): Promise<FoundryScene> {
     try {
-      if (this.config.useRestModule) {
+      if (this.config.apiKey) {
         const endpoint = sceneId ? `/api/scenes/${sceneId}` : '/api/scenes/current';
         const response = await this.http.get(endpoint);
         return response.data;
@@ -619,7 +614,7 @@ export class FoundryClient {
 
   /**
    * Retrieves a specific scene by ID
-   * 
+   *
    * @param sceneId - The ID of the scene to retrieve
    * @returns Promise resolving to scene data
    * @example
@@ -634,7 +629,7 @@ export class FoundryClient {
 
   /**
    * Retrieves information about the current world
-   * 
+   *
    * @returns Promise resolving to world information
    * @throws {Error} If world information cannot be retrieved
    * @example
@@ -645,7 +640,7 @@ export class FoundryClient {
    */
   async getWorldInfo(): Promise<FoundryWorld> {
     try {
-      if (this.config.useRestModule) {
+      if (this.config.apiKey) {
         const response = await this.http.get('/api/world');
         return response.data;
       } else {
@@ -670,7 +665,7 @@ export class FoundryClient {
 
   /**
    * Establishes WebSocket connection to FoundryVTT
-   * 
+   *
    * @private
    * @returns Promise that resolves when WebSocket connection is established
    * @throws {Error} If WebSocket connection fails
@@ -681,10 +676,10 @@ export class FoundryClient {
     }
 
     const wsUrl = this.config.baseUrl.replace(/^http/, 'ws') + '/socket.io/';
-    
+
     try {
       this.ws = new WebSocket(wsUrl);
-      
+
       this.ws.on('open', () => {
         logger.info('WebSocket connected to FoundryVTT');
       });
@@ -709,6 +704,82 @@ export class FoundryClient {
       });
     } catch (error) {
       logger.error('WebSocket connection failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Makes a GET request to the FoundryVTT server
+   *
+   * @param url - The URL path to request
+   * @param config - Optional axios request configuration
+   * @returns Promise resolving to the response
+   * @example
+   * ```typescript
+   * const response = await client.get('/api/diagnostics/health');
+   * console.log(response.data);
+   * ```
+   */
+  async get(url: string, config?: any): Promise<any> {
+    try {
+      return await this.http.get(url, config);
+    } catch (error) {
+      logger.error(`GET request to ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Makes a POST request to the FoundryVTT server
+   *
+   * @param url - The URL path to request
+   * @param data - The data to send in the request body
+   * @param config - Optional axios request configuration
+   * @returns Promise resolving to the response
+   * @example
+   * ```typescript
+   * const response = await client.post('/api/dice/roll', { formula: '1d20' });
+   * console.log(response.data);
+   * ```
+   */
+  async post(url: string, data?: any, config?: any): Promise<any> {
+    try {
+      return await this.http.post(url, data, config);
+    } catch (error) {
+      logger.error(`POST request to ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Makes a PUT request to the FoundryVTT server
+   *
+   * @param url - The URL path to request
+   * @param data - The data to send in the request body
+   * @param config - Optional axios request configuration
+   * @returns Promise resolving to the response
+   */
+  async put(url: string, data?: any, config?: any): Promise<any> {
+    try {
+      return await this.http.put(url, data, config);
+    } catch (error) {
+      logger.error(`PUT request to ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Makes a DELETE request to the FoundryVTT server
+   *
+   * @param url - The URL path to request
+   * @param config - Optional axios request configuration
+   * @returns Promise resolving to the response
+   */
+  async delete(url: string, config?: any): Promise<any> {
+    try {
+      return await this.http.delete(url, config);
+    } catch (error) {
+      logger.error(`DELETE request to ${url} failed:`, error);
       throw error;
     }
   }

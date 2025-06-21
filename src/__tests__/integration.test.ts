@@ -39,8 +39,7 @@ describe('Integration Tests', () => {
         client = new FoundryClient({
           baseUrl: 'http://localhost:30000',
           apiKey: 'test-key',
-          useRestModule: true,
-          timeout: 5000,
+            timeout: 5000,
         });
       }).not.toThrow();
 
@@ -50,7 +49,6 @@ describe('Integration Tests', () => {
     it('should handle connection lifecycle', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
       });
 
       // Mock successful connection
@@ -65,7 +63,7 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await expect(client.connect()).resolves.not.toThrow();
@@ -78,7 +76,6 @@ describe('Integration Tests', () => {
     it('should handle API operations with proper error handling', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
         retryAttempts: 2,
         retryDelay: 100,
       });
@@ -87,8 +84,8 @@ describe('Integration Tests', () => {
       const mockAxiosInstance = {
         get: vi.fn()
           .mockRejectedValueOnce(new Error('Temporary error'))
-          .mockResolvedValueOnce({ 
-            data: { 
+          .mockResolvedValueOnce({
+            data: {
               actors: [
                 { _id: '1', name: 'Test Actor', type: 'character' }
               ]
@@ -99,13 +96,13 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await client.connect();
-      
+
       const result = await client.searchActors({ query: 'Test' });
-      
+
       expect(result.actors).toHaveLength(1);
       expect(result.actors[0].name).toBe('Test Actor');
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2); // First failed, second succeeded
@@ -145,7 +142,7 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: false, // Use WebSocket
+        // Use WebSocket connection (no API key)
       });
 
       // Mock successful WebSocket connection
@@ -156,11 +153,11 @@ describe('Integration Tests', () => {
       });
 
       await expect(client.connect()).resolves.not.toThrow();
-      
+
       // Test message sending
       const testMessage = { type: 'ping', data: { timestamp: Date.now() } };
       client.sendMessage(testMessage);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(testMessage));
     });
 
@@ -177,7 +174,6 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: false,
         retryAttempts: 3,
         retryDelay: 50,
       });
@@ -204,7 +200,6 @@ describe('Integration Tests', () => {
     it('should process complete actor search workflow', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
       });
 
       const mockAxios = await import('axios');
@@ -234,11 +229,11 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await client.connect();
-      
+
       const searchParams = {
         query: 'Gandalf',
         type: 'npc',
@@ -246,12 +241,12 @@ describe('Integration Tests', () => {
       };
 
       const result = await client.searchActors(searchParams);
-      
+
       expect(result.actors).toHaveLength(1);
       expect(result.actors[0].name).toBe('Gandalf');
       expect(result.actors[0].abilities?.int?.mod).toBe(5);
       expect(result.total).toBe(1);
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
         params: searchParams,
       });
@@ -260,7 +255,6 @@ describe('Integration Tests', () => {
     it('should handle complex item search with filtering', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
       });
 
       const mockAxios = await import('axios');
@@ -289,11 +283,11 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await client.connect();
-      
+
       const searchParams = {
         query: 'Flame',
         type: 'weapon',
@@ -302,12 +296,12 @@ describe('Integration Tests', () => {
       };
 
       const result = await client.searchItems(searchParams);
-      
+
       expect(result.items).toHaveLength(1);
       expect(result.items[0].name).toBe('Flame Tongue');
       expect(result.items[0].damage?.parts).toHaveLength(2);
       expect(result.items[0].price?.value).toBe(5000);
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/items', {
         params: searchParams,
       });
@@ -318,7 +312,6 @@ describe('Integration Tests', () => {
     it('should handle cascading failures gracefully', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
         retryAttempts: 2,
         retryDelay: 10,
       });
@@ -331,14 +324,14 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await client.connect();
-      
+
       await expect(client.searchActors({ query: 'test' }))
         .rejects.toThrow('Service unavailable');
-      
+
       // Verify retry attempts were made
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3); // Initial + 2 retries
     });
@@ -346,7 +339,6 @@ describe('Integration Tests', () => {
     it('should maintain system stability after errors', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        useRestModule: true,
         retryAttempts: 1,
       });
 
@@ -361,19 +353,19 @@ describe('Integration Tests', () => {
           response: { use: vi.fn() },
         },
       };
-      
+
       (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await client.connect();
-      
+
       // First call should fail then succeed on retry
       const actorResult = await client.searchActors({ query: 'test' });
       expect(actorResult.actors).toEqual([]);
-      
+
       // Subsequent calls should work normally
       const itemResult = await client.searchItems({ query: 'test' });
       expect(itemResult.items).toEqual([]);
-      
+
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3); // 2 for actors (fail + retry), 1 for items
     });
   });

@@ -24,7 +24,7 @@ A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing 
 ## Installation
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 18+
 - FoundryVTT server running and accessible
 - MCP-compatible AI client (Claude Desktop, etc.)
 
@@ -65,7 +65,7 @@ npm run dev
 
 ## FoundryVTT Configuration
 
-The MCP server supports three authentication methods, listed from most secure to least secure:
+The MCP server supports two secure, local-only authentication methods:
 
 ### Option 1: Local REST API Module (🔒 Recommended)
 
@@ -74,7 +74,7 @@ The MCP server supports three authentication methods, listed from most secure to
 - ✅ **Maximum Privacy** - Your game data never leaves your network
 - ✅ **Full Control** - You own and manage all authentication
 - ✅ **Better Performance** - Direct local API access
-- ✅ **More Reliable** - No external service downtime
+- ✅ **Complete API Access** - Full access to all FoundryVTT features
 
 **Setup:**
 1. Install the **Foundry Local REST API** module:
@@ -88,26 +88,13 @@ The MCP server supports three authentication methods, listed from most secure to
    ```env
    FOUNDRY_URL=http://localhost:30000
    FOUNDRY_API_KEY=your_local_api_key_here
-   USE_REST_MODULE=false  # Use local module instead
    ```
 
-### Option 2: Third-Party REST API Module
+### Option 2: Username/Password (Fallback)
 
-**⚠️ Privacy Notice:** This option sends your game data through external relay servers.
+**Use when:** Local REST API module is not available or for simple setups.
 
-1. Install the **Foundry REST API** module from the community
-2. Get an API key from the third-party service
-3. Configure the module with the external API key
-4. Add to your `.env` file:
-   ```env
-   FOUNDRY_URL=http://localhost:30000
-   FOUNDRY_API_KEY=your_external_api_key_here
-   USE_REST_MODULE=true
-   ```
-
-### Option 3: Username/Password (Fallback)
-
-**Limited functionality** - Some features may not work properly.
+**Limitations:** Some advanced features may not work properly.
 
 1. Ensure your FoundryVTT user has appropriate permissions
 2. Add credentials to `.env` file:
@@ -119,14 +106,14 @@ The MCP server supports three authentication methods, listed from most secure to
 
 ### Comparison Table
 
-| Feature | **Local Module** | Third-Party Module | Username/Password |
-|---------|------------------|-------------------|-------------------|
-| **Privacy** | ✅ 100% Local | ❌ External relay | ✅ Local |
-| **Security** | ✅ Your keys only | ❌ External keys | ⚠️ Password auth |
-| **Reliability** | ✅ No external deps | ❌ Service dependent | ✅ Direct connection |
-| **Performance** | ✅ Direct access | ❌ Network latency | ⚠️ Limited features |
-| **Full Features** | ✅ Complete API | ✅ Complete API | ❌ Basic only |
-| **Setup Complexity** | ⚠️ Module install | ⚠️ External signup | ✅ Simple |
+| Feature | **Local REST API Module** | **Username/Password** |
+|---------|---------------------------|----------------------|
+| **Privacy** | ✅ 100% Local | ✅ 100% Local |
+| **Security** | ✅ API Key auth | ⚠️ Password auth |
+| **Performance** | ✅ Direct API access | ⚠️ WebSocket only |
+| **Features** | ✅ Complete API access | ❌ Limited functionality |
+| **Setup** | ⚠️ Module install required | ✅ Simple credentials |
+| **Reliability** | ✅ Stable API | ⚠️ Connection dependent |
 
 ### Required Permissions (All Methods)
 Your FoundryVTT user needs these permissions:
@@ -177,7 +164,7 @@ Ask your AI assistant things like:
 
 ### Data Access
 - `search_actors` - Find characters, NPCs, monsters
-- `search_items` - Find equipment, spells, consumables  
+- `search_items` - Find equipment, spells, consumables
 - `search_journals` - Search notes and handouts
 - `get_scene_info` - Current scene details
 - `get_actor_details` - Detailed character information
@@ -403,7 +390,7 @@ const result = await client.request({
 - [ ] Scene navigation and switching
 - [ ] Playlist controls and ambient audio
 
-### Version 0.3.0  
+### Version 0.3.0
 - [ ] Character sheet editing (level up, add equipment)
 - [ ] Journal entry creation and editing
 - [ ] Macro execution and management
@@ -433,7 +420,7 @@ npm run docs:serve  # Generate and serve locally
 
 ### 📚 What's Documented
 - **FoundryClient API** - Complete client documentation with examples
-- **TypeScript Interfaces** - All data structures and type definitions  
+- **TypeScript Interfaces** - All data structures and type definitions
 - **Configuration** - Environment variables and setup options
 - **Utilities** - Helper functions and logging
 - **Usage Examples** - Code samples for common operations

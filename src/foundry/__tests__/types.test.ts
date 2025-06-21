@@ -20,7 +20,7 @@ describe('FoundryVTT Types', () => {
         name: 'Test Actor',
         type: 'character',
       };
-      
+
       expect(actor._id).toBe('actor-123');
       expect(actor.name).toBe('Test Actor');
       expect(actor.type).toBe('character');
@@ -40,7 +40,7 @@ describe('FoundryVTT Types', () => {
         biography: 'A brave adventurer',
         notes: 'Player notes here',
       };
-      
+
       expect(actor.img).toBe('/path/to/image.png');
       expect(actor.hp?.value).toBe(25);
       expect(actor.level).toBe(5);
@@ -63,7 +63,7 @@ describe('FoundryVTT Types', () => {
           units: 'ft',
         },
       };
-      
+
       expect(weapon.damage?.parts[0]).toEqual(['1d8', 'slashing']);
       expect(weapon.damage?.versatile).toBe('1d10');
       expect(weapon.range?.value).toBe(5);
@@ -87,7 +87,7 @@ describe('FoundryVTT Types', () => {
           units: 'instantaneous',
         },
       };
-      
+
       expect(spell.level).toBe(3);
       expect(spell.school).toBe('evocation');
       expect(spell.components?.vocal).toBe(true);
@@ -110,7 +110,7 @@ describe('FoundryVTT Types', () => {
         globalLight: false,
         darkness: 0,
       };
-      
+
       expect(scene.width).toBe(4000);
       expect(scene.height).toBe(3000);
       expect(scene.active).toBe(true);
@@ -139,7 +139,7 @@ describe('FoundryVTT Types', () => {
           units: 'ft',
         },
       };
-      
+
       expect(scene.grid?.size).toBe(100);
       expect(scene.grid?.distance).toBe(5);
       expect(scene.grid?.units).toBe('ft');
@@ -180,7 +180,7 @@ describe('FoundryVTT Types', () => {
           skipDefeated: true,
         },
       };
-      
+
       expect(combat.round).toBe(3);
       expect(combat.turn).toBe(1);
       expect(combat.combatants).toHaveLength(2);
@@ -203,7 +203,7 @@ describe('FoundryVTT Types', () => {
           SCENE_CREATE: true,
         },
       };
-      
+
       expect(user.role).toBe(4);
       expect(user.permissions.ACTOR_CREATE).toBe(true);
       expect(user.color).toBe('#ff0000');
@@ -222,7 +222,7 @@ describe('FoundryVTT Types', () => {
           },
         ],
       };
-      
+
       expect(response.success).toBe(true);
       expect(response.data).toHaveLength(1);
       expect(response.data?.[0].name).toBe('Hero');
@@ -234,7 +234,7 @@ describe('FoundryVTT Types', () => {
         error: 'Not found',
         message: 'The requested resource was not found',
       };
-      
+
       expect(response.success).toBe(false);
       expect(response.error).toBe('Not found');
       expect(response.message).toContain('not found');
@@ -250,7 +250,7 @@ describe('FoundryVTT Types', () => {
         reason: 'Attack roll',
         timestamp: '2024-01-01T12:00:00.000Z',
       };
-      
+
       expect(roll.formula).toBe('2d6+3');
       expect(roll.total).toBe(11);
       expect(roll.breakdown).toContain('4 + 5');
@@ -279,7 +279,7 @@ describe('FoundryVTT Types', () => {
         },
         equipment: ['Spellbook', 'Component pouch', 'Quarterstaff'],
       };
-      
+
       expect(npc.name).toBe('Elara Moonwhisper');
       expect(npc.personality).toContain('Curious');
       expect(npc.stats?.int).toBe(18);
@@ -296,7 +296,7 @@ describe('FoundryVTT Types', () => {
         hooks: ['Missing travelers', 'Strange lights at night'],
         connections: ['Village of Millbrook', 'The Old Road'],
       };
-      
+
       expect(location.name).toBe('The Whispering Woods');
       expect(location.features).toContain('Ancient oak trees');
       expect(location.hooks).toContain('Missing travelers');
@@ -318,7 +318,7 @@ describe('FoundryVTT Types', () => {
         complications: ['Cave-ins', 'Additional goblin reinforcements'],
         timeLimit: '3 days before the ritual',
       };
-      
+
       expect(quest.title).toBe('The Lost Artifact');
       expect(quest.type).toBe('main');
       expect(quest.objectives).toHaveLength(4);

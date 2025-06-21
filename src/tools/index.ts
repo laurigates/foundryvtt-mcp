@@ -17,7 +17,7 @@ export const toolDefinitions: Tool[] = [
       required: ['formula']
     }
   },
-  
+
   // Actor Tools
   {
     name: 'search_actors',
@@ -51,7 +51,7 @@ export const toolDefinitions: Tool[] = [
       }
     }
   },
-  
+
   // Item Tools
   {
     name: 'search_items',
@@ -83,7 +83,7 @@ export const toolDefinitions: Tool[] = [
       }
     }
   },
-  
+
   // Scene Tools
   {
     name: 'get_scenes',
@@ -99,7 +99,7 @@ export const toolDefinitions: Tool[] = [
       }
     }
   },
-  
+
   // World Tools
   {
     name: 'get_world_info',

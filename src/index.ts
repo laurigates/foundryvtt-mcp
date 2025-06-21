@@ -2,11 +2,11 @@
 
 /**
  * FoundryVTT Model Context Protocol Server
- * 
+ *
  * This server provides integration between FoundryVTT and AI models through the Model Context Protocol (MCP).
- * It enables AI assistants to interact with FoundryVTT instances for RPG campaign management, 
+ * It enables AI assistants to interact with FoundryVTT instances for RPG campaign management,
  * character handling, and game automation.
- * 
+ *
  * @fileoverview Main entry point for the FoundryVTT MCP Server
  * @version 0.1.0
  * @author FoundryVTT MCP Team
@@ -26,6 +26,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import { FoundryClient } from './foundry/client.js';
+import { DiagnosticsClient } from './diagnostics/client.js';
 import { logger } from './utils/logger.js';
 import { config } from './config/index.js';
 
@@ -39,6 +40,7 @@ dotenv.config();
 class FoundryMCPServer {
   private server: Server;
   private foundryClient: FoundryClient;
+  private diagnosticsClient: DiagnosticsClient;
 
   /**
    * Creates a new FoundryMCPServer instance.
@@ -61,7 +63,6 @@ class FoundryMCPServer {
     // Initialize FoundryVTT client with configuration
     this.foundryClient = new FoundryClient({
       baseUrl: config.foundry.url,
-      useRestModule: config.foundry.useRestModule,
       apiKey: config.foundry.apiKey,
       username: config.foundry.username,
       password: config.foundry.password,
@@ -70,6 +71,9 @@ class FoundryMCPServer {
       retryAttempts: config.foundry.retryAttempts,
       retryDelay: config.foundry.retryDelay,
     });
+
+    // Initialize DiagnosticsClient
+    this.diagnosticsClient = new DiagnosticsClient(this.foundryClient);
 
     this.setupHandlers();
   }
@@ -249,6 +253,89 @@ class FoundryMCPServer {
               required: ['query'],
             },
           },
+          {
+            name: 'get_recent_logs',
+            description: 'Get recent FoundryVTT server logs for debugging and monitoring',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                lines: {
+                  type: 'number',
+                  description: 'Number of log lines to retrieve',
+                  default: 50,
+                },
+                level: {
+                  type: 'string',
+                  enum: ['log', 'warn', 'error', 'info', 'notification'],
+                  description: 'Filter by log level',
+                },
+                since: {
+                  type: 'string',
+                  description: 'ISO timestamp to filter logs since',
+                },
+                source: {
+                  type: 'string',
+                  enum: ['foundry', 'module', 'system', 'api', 'unknown'],
+                  description: 'Filter by log source',
+                },
+                includeStack: {
+                  type: 'boolean',
+                  description: 'Include stack traces in error logs',
+                  default: false,
+                },
+              },
+            },
+          },
+          {
+            name: 'search_logs',
+            description: 'Search FoundryVTT logs for specific patterns or errors',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                pattern: {
+                  type: 'string',
+                  description: 'Regular expression pattern to search for',
+                },
+                timeframe: {
+                  type: 'string',
+                  description: 'Time window in seconds (e.g., "3600" for last hour)',
+                },
+                level: {
+                  type: 'string',
+                  enum: ['log', 'warn', 'error', 'info', 'notification'],
+                  description: 'Filter by log level',
+                },
+                caseSensitive: {
+                  type: 'boolean',
+                  description: 'Case-sensitive search',
+                  default: false,
+                },
+              },
+              required: ['pattern'],
+            },
+          },
+          {
+            name: 'get_system_health',
+            description: 'Get FoundryVTT server health and performance metrics',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'diagnose_errors',
+            description: 'Analyze recent errors and provide diagnostic suggestions',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeframe: {
+                  type: 'number',
+                  description: 'Time window in seconds to analyze',
+                  default: 3600,
+                },
+              },
+            },
+          },
         ],
       };
     });
@@ -333,6 +420,14 @@ class FoundryMCPServer {
             return await this.handleGenerateLoot(args);
           case 'lookup_rule':
             return await this.handleLookupRule(args);
+          case 'get_recent_logs':
+            return await this.handleGetRecentLogs(args);
+          case 'search_logs':
+            return await this.handleSearchLogs(args);
+          case 'get_system_health':
+            return await this.handleGetSystemHealth(args);
+          case 'diagnose_errors':
+            return await this.handleDiagnoseErrors(args);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -341,11 +436,11 @@ class FoundryMCPServer {
         }
       } catch (error) {
         logger.error(`Error executing tool ${name}:`, error);
-        
+
         if (error instanceof McpError) {
           throw error;
         }
-        
+
         throw new McpError(
           ErrorCode.InternalError,
           `Failed to execute tool: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -363,12 +458,12 @@ class FoundryMCPServer {
           const actorId = uri.replace('foundry://actors/', '');
           return await this.readActorResource(actorId);
         }
-        
+
         if (uri.startsWith('foundry://scenes/')) {
           const sceneId = uri.replace('foundry://scenes/', '');
           return await this.readSceneResource(sceneId);
         }
-        
+
         // Handle general world resources
         switch (uri) {
           case 'foundry://world/actors':
@@ -394,11 +489,11 @@ class FoundryMCPServer {
         }
       } catch (error) {
         logger.error(`Error reading resource ${uri}:`, error);
-        
+
         if (error instanceof McpError) {
           throw error;
         }
-        
+
         throw new McpError(
           ErrorCode.InternalError,
           `Failed to read resource: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -408,7 +503,7 @@ class FoundryMCPServer {
   }
 
   // Tool Handlers
-  
+
   /**
    * Handles dice rolling requests using FoundryVTT's dice system
    * @param args - Arguments containing formula and optional reason
@@ -416,7 +511,7 @@ class FoundryMCPServer {
    */
   private async handleRollDice(args: any) {
     const { formula, reason } = args;
-    
+
     if (!formula || typeof formula !== 'string') {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -425,7 +520,7 @@ class FoundryMCPServer {
     }
 
     const result = await this.foundryClient.rollDice(formula, reason);
-    
+
     return {
       content: [
         {
@@ -443,7 +538,7 @@ class FoundryMCPServer {
    */
   private async handleSearchActors(args: any) {
     const { query, type, limit = 10 } = args;
-    
+
     const actors = await this.foundryClient.searchActors({
       query,
       type,
@@ -465,7 +560,7 @@ class FoundryMCPServer {
       };
     }
 
-    const actorList = actors.actors.map(actor => 
+    const actorList = actors.actors.map(actor =>
       `• **${actor.name}** (${actor.type}) - HP: ${actor.hp?.value || 'N/A'}/${actor.hp?.max || 'N/A'}`
     ).join('\n');
 
@@ -486,7 +581,7 @@ class FoundryMCPServer {
    */
   private async handleGetActorDetails(args: any) {
     const { actorId } = args;
-    
+
     if (!actorId) {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -495,7 +590,7 @@ class FoundryMCPServer {
     }
 
     const actor = await this.foundryClient.getActor(actorId);
-    
+
     return {
       content: [
         {
@@ -519,7 +614,7 @@ class FoundryMCPServer {
    */
   private async handleSearchItems(args: any) {
     const { query, type, rarity, limit = 10 } = args;
-    
+
     const items = await this.foundryClient.searchItems({
       query,
       type,
@@ -539,7 +634,7 @@ class FoundryMCPServer {
       };
     }
 
-    const itemList = items.items.map(item => 
+    const itemList = items.items.map(item =>
       `• **${item.name}** (${item.type}) ${item.rarity ? `- ${item.rarity}` : ''}`
     ).join('\n');
 
@@ -560,9 +655,9 @@ class FoundryMCPServer {
    */
   private async handleGetSceneInfo(args: any) {
     const { sceneId } = args;
-    
+
     const scene = await this.foundryClient.getCurrentScene(sceneId);
-    
+
     return {
       content: [
         {
@@ -585,7 +680,7 @@ class FoundryMCPServer {
    */
   private async handleGenerateNPC(args: any) {
     const { race, level, role, alignment } = args;
-    
+
     const npc = await this.generateRandomNPC({
       race,
       level: level || this.randomBetween(1, 10),
@@ -623,7 +718,7 @@ class FoundryMCPServer {
    */
   private async handleGenerateLoot(args: any) {
     const { challengeRating, treasureType = 'individual', includeCoins = true } = args;
-    
+
     if (!challengeRating || challengeRating < 0) {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -632,7 +727,7 @@ class FoundryMCPServer {
     }
 
     const loot = await this.generateTreasure(challengeRating, treasureType, includeCoins);
-    
+
     return {
       content: [
         {
@@ -650,9 +745,9 @@ class FoundryMCPServer {
    */
   private async handleLookupRule(args: any) {
     const { query, category } = args;
-    
+
     const ruleInfo = await this.lookupGameRule(query, category);
-    
+
     return {
       content: [
         {
@@ -661,6 +756,293 @@ class FoundryMCPServer {
         },
       ],
     };
+  }
+
+  /**
+   * Handles getting recent logs from FoundryVTT server
+   * @param args - Arguments containing log filtering parameters
+   * @returns MCP response with log entries
+   */
+  private async handleGetRecentLogs(args: any) {
+    const { lines = 50, level, since, source, includeStack = false } = args;
+
+    try {
+      // Check if diagnostics API is available
+      const isAvailable = await this.diagnosticsClient.isAvailable();
+      if (!isAvailable) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '⚠️ **Diagnostics API Unavailable**\n\nThe FoundryVTT REST API module with diagnostics support is not installed or enabled. Please ensure the module is active and restart FoundryVTT.',
+            },
+          ],
+        };
+      }
+
+      const response = await this.diagnosticsClient.getRecentLogs({
+        lines,
+        level,
+        since,
+        source,
+        includeStack,
+      });
+
+      const logText = response.logs.map(log => {
+        const levelEmoji = {
+          error: '❌',
+          warn: '⚠️',
+          info: 'ℹ️',
+          log: '📝',
+          notification: '🔔'
+        }[log.level] || '📝';
+
+        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+        let entry = `${levelEmoji} **${timestamp}** [${log.level.toUpperCase()}] ${log.message}`;
+
+        if (includeStack && log.stack) {
+          entry += `\n\`\`\`\n${log.stack}\n\`\`\``;
+        }
+
+        return entry;
+      }).join('\n\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📋 **Recent FoundryVTT Logs**\n\n**Total Entries:** ${response.total}\n**Buffer Size:** ${response.bufferSize}/${response.maxBufferSize}\n\n${logText || 'No logs found matching criteria.'}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Error getting recent logs:', error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to retrieve logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handles searching logs for specific patterns
+   * @param args - Arguments containing search pattern and filters
+   * @returns MCP response with matching log entries
+   */
+  private async handleSearchLogs(args: any) {
+    const { pattern, timeframe, level, caseSensitive = false } = args;
+
+    if (!pattern) {
+      throw new McpError(ErrorCode.InvalidParams, 'Search pattern is required');
+    }
+
+    try {
+      // Check if diagnostics API is available
+      const isAvailable = await this.diagnosticsClient.isAvailable();
+      if (!isAvailable) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '⚠️ **Diagnostics API Unavailable**\n\nThe FoundryVTT REST API module with diagnostics support is not installed or enabled.',
+            },
+          ],
+        };
+      }
+
+      const response = await this.diagnosticsClient.searchLogs({
+        pattern,
+        timeframe,
+        level,
+        caseSensitive,
+      });
+
+      const searchResults = response.logs.map(log => {
+        const levelEmoji = {
+          error: '❌',
+          warn: '⚠️',
+          info: 'ℹ️',
+          log: '📝',
+          notification: '🔔'
+        }[log.level] || '📝';
+
+        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+        return `${levelEmoji} **${timestamp}** [${log.level.toUpperCase()}] ${log.message}`;
+      }).join('\n\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔍 **Log Search Results**\n\n**Pattern:** \`${pattern}\`\n**Matches Found:** ${response.matches}\n**Timeframe:** ${response.searchTimeframe}\n\n${searchResults || 'No matching logs found.'}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Error searching logs:', error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to search logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handles getting system health metrics
+   * @param args - Empty arguments object
+   * @returns MCP response with system health information
+   */
+  private async handleGetSystemHealth(_args: any) {
+    try {
+      // Check if diagnostics API is available
+      const isAvailable = await this.diagnosticsClient.isAvailable();
+      if (!isAvailable) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '⚠️ **Diagnostics API Unavailable**\n\nThe FoundryVTT REST API module with diagnostics support is not installed or enabled.',
+            },
+          ],
+        };
+      }
+
+      const health = await this.diagnosticsClient.getSystemHealth();
+
+      const statusEmoji = {
+        healthy: '✅',
+        warning: '⚠️',
+        critical: '❌'
+      }[health.status] || '❓';
+
+      const memoryInfo = health.performance.memory ?
+        `**Memory Usage:** ${Math.round(health.performance.memory.heapUsed / 1024 / 1024)}MB / ${Math.round(health.performance.memory.heapTotal / 1024 / 1024)}MB` :
+        '**Memory Usage:** Not available';
+
+      const healthText = `${statusEmoji} **System Status: ${health.status.toUpperCase()}**
+
+**Server Information:**
+• FoundryVTT Version: ${health.server.foundryVersion}
+• System Version: ${health.server.systemVersion}
+• World ID: ${health.server.worldId}
+${health.server.uptime ? `• Uptime: ${Math.floor(health.server.uptime / 3600)}h ${Math.floor((health.server.uptime % 3600) / 60)}m` : ''}
+
+**Users & Activity:**
+• Active Users: ${health.users.active}/${health.users.total}
+• GM Users: ${health.users.gm}
+• Connected Clients: ${health.performance.connectedClients}
+
+**Modules:**
+• Active Modules: ${health.modules.active}/${health.modules.total}
+
+**Performance:**
+${memoryInfo}
+
+**Logs & Errors:**
+• Recent Errors: ${health.logs.recentErrors}
+• Recent Warnings: ${health.logs.recentWarnings}
+• Error Rate: ${(health.logs.errorRate * 100).toFixed(1)}%
+• Log Buffer: ${health.logs.bufferSize} entries`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🏥 **FoundryVTT System Health**\n\n${healthText}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Error getting system health:', error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to retrieve system health: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handles error diagnosis and provides suggestions
+   * @param args - Arguments containing timeframe for analysis
+   * @returns MCP response with error analysis and suggestions
+   */
+  private async handleDiagnoseErrors(args: any) {
+    const { timeframe = 3600 } = args;
+
+    try {
+      // Check if diagnostics API is available
+      const isAvailable = await this.diagnosticsClient.isAvailable();
+      if (!isAvailable) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '⚠️ **Diagnostics API Unavailable**\n\nThe FoundryVTT REST API module with diagnostics support is not installed or enabled.',
+            },
+          ],
+        };
+      }
+
+      const diagnosis = await this.diagnosticsClient.diagnoseErrors(timeframe);
+
+      const scoreEmoji = diagnosis.healthScore >= 90 ? '🟢' :
+                        diagnosis.healthScore >= 70 ? '🟡' :
+                        diagnosis.healthScore >= 50 ? '🟠' : '🔴';
+
+      const categoriesText = Object.entries(diagnosis.summary.categories)
+        .map(([category, count]) => `• ${category}: ${count}`)
+        .join('\n');
+
+      const suggestionsText = diagnosis.suggestions
+        .map(suggestion => {
+          const priorityEmoji = {
+            low: '🔵',
+            medium: '🟡',
+            high: '🟠',
+            critical: '🔴'
+          }[suggestion.priority] || '⚪';
+
+          return `${priorityEmoji} **${suggestion.category}** (${suggestion.priority}): ${suggestion.suggestion}`;
+        })
+        .join('\n\n');
+
+      const recentErrorsText = diagnosis.recentErrors.slice(-5)
+        .map(error => {
+          const timestamp = new Date(error.timestamp).toLocaleTimeString();
+          return `❌ **${timestamp}**: ${error.message}`;
+        })
+        .join('\n');
+
+      const diagnosisText = `${scoreEmoji} **Health Score: ${diagnosis.healthScore}/100**
+
+**Error Summary (${diagnosis.timeframe}):**
+• Total Errors: ${diagnosis.summary.totalErrors}
+• Unique Errors: ${diagnosis.summary.uniqueErrors}
+
+**Error Categories:**
+${categoriesText || 'No errors categorized'}
+
+**Diagnostic Suggestions:**
+${suggestionsText || 'No specific suggestions available'}
+
+**Recent Errors:**
+${recentErrorsText || 'No recent errors found'}`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔬 **FoundryVTT Error Diagnosis**\n\n${diagnosisText}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Error diagnosing errors:', error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   }
 
   // Resource Handlers
@@ -673,7 +1055,7 @@ class FoundryMCPServer {
   private async readActorResource(actorId: string) {
     try {
       const actor = await this.foundryClient.getActor(actorId);
-      
+
       return {
         contents: [
           {
@@ -695,7 +1077,7 @@ class FoundryMCPServer {
   private async readAllActorsResource() {
     try {
       const actors = await this.foundryClient.searchActors({ limit: 100 });
-      
+
       const summary = {
         total: actors.total,
         actors: actors.actors.map(actor => ({
@@ -729,7 +1111,7 @@ class FoundryMCPServer {
   private async readAllItemsResource() {
     try {
       const items = await this.foundryClient.searchItems({ limit: 100 });
-      
+
       const summary = {
         total: items.total,
         items: items.items.map(item => ({
@@ -783,7 +1165,7 @@ class FoundryMCPServer {
   private async readCurrentSceneResource() {
     try {
       const scene = await this.foundryClient.getCurrentScene();
-      
+
       return {
         contents: [
           {
@@ -793,7 +1175,7 @@ class FoundryMCPServer {
               scene,
               metadata: {
                 accessedAt: new Date().toISOString(),
-                hasRestApi: this.foundryClient.config?.useRestModule || false
+                hasLocalRestApi: !!this.foundryClient.config?.apiKey
               }
             }, null, 2),
           },
@@ -816,12 +1198,12 @@ class FoundryMCPServer {
           mimeType: 'application/json',
           text: JSON.stringify({
             serverUrl: this.foundryClient.config?.baseUrl,
-            connectionMethod: this.foundryClient.config?.useRestModule ? 'REST API' : 'WebSocket',
+            connectionMethod: this.foundryClient.config?.apiKey ? 'Local REST API' : 'WebSocket',
             lastConnected: new Date().toISOString(),
             features: {
-              restApi: this.foundryClient.config?.useRestModule || false,
+              localRestApi: !!this.foundryClient.config?.apiKey,
               webSocket: true,
-              dataAccess: this.foundryClient.config?.useRestModule ? 'Full' : 'Limited'
+              dataAccess: this.foundryClient.config?.apiKey ? 'Full' : 'Limited'
             }
           }, null, 2),
         },
@@ -837,7 +1219,7 @@ class FoundryMCPServer {
   private async readSceneResource(sceneId: string) {
     try {
       const scene = await this.foundryClient.getScene(sceneId);
-      
+
       return {
         contents: [
           {
@@ -896,9 +1278,9 @@ class FoundryMCPServer {
     if (!abilities) {
       return 'No ability scores available';
     }
-    
+
     return Object.entries(abilities)
-      .map(([key, ability]: [string, any]) => 
+      .map(([key, ability]: [string, any]) =>
         `${key.toUpperCase()}: ${ability.value || 'N/A'} (${ability.mod >= 0 ? '+' : ''}${ability.mod || 0})`
       ).join(', ');
   }
@@ -912,13 +1294,13 @@ class FoundryMCPServer {
     if (!skills) {
       return 'No skills available';
     }
-    
+
     const proficientSkills = Object.entries(skills)
       .filter(([_, skill]: [string, any]) => skill.proficient)
-      .map(([name, skill]: [string, any]) => 
+      .map(([name, skill]: [string, any]) =>
         `${name} ${skill.mod >= 0 ? '+' : ''}${skill.mod}`
       );
-    
+
     return proficientSkills.length > 0 ? proficientSkills.join(', ') : 'No proficient skills';
   }
 
@@ -971,7 +1353,7 @@ class FoundryMCPServer {
 
     const selectedRace = params.race || this.pickRandom(races);
     const raceNames = names[selectedRace] || names.default;
-    
+
     const personalityTraits = [
       'Speaks in whispers and seems nervous',
       'Always fidgets with a small trinket',
@@ -1025,7 +1407,7 @@ class FoundryMCPServer {
       race: selectedRace,
       level: params.level,
       role: params.role,
-      class: params.role === 'guard' ? 'Fighter' : 
+      class: params.role === 'guard' ? 'Fighter' :
              params.role === 'scholar' ? 'Wizard' :
              params.role === 'criminal' ? 'Rogue' : 'Commoner',
       appearance: this.pickRandom(appearances),
@@ -1044,7 +1426,7 @@ class FoundryMCPServer {
    */
   private async generateTreasure(challengeRating: number, treasureType: string, includeCoins: boolean): Promise<string> {
     let treasure = '';
-    
+
     if (includeCoins) {
       const baseCopper = Math.floor(Math.random() * 100) + challengeRating * 10;
       const baseSilver = Math.floor(Math.random() * 50) + challengeRating * 5;
@@ -1082,7 +1464,7 @@ class FoundryMCPServer {
     };
 
     const lowerQuery = query.toLowerCase();
-    
+
     for (const [rule, description] of Object.entries(commonRules)) {
       if (lowerQuery.includes(rule) || rule.includes(lowerQuery)) {
         return `**${rule.charAt(0).toUpperCase() + rule.slice(1)}**\n\n${description}\n\n*For complete rules, consult your game system's rulebook.*`;
@@ -1190,15 +1572,15 @@ class FoundryMCPServer {
    */
   async start(): Promise<void> {
     logger.info('Starting FoundryVTT MCP Server...');
-    
+
     try {
       // Test connection to FoundryVTT
       await this.foundryClient.testConnection();
       logger.info('✅ Connected to FoundryVTT successfully');
-      
+
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      
+
       logger.info(`🚀 FoundryVTT MCP Server running (${config.serverName} v${config.serverVersion})`);
     } catch (error) {
       logger.error('❌ Failed to start server:', error);

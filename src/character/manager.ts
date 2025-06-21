@@ -215,7 +215,7 @@ export class CharacterManager extends EventEmitter {
 
     const resources = this.resourceTracking.get(actorId)!;
     const existingIndex = resources.findIndex(r => r.resource === resourceName);
-    
+
     if (existingIndex >= 0) {
       resources[existingIndex] = resource;
     } else {
@@ -253,7 +253,7 @@ export class CharacterManager extends EventEmitter {
     const restoredResources: ResourceManagement[] = [];
 
     for (const resource of resources) {
-      if (resource.resetType === restType || 
+      if (resource.resetType === restType ||
           (restType === 'long_rest' && resource.resetType === 'short_rest')) {
         resource.currentValue = resource.maxValue;
         resource.lastReset = new Date();

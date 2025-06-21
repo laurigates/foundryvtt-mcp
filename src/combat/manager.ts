@@ -78,7 +78,7 @@ export class CombatManager extends EventEmitter {
 
   async startCombat(combatants: Partial<CombatantState>[]): Promise<CombatState> {
     logger.info('Starting new combat encounter');
-    
+
     const combat: CombatState = {
       id: this.generateCombatId(),
       round: 1,
@@ -92,10 +92,10 @@ export class CombatManager extends EventEmitter {
 
     // Sort by initiative
     combat.combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0));
-    
+
     this.currentCombat = combat;
     this.emitCombatEvent('combat_start', combat);
-    
+
     return combat;
   }
 
@@ -105,7 +105,7 @@ export class CombatManager extends EventEmitter {
     }
 
     const results: { [key: string]: number } = {};
-    const combatants = combatantId 
+    const combatants = combatantId
       ? this.currentCombat.combatants.filter(c => c.id === combatantId)
       : this.currentCombat.combatants;
 
@@ -114,18 +114,18 @@ export class CombatManager extends EventEmitter {
       const roll = Math.floor(Math.random() * 20) + 1;
       const modifier = this.getInitiativeModifier(combatant);
       const total = roll + modifier;
-      
+
       combatant.initiative = total;
       results[combatant.name] = total;
-      
+
       logger.debug(`${combatant.name} rolled initiative: ${total} (${roll} + ${modifier})`);
     }
 
     // Re-sort combatants by initiative
     this.currentCombat.combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0));
-    
+
     this.emitCombatEvent('initiative_changed', this.currentCombat, results);
-    
+
     return results;
   }
 
@@ -146,13 +146,13 @@ export class CombatManager extends EventEmitter {
 
     // Advance to next combatant
     this.currentCombat.turn++;
-    
+
     // Check if we need to start a new round
     if (this.currentCombat.turn >= this.currentCombat.combatants.length) {
       this.currentCombat.turn = 0;
       this.currentCombat.round++;
       this.emitCombatEvent('round_end', this.currentCombat);
-      
+
       // Reset turn actions for all combatants
       this.currentCombat.combatants.forEach(c => {
         c.turnTaken = false;
@@ -168,13 +168,13 @@ export class CombatManager extends EventEmitter {
     // Set current combatant
     this.currentCombat.currentCombatant = this.currentCombat.combatants[this.currentCombat.turn];
     this.currentCombat.turnStartTime = new Date();
-    
+
     if (!this.currentCombat.started) {
       this.currentCombat.started = true;
     }
 
     this.emitCombatEvent('turn_start', this.currentCombat);
-    
+
     return this.currentCombat.currentCombatant;
   }
 
@@ -197,7 +197,7 @@ export class CombatManager extends EventEmitter {
     }
 
     combatant.hp.current = Math.max(0, combatant.hp.current - remainingDamage);
-    
+
     // Check if combatant is defeated
     if (combatant.hp.current === 0) {
       combatant.defeated = true;
@@ -227,7 +227,7 @@ export class CombatManager extends EventEmitter {
     }
 
     combatant.hp.current = Math.min(combatant.hp.max, combatant.hp.current + healing);
-    
+
     if (combatant.hp.current > 0) {
       combatant.defeated = false;
     }
@@ -249,7 +249,7 @@ export class CombatManager extends EventEmitter {
 
     if (!combatant.conditions.includes(condition)) {
       combatant.conditions.push(condition);
-      
+
       this.emitCombatEvent('condition_applied', this.currentCombat, {
         combatantId,
         condition,
@@ -287,17 +287,17 @@ export class CombatManager extends EventEmitter {
     }
 
     this.currentCombat.active = false;
-    
+
     if (this.turnTimer) {
       clearTimeout(this.turnTimer);
     }
 
     const endedCombat = { ...this.currentCombat };
     this.emitCombatEvent('combat_end', endedCombat);
-    
+
     logger.info('Combat ended');
     this.currentCombat = null;
-    
+
     return endedCombat;
   }
 
@@ -310,7 +310,7 @@ export class CombatManager extends EventEmitter {
     const combatant = event.combat.currentCombatant;
     if (combatant) {
       logger.info(`Turn ${event.combat.turn + 1}, Round ${event.combat.round}: ${combatant.name}'s turn`);
-      
+
       // Set turn timer
       this.turnTimer = setTimeout(() => {
         this.emit('turn_warning', combatant);
@@ -384,7 +384,7 @@ export class CombatManager extends EventEmitter {
     };
 
     this.combatHistory.push(event);
-    
+
     // Keep history manageable
     if (this.combatHistory.length > 1000) {
       this.combatHistory = this.combatHistory.slice(-500);

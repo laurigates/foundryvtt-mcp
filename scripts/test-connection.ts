@@ -14,7 +14,7 @@ dotenv.config();
 
 async function testConnection() {
   console.log('🧪 FoundryVTT MCP Server - Connection Test\n');
-  
+
   try {
     console.log('📋 Configuration:');
     console.log(`   URL: ${config.foundry.url}`);
@@ -34,7 +34,7 @@ async function testConnection() {
 
     console.log('🔗 Testing connection...');
     const connected = await client.testConnection();
-    
+
     if (connected) {
       console.log('✅ Connection successful!\n');
     } else {
@@ -85,10 +85,10 @@ async function testConnection() {
     try {
       await client.connectWebSocket();
       console.log('✅ WebSocket connection established!\n');
-      
+
       // Give it a moment to connect
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       await client.disconnect();
       console.log('✅ WebSocket disconnected cleanly\n');
     } catch (error) {
@@ -101,7 +101,7 @@ async function testConnection() {
     console.log('   - Dice rolling: ✅');
     console.log(`   - Data access: ${config.foundry.useRestModule ? '✅ Full' : '⚠️  Limited'}`);
     console.log(`   - WebSocket: ${config.foundry.useRestModule ? '✅' : '⚠️  Basic'}`);
-    
+
     if (!config.foundry.useRestModule) {
       console.log('\n💡 Tips for enhanced functionality:');
       console.log('   1. Install the "Foundry REST API" module in FoundryVTT');

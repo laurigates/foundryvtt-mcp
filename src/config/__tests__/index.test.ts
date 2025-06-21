@@ -7,7 +7,6 @@ const mockEnv = {
   LOG_LEVEL: 'debug',
   NODE_ENV: 'test',
   FOUNDRY_URL: 'http://localhost:30000',
-  USE_REST_MODULE: 'true',
   FOUNDRY_API_KEY: 'test-api-key',
   FOUNDRY_USERNAME: 'testuser',
   FOUNDRY_PASSWORD: 'testpass',
@@ -40,15 +39,14 @@ describe('Config', () => {
   describe('valid configuration', () => {
     it('should load configuration from environment variables', async () => {
       process.env = { ...mockEnv };
-      
+
       const { config } = await import('../index.js');
-      
+
       expect(config.serverName).toBe('test-server');
       expect(config.serverVersion).toBe('1.0.0');
       expect(config.logLevel).toBe('debug');
       expect(config.nodeEnv).toBe('test');
       expect(config.foundry.url).toBe('http://localhost:30000');
-      expect(config.foundry.useRestModule).toBe(true);
       expect(config.foundry.apiKey).toBe('test-api-key');
       expect(config.foundry.username).toBe('testuser');
       expect(config.foundry.password).toBe('testpass');
@@ -63,14 +61,13 @@ describe('Config', () => {
 
     it('should use default values when environment variables are not set', async () => {
       process.env = { FOUNDRY_URL: 'http://localhost:30000' };
-      
+
       const { config } = await import('../index.js');
-      
+
       expect(config.serverName).toBe('foundry-mcp-server');
       expect(config.serverVersion).toBe('0.1.0');
       expect(config.logLevel).toBe('info');
       expect(config.nodeEnv).toBe('development');
-      expect(config.foundry.useRestModule).toBe(false);
       expect(config.foundry.socketPath).toBe('/socket.io/');
       expect(config.foundry.timeout).toBe(10000);
       expect(config.foundry.retryAttempts).toBe(3);
@@ -84,47 +81,47 @@ describe('Config', () => {
   describe('configuration validation', () => {
     it('should exit process when FOUNDRY_URL is missing', async () => {
       process.env = {};
-      
+
       await expect(async () => {
         await import('../index.js');
       }).rejects.toThrow('process.exit called');
-      
+
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('should exit process when FOUNDRY_URL is invalid', async () => {
       process.env = { FOUNDRY_URL: 'invalid-url' };
-      
+
       await expect(async () => {
         await import('../index.js');
       }).rejects.toThrow('process.exit called');
-      
+
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('should exit process when LOG_LEVEL is invalid', async () => {
-      process.env = { 
+      process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
         LOG_LEVEL: 'invalid-level'
       };
-      
+
       await expect(async () => {
         await import('../index.js');
       }).rejects.toThrow('process.exit called');
-      
+
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('should exit process when NODE_ENV is invalid', async () => {
-      process.env = { 
+      process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
         NODE_ENV: 'invalid-env'
       };
-      
+
       await expect(async () => {
         await import('../index.js');
       }).rejects.toThrow('process.exit called');
-      
+
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
@@ -139,9 +136,9 @@ describe('Config', () => {
         CACHE_TTL_SECONDS: '900',
         CACHE_MAX_SIZE: '5000',
       };
-      
+
       const { config } = await import('../index.js');
-      
+
       expect(config.foundry.timeout).toBe(15000);
       expect(config.foundry.retryAttempts).toBe(10);
       expect(config.foundry.retryDelay).toBe(2000);
@@ -155,10 +152,9 @@ describe('Config', () => {
         USE_REST_MODULE: 'true',
         CACHE_ENABLED: 'false',
       };
-      
+
       const { config } = await import('../index.js');
-      
-      expect(config.foundry.useRestModule).toBe(true);
+
       expect(config.cache.enabled).toBe(false);
     });
   });

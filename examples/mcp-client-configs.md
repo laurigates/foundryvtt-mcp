@@ -118,26 +118,26 @@ async def main():
         args=["./dist/index.js"],
         cwd="/path/to/foundry-mcp-server"
     )
-    
+
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             # Initialize the client
             await session.initialize()
-            
+
             # Roll dice
             roll_result = await session.call_tool(
                 "roll_dice",
                 arguments={"formula": "2d6+3", "reason": "Damage roll"}
             )
             print("Roll result:", roll_result)
-            
+
             # Generate NPC
             npc_result = await session.call_tool(
                 "generate_npc",
                 arguments={"race": "elf", "role": "merchant", "level": 5}
             )
             print("Generated NPC:", npc_result)
-            
+
             # Read world data
             world_data = await session.read_resource("foundry://world/info")
             print("World info:", world_data)
