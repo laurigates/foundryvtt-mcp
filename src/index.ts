@@ -63,9 +63,9 @@ class FoundryMCPServer {
     // Initialize FoundryVTT client with configuration
     this.foundryClient = new FoundryClient({
       baseUrl: config.foundry.url,
-      apiKey: config.foundry.apiKey,
-      username: config.foundry.username,
-      password: config.foundry.password,
+      apiKey: config.foundry.apiKey || '',
+      username: config.foundry.username || '',
+      password: config.foundry.password || '',
       socketPath: config.foundry.socketPath,
       timeout: config.foundry.timeout,
       retryAttempts: config.foundry.retryAttempts,
@@ -480,7 +480,7 @@ class FoundryMCPServer {
           case 'foundry://compendium/monsters':
           case 'foundry://compendium/items':
             const compendiumType = uri.split('/').pop();
-            return await this.readCompendiumResource(compendiumType);
+            return await this.readCompendiumResource(compendiumType || '');
           default:
             throw new McpError(
               ErrorCode.InvalidRequest,
@@ -703,8 +703,8 @@ class FoundryMCPServer {
                 `**Level**: ${npc.level}\n` +
                 `**Alignment**: ${alignment || 'Neutral'}\n\n` +
                 `**Appearance**: ${npc.appearance}\n\n` +
-                `**Personality Traits**:\n${npc.personality.map(t => `• ${t}`).join('\n')}\n\n` +
-                `**Motivations**:\n${npc.motivations.map(m => `• ${m}`).join('\n')}\n\n` +
+                `**Personality Traits**:\n${npc.personality.map((t: string) => `• ${t}`).join('\n')}\n\n` +
+                `**Motivations**:\n${npc.motivations.map((m: string) => `• ${m}`).join('\n')}\n\n` +
                 `**Equipment**: ${npc.equipment?.join(', ') || 'Basic clothing and personal effects'}`,
         },
       ],
@@ -1175,7 +1175,7 @@ ${recentErrorsText || 'No recent errors found'}`;
               scene,
               metadata: {
                 accessedAt: new Date().toISOString(),
-                hasLocalRestApi: !!this.foundryClient.config?.apiKey
+                hasLocalRestApi: !!(this.foundryClient as any).config?.apiKey
               }
             }, null, 2),
           },
@@ -1197,13 +1197,13 @@ ${recentErrorsText || 'No recent errors found'}`;
           uri: 'foundry://settings/game',
           mimeType: 'application/json',
           text: JSON.stringify({
-            serverUrl: this.foundryClient.config?.baseUrl,
-            connectionMethod: this.foundryClient.config?.apiKey ? 'Local REST API' : 'WebSocket',
+            serverUrl: (this.foundryClient as any).config?.baseUrl,
+            connectionMethod: (this.foundryClient as any).config?.apiKey ? 'Local REST API' : 'WebSocket',
             lastConnected: new Date().toISOString(),
             features: {
-              localRestApi: !!this.foundryClient.config?.apiKey,
+              localRestApi: !!(this.foundryClient as any).config?.apiKey,
               webSocket: true,
-              dataAccess: this.foundryClient.config?.apiKey ? 'Full' : 'Limited'
+              dataAccess: (this.foundryClient as any).config?.apiKey ? 'Full' : 'Limited'
             }
           }, null, 2),
         },
@@ -1246,7 +1246,7 @@ ${recentErrorsText || 'No recent errors found'}`;
       items: this.generateItemCompendium()
     };
 
-    const data = compendiumData[compendiumType] || {
+    const data = (compendiumData as any)[compendiumType] || {
       error: `Unknown compendium type: ${compendiumType}`,
       available: Object.keys(compendiumData)
     };
@@ -1352,7 +1352,7 @@ ${recentErrorsText || 'No recent errors found'}`;
     };
 
     const selectedRace = params.race || this.pickRandom(races);
-    const raceNames = names[selectedRace] || names.default;
+    const raceNames = (names as any)[selectedRace] || names.default;
 
     const personalityTraits = [
       'Speaks in whispers and seems nervous',
@@ -1413,7 +1413,7 @@ ${recentErrorsText || 'No recent errors found'}`;
       appearance: this.pickRandom(appearances),
       personality: this.pickRandomMultiple(personalityTraits, 2),
       motivations: this.pickRandomMultiple(motivations, 2),
-      equipment: equipment[params.role] || equipment.commoner
+      equipment: (equipment as any)[params.role] || equipment.commoner
     };
   }
 
@@ -1543,7 +1543,11 @@ ${recentErrorsText || 'No recent errors found'}`;
    * @returns Random element
    */
   private pickRandom<T>(array: T[]): T {
-    return array[Math.floor(Math.random() * array.length)];
+    const result = array[Math.floor(Math.random() * array.length)];
+    if (result === undefined) {
+      throw new Error('Array is empty or invalid index');
+    }
+    return result;
   }
 
   /**
