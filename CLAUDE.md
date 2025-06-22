@@ -86,3 +86,6 @@ Optional:
 - ESLint rules enforce functional programming patterns
 - WebSocket fallback when REST API module unavailable
 - Graceful degradation for missing FoundryVTT features
+
+## Reference Links
+- https://foundryvtt.com/api/
