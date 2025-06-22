@@ -45,6 +45,7 @@ describe('FoundryClient', () => {
       },
     };
 
+    vi.clearAllMocks();
     mockAxios.create = vi.fn().mockReturnValue(mockAxiosInstance);
     mockWebSocket.mockImplementation(() => ({
       on: vi.fn(),
@@ -69,6 +70,7 @@ describe('FoundryClient', () => {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
+          'User-Agent': 'FoundryMCP/0.1.0',
         },
       });
     });
@@ -87,7 +89,7 @@ describe('FoundryClient', () => {
         timeout: 5000,
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': 'test-key',
+          'User-Agent': 'FoundryMCP/0.1.0',
         },
       });
     });
@@ -104,7 +106,7 @@ describe('FoundryClient', () => {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Basic ' + Buffer.from('testuser:testpass').toString('base64'),
+          'User-Agent': 'FoundryMCP/0.1.0',
         },
       });
     });
@@ -150,6 +152,7 @@ describe('FoundryClient', () => {
     beforeEach(() => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
       });
     });
 
@@ -223,6 +226,7 @@ describe('FoundryClient', () => {
     beforeEach(() => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
         retryAttempts: 3,
         retryDelay: 100,
       });
@@ -265,6 +269,7 @@ describe('FoundryClient', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
       });
     });
 

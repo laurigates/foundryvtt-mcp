@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import axios from 'axios';
 
 // Mock external dependencies
 vi.mock('axios');
@@ -20,11 +21,31 @@ vi.mock('../config/index.js', () => ({
 const { FoundryClient } = await import('../foundry/client');
 const { logger } = await import('../utils/logger');
 
+const mockAxios = axios as any;
+
 describe('Integration Tests', () => {
   let client: FoundryClient;
+  let mockAxiosInstance: any;
 
   beforeEach(() => {
+    mockAxiosInstance = {
+      get: vi.fn(),
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      request: vi.fn(),
+      interceptors: {
+        request: {
+          use: vi.fn(),
+        },
+        response: {
+          use: vi.fn(),
+        },
+      },
+    };
+
     vi.clearAllMocks();
+    mockAxios.create = vi.fn().mockReturnValue(mockAxiosInstance);
   });
 
   afterEach(() => {
