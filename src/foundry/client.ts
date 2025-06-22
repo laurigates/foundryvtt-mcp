@@ -153,7 +153,7 @@ export class FoundryClient {
 
     this.http = axios.create({
       baseURL: this.config.baseUrl,
-      timeout: this.config.timeout,
+      timeout: this.config.timeout || 30000,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'FoundryMCP/0.1.0',
@@ -409,13 +409,16 @@ export class FoundryClient {
           flavor: reason,
         });
 
-        return {
+        const result: DiceRoll = {
           formula,
           total: response.data.total,
           breakdown: response.data.terms?.map((term: any) => term.results?.join(', ')).join(' + ') || formula,
-          reason,
           timestamp: new Date().toISOString(),
         };
+        if (reason) {
+          result.reason = reason;
+        }
+        return result;
       } else {
         // Use fallback dice rolling
         return this.fallbackDiceRoll(formula, reason);
@@ -443,8 +446,8 @@ export class FoundryClient {
     let match;
     while ((match = diceRegex.exec(formula)) !== null) {
       const [, numDice, numSides, modifier] = match;
-      const diceCount = parseInt(numDice);
-      const sides = parseInt(numSides);
+      const diceCount = parseInt(numDice || '1');
+      const sides = parseInt(numSides || '6');
       const mod = modifier ? parseInt(modifier) : 0;
 
       const rolls: number[] = [];
@@ -458,13 +461,16 @@ export class FoundryClient {
       breakdown.push(`${rolls.join(', ')}${mod !== 0 ? ` ${modifier}` : ''} = ${rollSum}`);
     }
 
-    return {
+    const result: DiceRoll = {
       formula,
       total,
       breakdown: breakdown.join(' | '),
-      reason,
       timestamp: new Date().toISOString(),
     };
+    if (reason) {
+      result.reason = reason;
+    }
+    return result;
   }
 
   /**
