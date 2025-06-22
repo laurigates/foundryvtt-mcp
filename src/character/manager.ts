@@ -129,9 +129,9 @@ export class CharacterManager extends EventEmitter {
 
     return {
       current: currentXP,
-      required: requiredXP,
-      remaining: requiredXP - currentXP,
-      nextMilestone: nextLevelXP
+      required: requiredXP || 0,
+      remaining: (requiredXP || 0) - currentXP,
+      nextMilestone: nextLevelXP || 0
     };
   }
 
@@ -251,6 +251,18 @@ export class CharacterManager extends EventEmitter {
   async restoreResources(actorId: string, restType: 'short_rest' | 'long_rest'): Promise<ResourceManagement[]> {
     const resources = this.resourceTracking.get(actorId) || [];
     const restoredResources: ResourceManagement[] = [];
+
+    // Process resource restoration
+    for (const resource of resources) {
+      if ((restType === 'short_rest' && resource.resetType === 'short_rest') ||
+          (restType === 'long_rest' && (resource.resetType === 'long_rest' || resource.resetType === 'short_rest'))) {
+        resource.currentValue = resource.maxValue;
+        resource.lastReset = new Date();
+        restoredResources.push(resource);
+      }
+    }
+
+    return restoredResources;
 
     for (const resource of resources) {
       if (resource.resetType === restType ||
