@@ -166,7 +166,10 @@ export class CombatManager extends EventEmitter {
     }
 
     // Set current combatant
-    this.currentCombat.currentCombatant = this.currentCombat.combatants[this.currentCombat.turn];
+    const combatant = this.currentCombat.combatants[this.currentCombat.turn];
+    if (combatant) {
+      this.currentCombat.currentCombatant = combatant;
+    }
     this.currentCombat.turnStartTime = new Date();
 
     if (!this.currentCombat.started) {
@@ -175,7 +178,7 @@ export class CombatManager extends EventEmitter {
 
     this.emitCombatEvent('turn_start', this.currentCombat);
 
-    return this.currentCombat.currentCombatant;
+    return this.currentCombat.currentCombatant || null;
   }
 
   async applyDamage(combatantId: string, damage: number, damageType?: string): Promise<CombatantState> {
@@ -338,14 +341,14 @@ export class CombatManager extends EventEmitter {
       const combatant: CombatantState = {
         id: data.id || this.generateCombatantId(),
         name: data.name || 'Unknown',
-        initiative: data.initiative,
+        initiative: data.initiative || 0,
         hp: data.hp || { current: 1, max: 1 },
-        ac: data.ac,
+        ac: data.ac || 10,
         conditions: data.conditions || [],
         defeated: data.defeated || false,
         hidden: data.hidden || false,
-        actorId: data.actorId,
-        tokenId: data.tokenId,
+        actorId: data.actorId || '',
+        tokenId: data.tokenId || '',
         turnTaken: false,
         actions: {
           action: false,
@@ -424,7 +427,11 @@ export class CombatManager extends EventEmitter {
 
     let totalTime = 0;
     for (let i = 1; i < turnEvents.length; i++) {
-      totalTime += turnEvents[i].timestamp.getTime() - turnEvents[i - 1].timestamp.getTime();
+      const currentEvent = turnEvents[i];
+      const previousEvent = turnEvents[i - 1];
+      if (currentEvent && previousEvent) {
+        totalTime += currentEvent.timestamp.getTime() - previousEvent.timestamp.getTime();
+      }
     }
 
     return Math.round(totalTime / (turnEvents.length - 1) / 1000); // seconds
