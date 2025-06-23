@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-local-rest-api-module-v0.6.0...foundry-local-rest-api-module-v0.7.0) (2025-06-23)
+
+
+### Miscellaneous Chores
+
+* **foundry-local-rest-api-module:** Synchronize containers-moodle versions
+
 ## [0.6.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-local-rest-api-module-v0.5.0...foundry-local-rest-api-module-v0.6.0) (2025-06-23)
 
 
