@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.4.4...foundry-mcp-server-v0.5.0) (2025-06-23)
+
+
+### Features
+
+* add FoundryVTT v13 compatibility and API key configuration UI ([#20](https://github.com/laurigates/foundryvtt-mcp/issues/20)) ([c61559f](https://github.com/laurigates/foundryvtt-mcp/commit/c61559f758a14f4e1bb0d756b88758c10f120760))
+
 ## [0.4.4](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.4.3...foundry-mcp-server-v0.4.4) (2025-06-23)
 
 
