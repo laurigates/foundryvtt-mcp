@@ -1,0 +1,40 @@
+name: Build and Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Create FoundryVTT module zip
+        if: contains(github.event.release.tag_name, 'foundry-local-rest-api')
+        run: |
+          cd foundry-local-rest-api
+          zip -r ../foundry-local-rest-api.zip . -x "*.git*" "node_modules/*" "*.DS_Store*"
+          cd ..
+
+      - name: Upload FoundryVTT module artifacts
+        if: contains(github.event.release.tag_name, 'foundry-local-rest-api')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" foundry-local-rest-api.zip foundry-local-rest-api/module.json
