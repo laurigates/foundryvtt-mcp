@@ -1,23 +1,12 @@
 {
-  "$schema": "https://raw.googleapis.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "node",
   "packages": {
     ".": {
       "package-name": "foundry-mcp-server",
-      "changelog-sections": [
-        {"type": "feat", "section": "Features"},
-        {"type": "fix", "section": "Bug Fixes"},
-        {"type": "chore", "section": "Miscellaneous", "hidden": false}
-      ]
+      "release-type": "node"
     },
     "foundry-local-rest-api": {
-      "package-name": "foundry-local-rest-api-module", 
+      "package-name": "foundry-local-rest-api-module",
       "release-type": "simple",
-      "changelog-sections": [
-        {"type": "feat", "section": "Features"},
-        {"type": "fix", "section": "Bug Fixes"},
-        {"type": "chore", "section": "Miscellaneous", "hidden": false}
-      ],
       "extra-files": [
         {
           "type": "json",
@@ -26,5 +15,13 @@
         }
       ]
     }
-  }
+  },
+  "plugins": [
+    "node-workspace",
+    {
+      "type": "linked-versions",
+      "groupName": "containers-moodle",
+      "components": ["foundry-mcp-server", "foundry-local-rest-api-module"]
+    }
+  ]
 }
