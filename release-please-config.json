@@ -1,36 +1,10 @@
 {
-  "packages": {
-    ".": {
-      "component": "foundry-mcp-server",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "foundry-local-rest-api/module.json",
-          "jsonpath": "$.version"
-        }
-      ]
-    },
-    "foundry-local-rest-api": {
-      "component": "foundry-local-rest-api",
-      "release-type": "simple",
-      "extra-files": [
-        {
-          "type": "json",
-          "path": "foundry-local-rest-api/module.json",
-          "jsonpath": "$.version"
-        }
-      ]
-    }
-  },
-  "plugins": [
+  "release-type": "node",
+  "extra-files": [
     {
-      "type": "node-workspace",
-      "merge": false
-    },
-    {
-      "type": "linked-versions",
-      "groupName": "foundry-mcp-packages",
-      "components": ["foundry-mcp-server", "foundry-local-rest-api"]
+      "type": "json",
+      "path": "foundry-local-rest-api/module.json",
+      "jsonpath": "$.version"
     }
   ]
 }
