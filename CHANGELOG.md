@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.7.0...foundry-mcp-server-v0.8.0) (2025-06-23)
+
+
+### Features
+
+* Bump module version to 0.7.0 ([#27](https://github.com/laurigates/foundryvtt-mcp/issues/27)) ([cf1a38b](https://github.com/laurigates/foundryvtt-mcp/commit/cf1a38bde8b582833afcedae52dcce37929b2eb1))
+
 ## [0.7.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.6.0...foundry-mcp-server-v0.7.0) (2025-06-23)
 
 
