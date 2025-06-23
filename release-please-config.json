@@ -2,7 +2,14 @@
   "packages": {
     ".": {
       "package-name": "foundry-mcp-server",
-      "release-type": "node"
+      "release-type": "node",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        }
+      ]
     },
     "foundry-local-rest-api": {
       "package-name": "foundry-local-rest-api-module",
@@ -20,7 +27,7 @@
     "node-workspace",
     {
       "type": "linked-versions",
-      "groupName": "containers-moodle",
+      "groupName": "foundry-mcp-packages",
       "components": ["foundry-mcp-server", "foundry-local-rest-api-module"]
     }
   ]
