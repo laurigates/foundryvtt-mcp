@@ -10,7 +10,7 @@
   "authors": [
     {
       "name": "Lauri Gates",
-      "email": "laurigates@gmail.com"
+      "email": "lauri.gates@gmail.com"
     }
   ],
   "scripts": ["scripts/rest-api.js"],
