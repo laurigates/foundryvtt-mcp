@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.4.2...foundry-mcp-server-v0.4.3) (2025-06-23)
+
+
+### Miscellaneous
+
+* release main ([#14](https://github.com/laurigates/foundryvtt-mcp/issues/14)) ([4feba6d](https://github.com/laurigates/foundryvtt-mcp/commit/4feba6da1c3bba91c7ef6ea0b3d52a5a043e78bc))
+
 ## [0.4.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.4.1...foundry-mcp-server-v0.4.2) (2025-06-23)
 
 
