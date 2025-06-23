@@ -9,13 +9,11 @@
   },
   "authors": [
     {
-      "name": "FoundryVTT MCP Team",
-      "email": "support@example.com"
+      "name": "Lauri Gates",
+      "email": "laurigates@gmail.com"
     }
   ],
-  "scripts": [
-    "scripts/rest-api.js"
-  ],
+  "scripts": ["scripts/rest-api.js"],
   "styles": [],
   "languages": [
     {
@@ -24,17 +22,17 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/lgates/foundryvtt-mcp",
-  "manifest": "https://github.com/lgates/foundryvtt-mcp/releases/latest/download/module.json",
-  "download": "https://github.com/lgates/foundryvtt-mcp/releases/latest/download/foundry-local-rest-api.zip",
+  "url": "https://github.com/laurigates/foundryvtt-mcp",
+  "manifest": "https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json",
+  "download": "https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/foundry-local-rest-api.zip",
   "license": "MIT",
-  "readme": "https://github.com/lgates/foundryvtt-mcp/blob/main/foundry-local-rest-api/README.md",
-  "bugs": "https://github.com/lgates/foundryvtt-mcp/issues",
-  "changelog": "https://github.com/lgates/foundryvtt-mcp/releases",
+  "readme": "https://github.com/laurigates/foundryvtt-mcp/blob/main/foundry-local-rest-api/README.md",
+  "bugs": "https://github.com/laurigates/foundryvtt-mcp/issues",
+  "changelog": "https://github.com/laurigates/foundryvtt-mcp/releases",
   "media": [
     {
       "type": "icon",
-      "url": "https://raw.githubusercontent.com/lgates/foundryvtt-mcp/main/foundry-local-rest-api/icon.png"
+      "url": "https://raw.githubusercontent.com/laurigates/foundryvtt-mcp/main/foundry-local-rest-api/icon.png"
     }
   ]
 }
