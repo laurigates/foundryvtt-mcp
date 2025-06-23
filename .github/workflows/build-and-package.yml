@@ -1,4 +1,4 @@
-name: Build and Package
+name: Build MCP Server
 
 on:
   release:
@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-package:
+  build-mcp-server:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,17 +24,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Create FoundryVTT module zip
-        if: contains(github.event.release.tag_name, 'foundry-local-rest-api')
-        run: |
-          cd foundry-local-rest-api
-          zip -r ../foundry-local-rest-api.zip . -x "*.git*" "node_modules/*" "*.DS_Store*"
-          cd ..
-
-      - name: Upload FoundryVTT module artifacts
-        if: contains(github.event.release.tag_name, 'foundry-local-rest-api')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ github.event.release.tag_name }}" foundry-local-rest-api.zip foundry-local-rest-api/module.json
