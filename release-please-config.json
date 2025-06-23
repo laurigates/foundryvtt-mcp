@@ -1,7 +1,14 @@
 {
   "packages": {
     ".": {
-      "component": "foundry-mcp-server"
+      "component": "foundry-mcp-server",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "foundry-local-rest-api/module.json",
+          "jsonpath": "$.version"
+        }
+      ]
     },
     "foundry-local-rest-api": {
       "component": "foundry-local-rest-api",
