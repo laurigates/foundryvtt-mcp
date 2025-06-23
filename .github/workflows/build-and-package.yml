@@ -1,8 +1,10 @@
 name: Build MCP Server
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'foundry-local-rest-api-module-v*.*.*'
+      - 'foundry-mcp-server-v*.*.*'
 
 permissions:
   contents: write

@@ -3,6 +3,7 @@ name: Build FoundryVTT Module
 on:
   push:
     tags:
+      - 'foundry-local-rest-api-module-v*.*.*'
       - 'foundry-mcp-server-v*.*.*'
 
 permissions:
