@@ -1,0 +1,121 @@
+<form class="foundry-local-rest-api-config">
+  <div class="form-group">
+    <h2><i class="fas fa-key"></i> {{localize "foundry-local-rest-api.config.title"}}</h2>
+    <p class="notes">{{localize "foundry-local-rest-api.config.description"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="api-status">{{localize "foundry-local-rest-api.config.status"}}</label>
+    <div class="form-fields">
+      <span class="api-status {{#if isEnabled}}enabled{{else}}disabled{{/if}}">
+        <i class="fas {{#if isEnabled}}fa-check-circle{{else}}fa-times-circle{{/if}}"></i>
+        {{#if isEnabled}}{{localize "foundry-local-rest-api.config.enabled"}}{{else}}{{localize "foundry-local-rest-api.config.disabled"}}{{/if}}
+      </span>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="api-key-display">{{localize "foundry-local-rest-api.config.api-key"}}</label>
+    <div class="form-fields">
+      <input type="text" id="api-key-display" value="{{apiKey}}" readonly class="api-key-field">
+      <div class="button-group">
+        {{#if hasApiKey}}
+          <button type="button" id="copy-api-key" class="config-button">
+            <i class="fas fa-copy"></i> {{localize "foundry-local-rest-api.config.copy"}}
+          </button>
+        {{/if}}
+        <button type="button" id="regenerate-api-key" class="config-button">
+          <i class="fas fa-refresh"></i> {{localize "foundry-local-rest-api.config.regenerate"}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="base-url">{{localize "foundry-local-rest-api.config.base-url"}}</label>
+    <div class="form-fields">
+      <input type="text" id="base-url" value="{{baseUrl}}" readonly>
+      <p class="notes">{{localize "foundry-local-rest-api.config.base-url-hint"}}</p>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "foundry-local-rest-api.config.connection-test"}}</label>
+    <div class="form-fields">
+      <button type="button" id="test-connection" class="config-button">
+        <i class="fas fa-plug"></i> {{localize "foundry-local-rest-api.config.test"}}
+      </button>
+      <p class="notes">{{localize "foundry-local-rest-api.config.test-hint"}}</p>
+    </div>
+  </div>
+
+  {{#if hasApiKey}}
+  <div class="form-group">
+    <label>{{localize "foundry-local-rest-api.config.example-usage"}}</label>
+    <div class="form-fields">
+      <pre class="code-example">curl -H "X-API-Key: {{apiKey}}" {{baseUrl}}/status</pre>
+      <p class="notes">{{localize "foundry-local-rest-api.config.example-hint"}}</p>
+    </div>
+  </div>
+  {{/if}}
+</form>
+
+<style>
+.foundry-local-rest-api-config {
+  padding: 10px;
+}
+
+.foundry-local-rest-api-config .form-group {
+  margin-bottom: 20px;
+}
+
+.foundry-local-rest-api-config .api-key-field {
+  font-family: monospace;
+  background: var(--color-bg-option);
+  border: 1px solid var(--color-border-light-tertiary);
+  color: var(--color-text-primary);
+}
+
+.foundry-local-rest-api-config .button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.foundry-local-rest-api-config .config-button {
+  padding: 6px 12px;
+  background: var(--color-bg-btn);
+  border: 1px solid var(--color-border-light-tertiary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.foundry-local-rest-api-config .config-button:hover {
+  background: var(--color-bg-btn-hover);
+}
+
+.foundry-local-rest-api-config .api-status {
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+
+.foundry-local-rest-api-config .api-status.enabled {
+  color: var(--color-text-light-success);
+}
+
+.foundry-local-rest-api-config .api-status.disabled {
+  color: var(--color-text-light-danger);
+}
+
+.foundry-local-rest-api-config .code-example {
+  background: var(--color-bg-option);
+  border: 1px solid var(--color-border-light-tertiary);
+  padding: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  overflow-x: auto;
+}
+</style>

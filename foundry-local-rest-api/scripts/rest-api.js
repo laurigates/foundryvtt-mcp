@@ -60,7 +60,7 @@ class FoundryLocalRestAPI {
       name: game.i18n.localize('foundry-local-rest-api.settings.api-key.name'),
       hint: game.i18n.localize('foundry-local-rest-api.settings.api-key.hint'),
       scope: 'world',
-      config: true,
+      config: false,
       type: String,
       default: '',
       onChange: (value) => {
@@ -75,6 +75,14 @@ class FoundryLocalRestAPI {
       config: true,
       type: Boolean,
       default: false
+    });
+
+    game.settings.registerMenu('foundry-local-rest-api', 'api-config', {
+      name: game.i18n.localize('foundry-local-rest-api.settings.api-config.name'),
+      hint: game.i18n.localize('foundry-local-rest-api.settings.api-config.hint'),
+      icon: 'fas fa-key',
+      type: ApiConfigurationForm,
+      restricted: true
     });
   }
 
@@ -256,5 +264,108 @@ Hooks.once('init', () => {
   FoundryLocalRestAPI.initialize();
 });
 
+/**
+ * Configuration form for API settings
+ */
+class ApiConfigurationForm extends FormApplication {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: 'foundry-local-rest-api-config',
+      title: game.i18n.localize('foundry-local-rest-api.config.title'),
+      template: 'modules/foundry-local-rest-api/templates/api-config.hbs',
+      width: 500,
+      height: 'auto',
+      closeOnSubmit: false,
+      submitOnChange: false,
+      resizable: true
+    });
+  }
+
+  getData() {
+    const apiKey = game.settings.get('foundry-local-rest-api', 'api-key');
+    const isEnabled = game.settings.get('foundry-local-rest-api', 'enable-api');
+    const port = game.socket?.socket?.io?.engine?.port || '30000';
+    
+    return {
+      apiKey: apiKey || 'No API key generated',
+      hasApiKey: !!apiKey,
+      isEnabled,
+      port,
+      baseUrl: `${window.location.protocol}//${window.location.hostname}:${port}/api`
+    };
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    
+    html.find('#copy-api-key').click(this._onCopyApiKey.bind(this));
+    html.find('#regenerate-api-key').click(this._onRegenerateApiKey.bind(this));
+    html.find('#test-connection').click(this._onTestConnection.bind(this));
+  }
+
+  async _onCopyApiKey(event) {
+    event.preventDefault();
+    const apiKey = game.settings.get('foundry-local-rest-api', 'api-key');
+    
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      ui.notifications.info(game.i18n.localize('foundry-local-rest-api.config.api-key-copied'));
+    } catch (err) {
+      ui.notifications.error(game.i18n.localize('foundry-local-rest-api.config.copy-failed'));
+    }
+  }
+
+  async _onRegenerateApiKey(event) {
+    event.preventDefault();
+    
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize('foundry-local-rest-api.config.regenerate-confirm-title') },
+      content: `<p>${game.i18n.localize('foundry-local-rest-api.config.regenerate-confirm-content')}</p>`,
+      yes: { label: game.i18n.localize('foundry-local-rest-api.config.regenerate') },
+      no: { label: game.i18n.localize('foundry-local-rest-api.config.cancel') }
+    });
+
+    if (confirmed) {
+      window.foundryLocalRestAPI.generateApiKey();
+      this.render();
+    }
+  }
+
+  async _onTestConnection(event) {
+    event.preventDefault();
+    const apiKey = game.settings.get('foundry-local-rest-api', 'api-key');
+    const port = game.socket?.socket?.io?.engine?.port || '30000';
+    const baseUrl = `${window.location.protocol}//${window.location.hostname}:${port}/api`;
+    
+    try {
+      const response = await fetch(`${baseUrl}/status`, {
+        headers: {
+          'X-API-Key': apiKey
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        ui.notifications.info(game.i18n.format('foundry-local-rest-api.config.test-success', { 
+          status: data.status, 
+          version: data.version 
+        }));
+      } else {
+        ui.notifications.error(game.i18n.format('foundry-local-rest-api.config.test-failed', { 
+          status: response.status 
+        }));
+      }
+    } catch (error) {
+      ui.notifications.error(game.i18n.format('foundry-local-rest-api.config.test-error', { 
+        error: error.message 
+      }));
+    }
+  }
+
+  async _updateObject(event, formData) {
+    // This form is read-only, no updates needed
+  }
+}
+
 // Export for external access
-export { FoundryLocalRestAPI };
+export { FoundryLocalRestAPI, ApiConfigurationForm };
