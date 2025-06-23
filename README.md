@@ -204,6 +204,13 @@ Ask your AI assistant things like:
 - `roll_table` - Random encounters, events, weather
 - `suggest_tactics` - Combat advice and strategy
 
+### Diagnostics & System Health
+
+- `get_system_health` - Server performance and health metrics
+- `get_recent_logs` - Retrieve filtered FoundryVTT logs
+- `search_logs` - Search logs with regex patterns
+- `diagnose_errors` - Analyze errors with troubleshooting suggestions
+
 ## Available Resources
 
 The server exposes these FoundryVTT resources:
@@ -238,7 +245,36 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 - Run server on internal network only
 - Monitor logs for suspicious activity
 
-## Troubleshooting
+## Diagnostics & Troubleshooting
+
+### Built-in Diagnostics
+
+The server includes comprehensive diagnostic tools to help troubleshoot connection and performance issues:
+
+**Connection Testing:**
+```bash
+# Test complete MCP connection and functionality
+npm run test-connection
+
+# Clean build and test setup
+npm run setup
+```
+
+**Diagnostic Tools (via AI assistant):**
+- **System Health:** "Get the FoundryVTT system health status"
+- **Error Analysis:** "Diagnose recent errors and provide recommendations"
+- **Log Search:** "Search logs for 'connection' patterns in the last hour"
+- **Recent Issues:** "Show me recent error logs"
+
+### Advanced Diagnostics
+
+When using the **Local REST API module**, you get access to advanced diagnostic features:
+
+- 🔍 **Real-time Log Analysis** - Monitor FoundryVTT console output and notifications
+- 📊 **System Health Metrics** - Server performance, memory usage, and client connections
+- 🎯 **Error Pattern Recognition** - Automatic detection of common issues
+- 💡 **Smart Suggestions** - Context-aware troubleshooting recommendations
+- 📈 **Performance Monitoring** - Track server uptime and response times
 
 ### Connection Issues
 
