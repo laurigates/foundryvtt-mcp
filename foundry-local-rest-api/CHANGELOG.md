@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.3](https://github.com/laurigates/foundryvtt-mcp/compare/v0.4.2...v0.4.3) (2025-06-23)
+
+
+### Bug Fixes
+
+* **author:** update author email ([#12](https://github.com/laurigates/foundryvtt-mcp/issues/12)) ([06e3895](https://github.com/laurigates/foundryvtt-mcp/commit/06e38952cce20a6517725f4a6dc7bbdf9c044661))
+
+
+### Miscellaneous
+
+* release main ([#13](https://github.com/laurigates/foundryvtt-mcp/issues/13)) ([2d1fdf5](https://github.com/laurigates/foundryvtt-mcp/commit/2d1fdf5f8de659dd95972000874d3b3dc1a5d0fc))
+
 ## [0.4.2](https://github.com/laurigates/foundryvtt-mcp/compare/v0.4.1...v0.4.2) (2025-06-23)
 
 
