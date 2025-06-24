@@ -1,10 +1,14 @@
 {
   "release-type": "node",
-  "extra-files": [
-    {
-      "type": "json",
-      "path": "foundry-local-rest-api/module.json",
-      "jsonpath": "$.version"
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "module.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
-  ]
+  }
 }
