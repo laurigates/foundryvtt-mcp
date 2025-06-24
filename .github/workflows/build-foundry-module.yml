@@ -3,7 +3,7 @@ name: Build FoundryVTT Module
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'foundry-mcp-server-v*.*.*'
 
 permissions:
   contents: write
