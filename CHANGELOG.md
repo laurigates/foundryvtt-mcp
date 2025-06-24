@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.0...foundry-mcp-server-v0.9.1) (2025-06-24)
+
+
+### Bug Fixes
+
+* workflow trigger tags ([#36](https://github.com/laurigates/foundryvtt-mcp/issues/36)) ([f60c84d](https://github.com/laurigates/foundryvtt-mcp/commit/f60c84d69bf042149124124e08808fb9504f5efb))
+
 ## [0.9.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.8.1...foundry-mcp-server-v0.9.0) (2025-06-24)
 
 
