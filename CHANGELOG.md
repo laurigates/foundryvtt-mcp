@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.1...foundry-mcp-server-v0.9.2) (2025-06-24)
+
+
+### Bug Fixes
+
+* improve config layout ([#40](https://github.com/laurigates/foundryvtt-mcp/issues/40)) ([f6496e2](https://github.com/laurigates/foundryvtt-mcp/commit/f6496e295345eed2b1203a630a482797f1f6d16d))
+
 ## [0.9.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.0...foundry-mcp-server-v0.9.1) (2025-06-24)
 
 
