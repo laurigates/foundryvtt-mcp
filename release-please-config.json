@@ -5,7 +5,7 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "module.json",
+          "path": "foundry-local-rest-api/module.json",
           "jsonpath": "$.version"
         }
       ]
