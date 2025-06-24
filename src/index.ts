@@ -27,6 +27,7 @@ import {
 import dotenv from 'dotenv';
 import { FoundryClient } from './foundry/client.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
+import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
 import { config } from './config/index.js';
 
@@ -41,6 +42,7 @@ class FoundryMCPServer {
   private server: Server;
   private foundryClient: FoundryClient;
   private diagnosticsClient: DiagnosticsClient;
+  private diagnosticSystem: DiagnosticSystem;
 
   /**
    * Creates a new FoundryMCPServer instance.
@@ -74,6 +76,9 @@ class FoundryMCPServer {
 
     // Initialize DiagnosticsClient
     this.diagnosticsClient = new DiagnosticsClient(this.foundryClient);
+
+    // Initialize DiagnosticSystem
+    this.diagnosticSystem = new DiagnosticSystem(this.foundryClient);
 
     this.setupHandlers();
   }
@@ -336,6 +341,20 @@ class FoundryMCPServer {
               },
             },
           },
+          {
+            name: 'get_health_status',
+            description: 'Get comprehensive health check and system status',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                detailed: {
+                  type: 'boolean',
+                  description: 'Include detailed diagnostic information',
+                  default: true,
+                },
+              },
+            },
+          },
         ],
       };
     });
@@ -428,6 +447,8 @@ class FoundryMCPServer {
             return await this.handleGetSystemHealth(args);
           case 'diagnose_errors':
             return await this.handleDiagnoseErrors(args);
+          case 'get_health_status':
+            return await this.handleGetHealthStatus(args);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -539,39 +560,63 @@ class FoundryMCPServer {
   private async handleSearchActors(args: any) {
     const { query, type, limit = 10 } = args;
 
-    const actors = await this.foundryClient.searchActors({
-      query,
-      type,
-      limit: Math.min(limit, 50), // Cap at 50 for performance
-    });
+    try {
+      const actors = await this.foundryClient.searchActors({
+        query,
+        type,
+        limit: Math.min(limit, 50), // Cap at 50 for performance
+      });
 
-    if (actors.actors.length === 0) {
+      if (actors.actors.length === 0) {
+        // Use diagnostic system to provide helpful guidance
+        const diagnostic = await this.diagnosticSystem.diagnoseFeatureProblem('actors');
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `🔍 **No actors found**${query ? ` matching "${query}"` : ''}\n\n` +
+                    `**${diagnostic.explanation}**\n\n` +
+                    `**💡 Solutions:**\n${diagnostic.suggestions}\n\n` +
+                    `${diagnostic.canContinue ? '✅ You can continue using other features while resolving this.' : '⚠️ This issue needs to be resolved for actor search to work.'}\n\n` +
+                    `📚 **Need help?** See: ${diagnostic.documentationUrl || 'SETUP_GUIDE.md'}`,
+            },
+          ],
+        };
+      }
+
+      const actorList = actors.actors.map(actor =>
+        `• **${actor.name}** (${actor.type}) - HP: ${actor.hp?.value || 'N/A'}/${actor.hp?.max || 'N/A'}`
+      ).join('\n');
+
       return {
         content: [
           {
             type: 'text',
-            text: `No actors found${query ? ` matching "${query}"` : ''}.\n\n` +
-                  `💡 **Tip**: If you're getting empty results, you may need to:\n` +
-                  `• Install and configure the "Foundry REST API" module\n` +
-                  `• Set USE_REST_MODULE=true in your environment\n` +
-                  `• Or search for actors directly in FoundryVTT first`,
+            text: `🎭 **Found ${actors.actors.length} actor${actors.actors.length === 1 ? '' : 's'}:**\n\n${actorList}\n\n` +
+                  `${actors.total > actors.actors.length ? `📊 Showing ${actors.actors.length} of ${actors.total} total actors` : ''}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Actor search failed:', error);
+      
+      // Provide diagnostic information for the error
+      const diagnostic = await this.diagnosticSystem.diagnoseFeatureProblem('actors');
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ **Actor search failed**\n\n` +
+                  `**Issue:** ${diagnostic.explanation}\n\n` +
+                  `**Solutions:**\n${diagnostic.suggestions}\n\n` +
+                  `**Technical details:** ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                  `📚 **Troubleshooting guide:** ${diagnostic.documentationUrl || 'SETUP_GUIDE.md'}`,
           },
         ],
       };
     }
-
-    const actorList = actors.actors.map(actor =>
-      `• **${actor.name}** (${actor.type}) - HP: ${actor.hp?.value || 'N/A'}/${actor.hp?.max || 'N/A'}`
-    ).join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Found ${actors.actors.length} actors:\n\n${actorList}`,
-        },
-      ],
-    };
   }
 
   /**
@@ -615,37 +660,65 @@ class FoundryMCPServer {
   private async handleSearchItems(args: any) {
     const { query, type, rarity, limit = 10 } = args;
 
-    const items = await this.foundryClient.searchItems({
-      query,
-      type,
-      rarity,
-      limit: Math.min(limit, 50),
-    });
+    try {
+      const items = await this.foundryClient.searchItems({
+        query,
+        type,
+        rarity,
+        limit: Math.min(limit, 50),
+      });
 
-    if (items.items.length === 0) {
+      if (items.items.length === 0) {
+        // Use diagnostic system to provide helpful guidance
+        const diagnostic = await this.diagnosticSystem.diagnoseFeatureProblem('items');
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `🎒 **No items found**${query ? ` matching "${query}"` : ''}${type ? ` of type "${type}"` : ''}${rarity ? ` with rarity "${rarity}"` : ''}\n\n` +
+                    `**${diagnostic.explanation}**\n\n` +
+                    `**💡 Solutions:**\n${diagnostic.suggestions}\n\n` +
+                    `${diagnostic.canContinue ? '✅ You can continue using other features while resolving this.' : '⚠️ This issue needs to be resolved for item search to work.'}\n\n` +
+                    `📚 **Need help?** See: ${diagnostic.documentationUrl || 'SETUP_GUIDE.md'}`,
+            },
+          ],
+        };
+      }
+
+      const itemList = items.items.map(item =>
+        `• **${item.name}** (${item.type})${item.rarity ? ` - ${item.rarity}` : ''}${item.price ? ` - ${item.price.value} ${item.price.denomination || 'gp'}` : ''}`
+      ).join('\n');
+
       return {
         content: [
           {
             type: 'text',
-            text: `No items found${query ? ` matching "${query}"` : ''}.\n\n` +
-                  `💡 **Tip**: Item searching requires the REST API module for full functionality.`,
+            text: `🗡️ **Found ${items.items.length} item${items.items.length === 1 ? '' : 's'}:**\n\n${itemList}\n\n` +
+                  `${items.total > items.items.length ? `📊 Showing ${items.items.length} of ${items.total} total items` : ''}` +
+                  `${query || type || rarity ? '\n\n💡 **Tip:** Remove filters to see more items' : ''}`,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Item search failed:', error);
+      
+      // Provide diagnostic information for the error
+      const diagnostic = await this.diagnosticSystem.diagnoseFeatureProblem('items');
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ **Item search failed**\n\n` +
+                  `**Issue:** ${diagnostic.explanation}\n\n` +
+                  `**Solutions:**\n${diagnostic.suggestions}\n\n` +
+                  `**Technical details:** ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                  `📚 **Troubleshooting guide:** ${diagnostic.documentationUrl || 'SETUP_GUIDE.md'}`,
           },
         ],
       };
     }
-
-    const itemList = items.items.map(item =>
-      `• **${item.name}** (${item.type}) ${item.rarity ? `- ${item.rarity}` : ''}`
-    ).join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Found ${items.items.length} items:\n\n${itemList}`,
-        },
-      ],
-    };
   }
 
   /**
@@ -1042,6 +1115,79 @@ ${recentErrorsText || 'No recent errors found'}`;
         ErrorCode.InternalError,
         `Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    }
+  }
+
+  /**
+   * Handles health status requests
+   * @param args - Arguments containing detailed flag
+   * @returns MCP response with comprehensive health information
+   */
+  private async handleGetHealthStatus(args: any) {
+    const { detailed = true } = args;
+
+    try {
+      // Perform comprehensive health check
+      const healthReport = await this.diagnosticSystem.performHealthCheck();
+      
+      // Format the health report for display
+      const formattedReport = this.diagnosticSystem.formatHealthReport(healthReport);
+      
+      let responseText = formattedReport;
+      
+      if (detailed) {
+        // Add additional diagnostic information
+        responseText += '\n\n🔧 **Quick Diagnostic Commands:**\n';
+        responseText += '• Test connection: `npm run test-connection`\n';
+        responseText += '• Check configuration: Review your .env file\n';
+        responseText += '• View logs: Check FoundryVTT console for errors\n';
+        responseText += '• Module status: Verify REST API module is enabled\n\n';
+        
+        // Add configuration summary
+        responseText += '⚙️ **Current Configuration:**\n';
+        responseText += `• Server URL: ${config.foundry.url}\n`;
+        responseText += `• Authentication: ${config.foundry.apiKey ? 'API Key' : 'Username/Password'}\n`;
+        responseText += `• Timeout: ${config.foundry.timeout}ms\n`;
+        responseText += `• Retry Attempts: ${config.foundry.retryAttempts}\n`;
+        
+        // Add feature recommendations
+        if (!healthReport.restApiAvailable) {
+          responseText += '\n\n🚀 **Recommended Next Steps:**\n';
+          responseText += '1. **Install REST API Module**: Download from FoundryVTT module browser\n';
+          responseText += '2. **Enable Module**: Activate in your world settings\n';
+          responseText += '3. **Generate API Key**: Configure in module settings\n';
+          responseText += '4. **Update Configuration**: Add API key to .env file\n';
+          responseText += '5. **Restart Services**: Restart both FoundryVTT and MCP server\n';
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Health check failed:', error);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ **Health Check Failed**\n\n` +
+                  `Unable to perform health diagnostics due to an error:\n\n` +
+                  `**Error:** ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                  `**Basic Troubleshooting:**\n` +
+                  `• Ensure FoundryVTT is running and accessible\n` +
+                  `• Check your .env configuration file\n` +
+                  `• Verify network connectivity\n` +
+                  `• Try restarting the MCP server\n\n` +
+                  `📚 **Need help?** See: TROUBLESHOOTING.md`,
+          },
+        ],
+      };
     }
   }
 
@@ -1572,22 +1718,120 @@ ${recentErrorsText || 'No recent errors found'}`;
   }
 
   /**
+   * Logs startup diagnostic results
+   * @private
+   */
+  private logStartupDiagnostics(healthReport: any): void {
+    logger.info(`🔗 Connection: ${healthReport.connectivity.status.toUpperCase()} ${healthReport.connectivity.emoji}`);
+    logger.info(`🔐 Authentication: ${healthReport.authentication.method.toUpperCase()} ${healthReport.authentication.emoji}`);
+    
+    if (healthReport.authentication.status === 'invalid') {
+      logger.warn('   ⚠️ Authentication failed - some features may be limited');
+    }
+    
+    logger.info(`🏪 REST API Module: ${healthReport.restApiAvailable ? '✅ Available' : '❌ Not detected'}`);
+    
+    if (healthReport.connectivity.status === 'limited') {
+      logger.warn('   ⚠️ Limited functionality - REST API module recommended for full features');
+    }
+  }
+
+  /**
+   * Logs feature availability summary
+   * @private
+   */
+  private logFeatureSummary(healthReport: any): void {
+    const features = healthReport.features;
+    
+    logger.info('\n📊 Feature Availability:');
+    logger.info(`   🎲 Dice Rolling: ${features.diceRolling ? '✅' : '❌'}`);
+    logger.info(`   🎭 Actor Search: ${features.actorSearch ? '✅ Full' : '⚠️ Limited'}`);
+    logger.info(`   🗡️ Item Search: ${features.itemSearch ? '✅ Full' : '⚠️ Limited'}`);
+    logger.info(`   🗺️ Scene Data: ${features.sceneData ? '✅ Real-time' : '⚠️ Mock data'}`);
+    logger.info(`   🏥 Diagnostics: ${features.diagnostics ? '✅' : '❌'}`);
+    
+    const workingFeatures = Object.values(features).filter(Boolean).length;
+    const totalFeatures = Object.keys(features).length;
+    
+    if (workingFeatures === totalFeatures) {
+      logger.info(`\n🎉 All ${totalFeatures} features operational!`);
+    } else {
+      logger.info(`\n📈 ${workingFeatures}/${totalFeatures} features operational`);
+    }
+  }
+
+  /**
    * Starts the MCP server and connects to FoundryVTT
    */
   async start(): Promise<void> {
-    logger.info('Starting FoundryVTT MCP Server...');
+    const startTime = Date.now();
+    logger.info('🚀 Starting FoundryVTT MCP Server...');
+    logger.info(`📋 Configuration: ${config.foundry.url} (${config.foundry.apiKey ? 'API Key' : 'Credentials'})`);
 
     try {
-      // Test connection to FoundryVTT
-      await this.foundryClient.testConnection();
-      logger.info('✅ Connected to FoundryVTT successfully');
+      // Perform comprehensive startup diagnostics
+      logger.info('🔍 Running startup diagnostics...');
+      const healthReport = await this.diagnosticSystem.performHealthCheck();
+      
+      // Log diagnostic results
+      this.logStartupDiagnostics(healthReport);
+      
+      // Determine if we can continue based on health check
+      if (healthReport.connectivity.status === 'offline') {
+        logger.error('❌ Cannot start: FoundryVTT is not accessible');
+        logger.error(`   ${healthReport.connectivity.details}`);
+        logger.error('\n🔧 Troubleshooting:');
+        logger.error('   1. Ensure FoundryVTT is running');
+        logger.error('   2. Check FOUNDRY_URL in your .env file');
+        logger.error('   3. Verify network connectivity');
+        process.exit(1);
+      }
 
+      // Start MCP transport
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
 
-      logger.info(`🚀 FoundryVTT MCP Server running (${config.serverName} v${config.serverVersion})`);
+      const startupTime = Date.now() - startTime;
+      logger.info(`✅ FoundryVTT MCP Server running (${config.serverName} v${config.serverVersion})`);
+      logger.info(`⚡ Startup completed in ${startupTime}ms`);
+      
+      // Log feature availability summary
+      this.logFeatureSummary(healthReport);
+      
+      // Show helpful tips for improved functionality
+      if (!healthReport.restApiAvailable) {
+        logger.info('\n💡 Enhanced Features Available:');
+        logger.info('   Install the "Foundry Local REST API" module for:');
+        logger.info('   • Full actor and item search capabilities');
+        logger.info('   • Real-time scene data access');
+        logger.info('   • System health monitoring and diagnostics');
+        logger.info('   📚 Setup guide: https://github.com/laurigates/foundryvtt-mcp#setup');
+      }
+
     } catch (error) {
       logger.error('❌ Failed to start server:', error);
+      
+      if (error instanceof Error) {
+        // Provide specific guidance based on error type
+        if (error.message.includes('ECONNREFUSED')) {
+          logger.error('\n🔧 Connection Refused - FoundryVTT may not be running');
+          logger.error('   1. Start FoundryVTT server');
+          logger.error('   2. Ensure it\'s accessible at the configured URL');
+          logger.error(`   3. Test manually: ${config.foundry.url}`);
+        } else if (error.message.includes('ENOTFOUND')) {
+          logger.error('\n🔧 Host Not Found - Check your URL configuration');
+          logger.error('   1. Verify FOUNDRY_URL in .env file');
+          logger.error('   2. Check DNS resolution');
+          logger.error('   3. Ensure no typos in hostname');
+        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          logger.error('\n🔧 Authentication Failed');
+          logger.error('   1. Check API key or username/password');
+          logger.error('   2. Verify user has required permissions');
+          logger.error('   3. Try regenerating API key in FoundryVTT');
+        }
+      }
+      
+      logger.error('\n📚 For detailed troubleshooting: TROUBLESHOOTING.md');
       process.exit(1);
     }
   }

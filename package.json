@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test-connection": "tsx scripts/test-connection.ts",
+    "setup-wizard": "tsx scripts/setup-wizard.ts",
     "lint": "eslint src --ext .ts",
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
