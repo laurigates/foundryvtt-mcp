@@ -134,6 +134,11 @@ export class FoundryClient {
    * ```
    */
   constructor(config: FoundryClientConfig) {
+    // Validate required configuration
+    if (!config.baseUrl) {
+      throw new Error('baseUrl is required for FoundryVTT client');
+    }
+    
     this.config = {
       timeout: 10000,
       retryAttempts: 3,
@@ -315,6 +320,7 @@ export class FoundryClient {
     } else {
       // Use WebSocket connection
       await this.connectWebSocket();
+      this._isConnected = true;
     }
   }
 
@@ -489,30 +495,14 @@ export class FoundryClient {
    * ```
    */
   async searchActors(params: SearchActorsParams): Promise<ActorSearchResult> {
-    try {
-      logger.debug('Searching actors', params);
+    logger.debug('Searching actors', params);
 
-      if (this.config.apiKey) {
-        const queryParams = new URLSearchParams();
-        if (params.query) {
-          queryParams.append('search', params.query);
-        }
-        if (params.type) {
-          queryParams.append('type', params.type);
-        }
-        if (params.limit) {
-          queryParams.append('limit', params.limit.toString());
-        }
-
-        const response = await this.http.get(`/api/actors`, { params });
-        return response.data;
-      } else {
-        // Fallback: return mock data or empty array
-        logger.warn('Actor search requires REST API module - returning empty results');
-        return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
-      }
-    } catch (error) {
-      logger.error('Actor search failed:', error);
+    if (this.config.apiKey) {
+      const response = await this.retryRequest(() => this.http.get(`/api/actors`, { params }));
+      return response.data;
+    } else {
+      // Fallback: return mock data or empty array
+      logger.warn('Actor search requires REST API module - returning empty results');
       return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
     }
   }
@@ -559,18 +549,13 @@ export class FoundryClient {
    * ```
    */
   async searchItems(params: SearchItemsParams): Promise<ItemSearchResult> {
-    try {
-      logger.debug('Searching items', params);
+    logger.debug('Searching items', params);
 
-      if (this.config.apiKey) {
-        const response = await this.http.get(`/api/items`, { params });
-        return response.data;
-      } else {
-        logger.warn('Item search requires REST API module - returning empty results');
-        return { items: [], total: 0, page: 1, limit: params.limit || 10 };
-      }
-    } catch (error) {
-      logger.error('Item search failed:', error);
+    if (this.config.apiKey) {
+      const response = await this.retryRequest(() => this.http.get(`/api/items`, { params }));
+      return response.data;
+    } else {
+      logger.warn('Item search requires REST API module - returning empty results');
       return { items: [], total: 0, page: 1, limit: params.limit || 10 };
     }
   }
@@ -683,35 +668,48 @@ export class FoundryClient {
 
     const wsUrl = this.config.baseUrl.replace(/^http/, 'ws') + '/socket.io/';
 
-    try {
-      this.ws = new WebSocket(wsUrl);
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(wsUrl);
 
-      this.ws.on('open', () => {
-        logger.info('WebSocket connected to FoundryVTT');
-      });
+        this.ws.on('open', () => {
+          logger.info('WebSocket connected to FoundryVTT');
+          resolve();
+        });
 
-      this.ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          this.handleWebSocketMessage(message);
-        } catch (error) {
-          logger.warn('Failed to parse WebSocket message:', error);
-        }
-      });
+        this.ws.on('message', (data) => {
+          try {
+            const message = JSON.parse(data.toString());
+            this.handleWebSocketMessage(message);
 
-      this.ws.on('error', (error) => {
-        logger.error('WebSocket error:', error);
-      });
+            // Handle message type callbacks
+            if (this.messageHandlers) {
+              const handler = this.messageHandlers.get(message.type);
+              if (handler) {
+                handler(message.data);
+              }
+            }
+          } catch (error) {
+            logger.warn('Failed to parse WebSocket message:', error);
+          }
+        });
 
-      this.ws.on('close', () => {
-        logger.info('WebSocket disconnected');
-        this.ws = null;
-        this._isConnected = false;
-      });
-    } catch (error) {
-      logger.error('WebSocket connection failed:', error);
-      throw error;
-    }
+        this.ws.on('error', (error) => {
+          logger.error('WebSocket error:', error);
+          this._isConnected = false;
+          reject(error);
+        });
+
+        this.ws.on('close', () => {
+          logger.info('WebSocket disconnected');
+          this.ws = null;
+          this._isConnected = false;
+        });
+      } catch (error) {
+        logger.error('WebSocket connection failed:', error);
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -788,5 +786,39 @@ export class FoundryClient {
       logger.error(`DELETE request to ${url} failed:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Retry mechanism for HTTP requests
+   *
+   * @private
+   * @param requestFn - Function that performs the HTTP request
+   * @returns Promise resolving to the response
+   */
+  private async retryRequest(requestFn: () => Promise<any>): Promise<any> {
+    let lastError: any;
+    const maxAttempts = (this.config.retryAttempts || 3) + 1; // +1 for initial attempt
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await requestFn();
+        if (!response) {
+          throw new Error('Request returned undefined response');
+        }
+        return response;
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxAttempts) {
+          logger.error(`Request failed after ${maxAttempts} attempts:`, error);
+          throw error;
+        }
+        
+        logger.warn(`Request attempt ${attempt} failed, retrying...`, error);
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay || 1000));
+      }
+    }
+    
+    throw lastError;
   }
 }
