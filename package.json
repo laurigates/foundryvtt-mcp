@@ -18,7 +18,8 @@
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
     "docs:serve": "npm run docs && npx http-server docs",
-    "setup": "npm run clean && npm run build && npm run test-connection"
+    "setup": "npm run clean && npm run build && npm run test-connection",
+    "process-template": "node scripts/process-template.cjs"
   },
   "keywords": [
     "foundry",
