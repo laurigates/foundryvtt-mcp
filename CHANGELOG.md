@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.2...foundry-mcp-server-v0.9.3) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#43](https://github.com/laurigates/foundryvtt-mcp/issues/43) - FoundryClient connection lifecycle ([#46](https://github.com/laurigates/foundryvtt-mcp/issues/46)) ([9c315d6](https://github.com/laurigates/foundryvtt-mcp/commit/9c315d6a1ff1b38de7b537a900ef3bdff197d4b9))
+
 ## [0.9.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.1...foundry-mcp-server-v0.9.2) (2025-06-24)
 
 
