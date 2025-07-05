@@ -236,7 +236,19 @@ export class FoundryClient {
   private handleWebSocketMessage(message: any): void {
     logger.debug('WebSocket message received:', message);
 
-    // Handle different message types
+    // Call registered message handlers first
+    if (this.messageHandlers && this.messageHandlers.has(message.type)) {
+      const handler = this.messageHandlers.get(message.type);
+      if (handler) {
+        try {
+          handler(message.data);
+        } catch (error) {
+          logger.error('Error in message handler:', error);
+        }
+      }
+    }
+
+    // Handle built-in message types
     switch (message.type) {
       case 'combatUpdate':
         logger.info('Combat state updated');
@@ -683,35 +695,42 @@ export class FoundryClient {
 
     const wsUrl = this.config.baseUrl.replace(/^http/, 'ws') + '/socket.io/';
 
-    try {
-      this.ws = new WebSocket(wsUrl);
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(wsUrl);
 
-      this.ws.on('open', () => {
-        logger.info('WebSocket connected to FoundryVTT');
-      });
+        this.ws.on('open', () => {
+          this._isConnected = true;
+          logger.info('WebSocket connected to FoundryVTT');
+          resolve();
+        });
 
-      this.ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          this.handleWebSocketMessage(message);
-        } catch (error) {
-          logger.warn('Failed to parse WebSocket message:', error);
-        }
-      });
+        this.ws.on('message', (data) => {
+          try {
+            const message = JSON.parse(data.toString());
+            this.handleWebSocketMessage(message);
+          } catch (error) {
+            logger.warn('Failed to parse WebSocket message:', error);
+          }
+        });
 
-      this.ws.on('error', (error) => {
-        logger.error('WebSocket error:', error);
-      });
+        this.ws.on('error', (error) => {
+          logger.error('WebSocket error:', error);
+          this.ws = null;
+          this._isConnected = false;
+          reject(error);
+        });
 
-      this.ws.on('close', () => {
-        logger.info('WebSocket disconnected');
-        this.ws = null;
-        this._isConnected = false;
-      });
-    } catch (error) {
-      logger.error('WebSocket connection failed:', error);
-      throw error;
-    }
+        this.ws.on('close', () => {
+          logger.info('WebSocket disconnected');
+          this.ws = null;
+          this._isConnected = false;
+        });
+      } catch (error) {
+        logger.error('WebSocket connection failed:', error);
+        reject(error);
+      }
+    });
   }
 
   /**

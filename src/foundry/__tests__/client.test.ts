@@ -269,7 +269,7 @@ describe('FoundryClient', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-api-key',
+        // No apiKey - this will use WebSocket mode
       });
     });
 
