@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.7](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.6...foundry-mcp-server-v0.9.7) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#45](https://github.com/laurigates/foundryvtt-mcp/issues/45) - API retry mechanism not working ([#58](https://github.com/laurigates/foundryvtt-mcp/issues/58)) ([3050ad0](https://github.com/laurigates/foundryvtt-mcp/commit/3050ad086d599aacb9aa275797da494ee83592a1))
+
 ## [0.9.6](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.5...foundry-mcp-server-v0.9.6) (2025-07-05)
 
 
