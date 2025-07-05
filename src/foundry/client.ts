@@ -289,6 +289,38 @@ export class FoundryClient {
   }
 
   /**
+   * Executes an HTTP request with retry logic
+   *
+   * @private
+   * @param operation - Function that returns a Promise for the HTTP operation
+   * @returns Promise that resolves to the operation result
+   * @throws {Error} If all retry attempts fail
+   */
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: Error;
+    const maxAttempts = (this.config.retryAttempts || 3) + 1; // Include initial attempt
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        logger.debug(`Request attempt ${attempt} failed:`, error);
+        
+        // If this was the last attempt, throw the error
+        if (attempt === maxAttempts) {
+          throw lastError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay || 1000));
+      }
+    }
+    
+    throw lastError!;
+  }
+
+  /**
    * Establishes connection to FoundryVTT server
    *
    * Uses either REST API or WebSocket connection based on configuration.
@@ -489,10 +521,10 @@ export class FoundryClient {
    * ```
    */
   async searchActors(params: SearchActorsParams): Promise<ActorSearchResult> {
-    try {
-      logger.debug('Searching actors', params);
+    logger.debug('Searching actors', params);
 
-      if (this.config.apiKey) {
+    if (this.config.apiKey) {
+      return await this.executeWithRetry(async () => {
         const queryParams = new URLSearchParams();
         if (params.query) {
           queryParams.append('search', params.query);
@@ -506,13 +538,10 @@ export class FoundryClient {
 
         const response = await this.http.get(`/api/actors`, { params });
         return response.data;
-      } else {
-        // Fallback: return mock data or empty array
-        logger.warn('Actor search requires REST API module - returning empty results');
-        return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
-      }
-    } catch (error) {
-      logger.error('Actor search failed:', error);
+      });
+    } else {
+      // Fallback: return mock data or empty array
+      logger.warn('Actor search requires REST API module - returning empty results');
       return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
     }
   }
