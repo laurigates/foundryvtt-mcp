@@ -70,6 +70,7 @@ describe('Integration Tests', () => {
     it('should handle connection lifecycle', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
+        apiKey: 'test-key',
       });
 
       // Mock successful connection
