@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.3...foundry-mcp-server-v0.9.4) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#44](https://github.com/laurigates/foundryvtt-mcp/issues/44) - WebSocket functionality not working properly ([#48](https://github.com/laurigates/foundryvtt-mcp/issues/48)) ([ae93be9](https://github.com/laurigates/foundryvtt-mcp/commit/ae93be918ce0f281f942bad292dda45eac37c8a7))
+
 ## [0.9.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.2...foundry-mcp-server-v0.9.3) (2025-07-05)
 
 
