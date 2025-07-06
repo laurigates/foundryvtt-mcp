@@ -134,6 +134,18 @@ export class FoundryClient {
    * ```
    */
   constructor(config: FoundryClientConfig) {
+    // Validate required configuration
+    if (!config.baseUrl || config.baseUrl.trim() === '') {
+      throw new Error('baseUrl is required and cannot be empty');
+    }
+
+    // Basic URL validation
+    try {
+      new URL(config.baseUrl);
+    } catch (error) {
+      throw new Error(`Invalid baseUrl: ${config.baseUrl}`);
+    }
+
     this.config = {
       timeout: 10000,
       retryAttempts: 3,
