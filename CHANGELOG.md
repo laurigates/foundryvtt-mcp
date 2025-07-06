@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.8](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.7...foundry-mcp-server-v0.9.8) (2025-07-06)
+
+
+### Bug Fixes
+
+* resolve integration test timeouts by adding missing apiKey configuration ([#60](https://github.com/laurigates/foundryvtt-mcp/issues/60)) ([d59dba7](https://github.com/laurigates/foundryvtt-mcp/commit/d59dba72a161ee8fcf500797c144469e7061a866))
+
 ## [0.9.7](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.6...foundry-mcp-server-v0.9.7) (2025-07-05)
 
 
