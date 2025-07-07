@@ -135,8 +135,15 @@ export class FoundryClient {
    */
   constructor(config: FoundryClientConfig) {
     // Validate required configuration
-    if (!config.baseUrl) {
-      throw new Error('baseUrl is required for FoundryVTT client');
+    if (!config.baseUrl || config.baseUrl.trim() === '') {
+      throw new Error('baseUrl is required and cannot be empty');
+    }
+
+    // Basic URL validation
+    try {
+      new URL(config.baseUrl);
+    } catch (error) {
+      throw new Error(`Invalid baseUrl: ${config.baseUrl}`);
     }
     
     this.config = {
@@ -241,7 +248,19 @@ export class FoundryClient {
   private handleWebSocketMessage(message: any): void {
     logger.debug('WebSocket message received:', message);
 
-    // Handle different message types
+    // Call registered message handlers first
+    if (this.messageHandlers && this.messageHandlers.has(message.type)) {
+      const handler = this.messageHandlers.get(message.type);
+      if (handler) {
+        try {
+          handler(message.data);
+        } catch (error) {
+          logger.error('Error in message handler:', error);
+        }
+      }
+    }
+
+    // Handle built-in message types
     switch (message.type) {
       case 'combatUpdate':
         logger.info('Combat state updated');
@@ -291,6 +310,38 @@ export class FoundryClient {
    */
   isConnected(): boolean {
     return this._isConnected;
+  }
+
+  /**
+   * Executes an HTTP request with retry logic
+   *
+   * @private
+   * @param operation - Function that returns a Promise for the HTTP operation
+   * @returns Promise that resolves to the operation result
+   * @throws {Error} If all retry attempts fail
+   */
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: Error;
+    const maxAttempts = (this.config.retryAttempts || 3) + 1; // Include initial attempt
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        logger.debug(`Request attempt ${attempt} failed:`, error);
+        
+        // If this was the last attempt, throw the error
+        if (attempt === maxAttempts) {
+          throw lastError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay || 1000));
+      }
+    }
+    
+    throw lastError!;
   }
 
   /**
@@ -498,8 +549,21 @@ export class FoundryClient {
     logger.debug('Searching actors', params);
 
     if (this.config.apiKey) {
-      const response = await this.retryRequest(() => this.http.get(`/api/actors`, { params }));
-      return response.data;
+      return await this.executeWithRetry(async () => {
+        const queryParams = new URLSearchParams();
+        if (params.query) {
+          queryParams.append('search', params.query);
+        }
+        if (params.type) {
+          queryParams.append('type', params.type);
+        }
+        if (params.limit) {
+          queryParams.append('limit', params.limit.toString());
+        }
+
+        const response = await this.http.get(`/api/actors`, { params });
+        return response.data;
+      });
     } else {
       // Fallback: return mock data or empty array
       logger.warn('Actor search requires REST API module - returning empty results');
@@ -673,6 +737,7 @@ export class FoundryClient {
         this.ws = new WebSocket(wsUrl);
 
         this.ws.on('open', () => {
+          this._isConnected = true;
           logger.info('WebSocket connected to FoundryVTT');
           resolve();
         });
@@ -681,7 +746,6 @@ export class FoundryClient {
           try {
             const message = JSON.parse(data.toString());
             this.handleWebSocketMessage(message);
-
             // Handle message type callbacks
             if (this.messageHandlers) {
               const handler = this.messageHandlers.get(message.type);
@@ -696,6 +760,7 @@ export class FoundryClient {
 
         this.ws.on('error', (error) => {
           logger.error('WebSocket error:', error);
+          this.ws = null;
           this._isConnected = false;
           reject(error);
         });

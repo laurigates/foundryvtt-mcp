@@ -32,7 +32,23 @@ A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing 
 - FoundryVTT server running and accessible
 - MCP-compatible AI client (Claude Desktop, etc.)
 
-### Setup
+### Quick Setup (Recommended)
+
+**🧙‍♂️ Interactive Setup Wizard:**
+```bash
+git clone <repository-url>
+cd foundry-mcp-server
+npm install
+npm run setup-wizard
+```
+
+The setup wizard will:
+- Automatically detect your FoundryVTT server
+- Test connectivity and authentication
+- Generate your `.env` configuration file
+- Validate the complete setup
+
+### Manual Setup
 
 1. **Clone and install:**
 
@@ -59,9 +75,10 @@ FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 ```
 
-4. **Build and start:**
+4. **Test and start:**
 
 ```bash
+npm run test-connection  # Verify setup
 npm run build
 npm start
 ```
@@ -529,11 +546,31 @@ The documentation is automatically updated via GitHub Actions when source code c
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## Troubleshooting
+
+### 🔍 Quick Diagnostics
+```bash
+npm run test-connection      # Test FoundryVTT connectivity
+npm run setup-wizard        # Re-run interactive setup
+```
+
+### 🏥 Health Check
+Use the `get_health_status` MCP tool for comprehensive diagnostics, or check server logs during startup for detailed status information.
+
+### 📚 Common Issues
+- **Connection refused**: Ensure FoundryVTT is running on the configured port
+- **Authentication failed**: Verify API key or username/password in `.env`
+- **Empty search results**: Install and enable the "Foundry Local REST API" module
+- **Limited functionality**: REST API module required for full features
+
+**📖 Detailed troubleshooting guide**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ## Support
 
 - **Issues**: GitHub Issues for bugs and feature requests
 - **Discord**: [FoundryVTT Discord](https://discord.gg/foundryvtt) #api-development
 - **Documentation**: [FoundryVTT API Docs](https://foundryvtt.com/api/)
+- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## Acknowledgments
 

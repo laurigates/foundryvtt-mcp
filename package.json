@@ -1,6 +1,6 @@
 {
   "name": "foundry-mcp-server",
-  "version": "0.7.0",
+  "version": "0.9.8",
   "description": "Model Context Protocol server for FoundryVTT integration",
   "main": "dist/index.js",
   "type": "module",
@@ -13,11 +13,13 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test-connection": "tsx scripts/test-connection.ts",
+    "setup-wizard": "tsx scripts/setup-wizard.ts",
     "lint": "eslint src --ext .ts",
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
     "docs:serve": "npm run docs && npx http-server docs",
-    "setup": "npm run clean && npm run build && npm run test-connection"
+    "setup": "npm run clean && npm run build && npm run test-connection",
+    "process-template": "node scripts/process-template.cjs"
   },
   "keywords": [
     "foundry",

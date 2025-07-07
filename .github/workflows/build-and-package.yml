@@ -3,7 +3,7 @@ name: Build MCP Server
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'foundry-mcp-server-v*.*.*'
 
 permissions:
   contents: write

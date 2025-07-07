@@ -218,6 +218,12 @@ describe('Integration Tests', () => {
 
   describe('Data Flow Integration', () => {
     it('should process complete actor search workflow', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-key',
+      });
+
+      const mockAxios = await import('axios');
       const mockActorData = {
         actors: [
           {
@@ -268,6 +274,12 @@ describe('Integration Tests', () => {
     });
 
     it('should handle complex item search with filtering', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-key',
+      });
+
+      const mockAxios = await import('axios');
       const mockItemData = {
         items: [
           {

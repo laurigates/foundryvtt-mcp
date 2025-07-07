@@ -2,18 +2,20 @@
   "id": "foundry-local-rest-api",
   "title": "Foundry Local REST API",
   "description": "<p>A purely local REST API module for FoundryVTT that provides HTTP endpoints for external integrations without relying on third-party relay services. Enables secure, local-only access to actors, items, scenes, dice rolling, and world data.</p><p><strong>Features:</strong></p><ul><li>Local API key authentication</li><li>Actor and item search endpoints</li><li>Dice rolling API</li><li>Scene and world data access</li><li>No external dependencies</li></ul>",
-  "version": "0.8.1",
+  "version": "{{MODULE_VERSION}}",
   "compatibility": {
     "minimum": "11",
     "verified": "13"
   },
   "authors": [
     {
-      "name": "Lauri Gates",
-      "email": "lauri.gates@gmail.com"
+      "name": "{{AUTHOR_NAME}}",
+      "email": "{{AUTHOR_EMAIL}}"
     }
   ],
-  "esmodules": ["scripts/rest-api.js"],
+  "esmodules": [
+    "scripts/rest-api.js"
+  ],
   "styles": [],
   "languages": [
     {
@@ -22,17 +24,17 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/laurigates/foundryvtt-mcp",
-  "manifest": "https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json",
-  "download": "https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/foundry-local-rest-api.zip",
+  "url": "https://github.com/{{GITHUB_REPOSITORY}}",
+  "manifest": "https://github.com/{{GITHUB_REPOSITORY}}/releases/latest/download/module.json",
+  "download": "https://github.com/{{GITHUB_REPOSITORY}}/releases/latest/download/foundry-local-rest-api.zip",
   "license": "MIT",
-  "readme": "https://github.com/laurigates/foundryvtt-mcp/blob/main/foundry-local-rest-api/README.md",
-  "bugs": "https://github.com/laurigates/foundryvtt-mcp/issues",
-  "changelog": "https://github.com/laurigates/foundryvtt-mcp/releases",
+  "readme": "https://github.com/{{GITHUB_REPOSITORY}}/blob/main/foundry-local-rest-api/README.md",
+  "bugs": "https://github.com/{{GITHUB_REPOSITORY}}/issues",
+  "changelog": "https://github.com/{{GITHUB_REPOSITORY}}/releases",
   "media": [
     {
       "type": "icon",
-      "url": "https://raw.githubusercontent.com/laurigates/foundryvtt-mcp/main/foundry-local-rest-api/icon.png"
+      "url": "https://raw.githubusercontent.com/{{GITHUB_REPOSITORY}}/main/foundry-local-rest-api/icon.png"
     }
   ]
 }
