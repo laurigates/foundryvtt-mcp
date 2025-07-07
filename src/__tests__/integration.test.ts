@@ -68,25 +68,13 @@ describe('Integration Tests', () => {
     });
 
     it('should handle connection lifecycle', async () => {
+      // Configure the global mock for this test
+      mockAxiosInstance.get.mockResolvedValue({ data: { status: 'connected' } });
+
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-key',
       });
-
-      // Mock successful connection
-      const mockAxios = await import('axios');
-      const mockAxiosInstance = {
-        get: vi.fn().mockResolvedValue({ data: { status: 'connected' } }),
-        post: vi.fn(),
-        put: vi.fn(),
-        delete: vi.fn(),
-        interceptors: {
-          request: { use: vi.fn() },
-          response: { use: vi.fn() },
-        },
-      };
-
-      (mockAxios.default as any).create = vi.fn().mockReturnValue(mockAxiosInstance);
 
       await expect(client.connect()).resolves.not.toThrow();
       expect(client.isConnected()).toBe(true);

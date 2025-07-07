@@ -71,7 +71,12 @@ describe('FoundryClient', () => {
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'FoundryMCP/0.1.0',
+          'Accept-Encoding': 'gzip, deflate, br',
         },
+        maxRedirects: 3,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024,
+        validateStatus: expect.any(Function),
       });
     });
 
@@ -90,7 +95,12 @@ describe('FoundryClient', () => {
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'FoundryMCP/0.1.0',
+          'Accept-Encoding': 'gzip, deflate, br',
         },
+        maxRedirects: 3,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024,
+        validateStatus: expect.any(Function),
       });
     });
 
@@ -107,7 +117,12 @@ describe('FoundryClient', () => {
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'FoundryMCP/0.1.0',
+          'Accept-Encoding': 'gzip, deflate, br',
         },
+        maxRedirects: 3,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024,
+        validateStatus: expect.any(Function),
       });
     });
   });
@@ -215,11 +230,19 @@ describe('FoundryClient', () => {
     });
 
     it('should handle API errors', async () => {
+      // Create client with faster retry settings for this test
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 1,
+        retryDelay: 10,
+      });
+
       mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
 
       await expect(client.searchActors({ query: 'test' }))
         .rejects.toThrow('Network error');
-    });
+    }, 10000); // 10 second timeout
   });
 
   describe('retry mechanism', () => {

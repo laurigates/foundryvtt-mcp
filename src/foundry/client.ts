@@ -93,6 +93,18 @@ export interface SearchItemsParams {
 }
 
 /**
+ * WebSocket message interface for validation
+ *
+ * @interface WebSocketMessage
+ */
+export interface WebSocketMessage {
+  /** Message type identifier */
+  type: string;
+  /** Optional message data payload */
+  data?: any;
+}
+
+/**
  * Client for communicating with FoundryVTT instances
  *
  * This class provides methods for interacting with FoundryVTT through both REST API
@@ -112,6 +124,25 @@ export interface SearchItemsParams {
  * const diceResult = await client.rollDice('1d20+5', 'Attack roll');
  * ```
  */
+/**
+ * Maximum WebSocket message size in bytes to prevent JSON bomb attacks
+ */
+const MAX_WEBSOCKET_MESSAGE_SIZE = 1024 * 1024; // 1MB
+
+/**
+ * Validates if an object is a valid WebSocket message
+ *
+ * @param obj - Object to validate
+ * @returns True if the object is a valid WebSocket message
+ */
+function isValidWebSocketMessage(obj: any): obj is WebSocketMessage {
+  return obj && 
+         typeof obj === 'object' && 
+         typeof obj.type === 'string' && 
+         obj.type.length > 0 &&
+         obj.type.length < 100; // Prevent extremely long type strings
+}
+
 export class FoundryClient {
   private http: AxiosInstance;
   private ws: WebSocket | null = null;
@@ -169,7 +200,13 @@ export class FoundryClient {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'FoundryMCP/0.1.0',
+        'Accept-Encoding': 'gzip, deflate, br', // Enable compression
       },
+      // HTTP connection pooling and performance optimizations
+      maxRedirects: 3,
+      maxContentLength: 50 * 1024 * 1024, // 50MB limit
+      maxBodyLength: 50 * 1024 * 1024,    // 50MB limit
+      validateStatus: (status) => status >= 200 && status < 300, // Only 2xx responses are successful
     });
 
     this.setupHttpInterceptors();
@@ -323,12 +360,22 @@ export class FoundryClient {
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error;
     const maxAttempts = (this.config.retryAttempts || 3) + 1; // Include initial attempt
+    const baseDelay = this.config.retryDelay || 1000;
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await operation();
       } catch (error) {
         lastError = error as Error;
+        
+        // Don't retry client errors (4xx) except for 429 (rate limiting)
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as any;
+          if (axiosError.response?.status >= 400 && axiosError.response?.status < 500 && axiosError.response?.status !== 429) {
+            throw lastError;
+          }
+        }
+        
         logger.debug(`Request attempt ${attempt} failed:`, error);
         
         // If this was the last attempt, throw the error
@@ -336,8 +383,13 @@ export class FoundryClient {
           throw lastError;
         }
         
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay || 1000));
+        // Exponential backoff with jitter
+        const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * 0.1 * exponentialDelay;
+        const finalDelay = exponentialDelay + jitter;
+        
+        logger.debug(`Retrying in ${Math.round(finalDelay)}ms (attempt ${attempt + 1}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, finalDelay));
       }
     }
     
@@ -583,17 +635,23 @@ export class FoundryClient {
    * ```
    */
   async getActor(actorId: string): Promise<FoundryActor> {
-    try {
-      if (this.config.apiKey) {
+    if (!this.config.apiKey) {
+      throw new Error('Actor retrieval requires REST API module');
+    }
+
+    return this.executeWithRetry(async () => {
+      try {
         const response = await this.http.get(`/api/actors/${actorId}`);
         return response.data;
-      } else {
-        throw new Error('Actor retrieval requires REST API module');
+      } catch (error: any) {
+        // Preserve 404 errors as meaningful actor not found errors
+        if (error.response?.status === 404) {
+          throw new Error(`Actor not found: ${actorId}`);
+        }
+        // Re-throw other errors for retry handling
+        throw error;
       }
-    } catch (error) {
-      logger.error(`Failed to get actor ${actorId}:`, error);
-      throw new Error(`Actor not found: ${actorId}`);
-    }
+    });
   }
 
   /**
@@ -612,20 +670,17 @@ export class FoundryClient {
    * ```
    */
   async searchItems(params: SearchItemsParams): Promise<ItemSearchResult> {
-    try {
-      logger.debug('Searching items', params);
+    logger.debug('Searching items', params);
 
-      if (this.config.apiKey) {
-        const response = await this.http.get(`/api/items`, { params });
-        return response.data;
-      } else {
-        logger.warn('Item search requires REST API module - returning empty results');
-        return { items: [], total: 0, page: 1, limit: params.limit || 10 };
-      }
-    } catch (error) {
-      logger.error('Item search failed:', error);
+    if (!this.config.apiKey) {
+      logger.warn('Item search requires REST API module - returning empty results');
       return { items: [], total: 0, page: 1, limit: params.limit || 10 };
     }
+
+    return this.executeWithRetry(async () => {
+      const response = await this.http.get(`/api/items`, { params });
+      return response.data;
+    });
   }
 
   /**
@@ -643,32 +698,38 @@ export class FoundryClient {
    * ```
    */
   async getCurrentScene(sceneId?: string): Promise<FoundryScene> {
-    try {
-      if (this.config.apiKey) {
+    if (!this.config.apiKey) {
+      // Return mock scene data when no API key available
+      return {
+        _id: 'mock-scene',
+        name: 'Unknown Scene',
+        active: true,
+        navigation: true,
+        width: 4000,
+        height: 3000,
+        padding: 0.25,
+        shiftX: 0,
+        shiftY: 0,
+        globalLight: false,
+        darkness: 0,
+        description: 'Scene information requires REST API module to be installed and configured.'
+      };
+    }
+
+    return this.executeWithRetry(async () => {
+      try {
         const endpoint = sceneId ? `/api/scenes/${sceneId}` : '/api/scenes/current';
         const response = await this.http.get(endpoint);
         return response.data;
-      } else {
-        // Return mock scene data
-        return {
-          _id: 'mock-scene',
-          name: 'Unknown Scene',
-          active: true,
-          navigation: true,
-          width: 4000,
-          height: 3000,
-          padding: 0.25,
-          shiftX: 0,
-          shiftY: 0,
-          globalLight: false,
-          darkness: 0,
-          description: 'Scene information requires REST API module to be installed and configured.'
-        };
+      } catch (error: any) {
+        // Preserve 404 errors as meaningful scene not found errors
+        if (error.response?.status === 404) {
+          throw new Error('Scene not found');
+        }
+        // Re-throw other errors for retry handling
+        throw error;
       }
-    } catch (error) {
-      logger.error('Failed to get scene:', error);
-      throw new Error('Scene not found');
-    }
+    });
   }
 
   /**
@@ -698,28 +759,25 @@ export class FoundryClient {
    * ```
    */
   async getWorldInfo(): Promise<FoundryWorld> {
-    try {
-      if (this.config.apiKey) {
-        const response = await this.http.get('/api/world');
-        return response.data;
-      } else {
-        // Return basic world info
-        return {
-          id: 'unknown',
-          title: 'FoundryVTT World',
-          description: 'World information requires REST API module',
-          system: 'unknown',
-          coreVersion: 'unknown',
-          systemVersion: 'unknown',
-          playtime: 0,
-          created: new Date().toISOString(),
-          modified: new Date().toISOString(),
-        };
-      }
-    } catch (error) {
-      logger.error('Failed to get world info:', error);
-      throw new Error('Failed to retrieve world information');
+    if (!this.config.apiKey) {
+      // Return basic world info when no API key available
+      return {
+        id: 'unknown',
+        title: 'FoundryVTT World',
+        description: 'World information requires REST API module',
+        system: 'unknown',
+        coreVersion: 'unknown',
+        systemVersion: 'unknown',
+        playtime: 0,
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+      };
     }
+
+    return this.executeWithRetry(async () => {
+      const response = await this.http.get('/api/world');
+      return response.data;
+    });
   }
 
   /**
@@ -747,9 +805,25 @@ export class FoundryClient {
         });
 
         this.ws.on('message', (data) => {
+          // Check message size to prevent JSON bomb attacks
+          const dataLength = Buffer.isBuffer(data) ? data.length : data instanceof ArrayBuffer ? data.byteLength : data.toString().length;
+          if (dataLength > MAX_WEBSOCKET_MESSAGE_SIZE) {
+            logger.warn('WebSocket message too large, ignoring', { size: dataLength });
+            return;
+          }
+
           try {
             const message = JSON.parse(data.toString());
-            this.handleWebSocketMessage(message);
+            
+            // Validate message structure before processing
+            if (isValidWebSocketMessage(message)) {
+              this.handleWebSocketMessage(message);
+            } else {
+              logger.warn('Received malformed WebSocket message, ignoring', { 
+                messageType: typeof message,
+                hasType: message && typeof message.type
+              });
+            }
           } catch (error) {
             logger.warn('Failed to parse WebSocket message:', error);
           }
@@ -787,12 +861,9 @@ export class FoundryClient {
    * ```
    */
   async get(url: string, config?: any): Promise<any> {
-    try {
+    return this.executeWithRetry(async () => {
       return await this.http.get(url, config);
-    } catch (error) {
-      logger.error(`GET request to ${url} failed:`, error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -809,12 +880,9 @@ export class FoundryClient {
    * ```
    */
   async post(url: string, data?: any, config?: any): Promise<any> {
-    try {
+    return this.executeWithRetry(async () => {
       return await this.http.post(url, data, config);
-    } catch (error) {
-      logger.error(`POST request to ${url} failed:`, error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -826,12 +894,9 @@ export class FoundryClient {
    * @returns Promise resolving to the response
    */
   async put(url: string, data?: any, config?: any): Promise<any> {
-    try {
+    return this.executeWithRetry(async () => {
       return await this.http.put(url, data, config);
-    } catch (error) {
-      logger.error(`PUT request to ${url} failed:`, error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -842,11 +907,8 @@ export class FoundryClient {
    * @returns Promise resolving to the response
    */
   async delete(url: string, config?: any): Promise<any> {
-    try {
+    return this.executeWithRetry(async () => {
       return await this.http.delete(url, config);
-    } catch (error) {
-      logger.error(`DELETE request to ${url} failed:`, error);
-      throw error;
-    }
+    });
   }
 }
