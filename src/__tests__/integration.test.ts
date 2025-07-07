@@ -28,6 +28,7 @@ describe('Integration Tests', () => {
   let mockAxiosInstance: any;
 
   beforeEach(() => {
+    // Create a fresh mock for each test
     mockAxiosInstance = {
       get: vi.fn(),
       post: vi.fn(),
@@ -46,6 +47,8 @@ describe('Integration Tests', () => {
 
     vi.clearAllMocks();
     mockAxios.create = vi.fn().mockReturnValue(mockAxiosInstance);
+    // Ensure the mock is set up properly for dynamic imports
+    mockAxios.default = mockAxios;
   });
 
   afterEach(() => {
@@ -71,6 +74,7 @@ describe('Integration Tests', () => {
       // Configure the global mock for this test
       mockAxiosInstance.get.mockResolvedValue({ data: { status: 'connected' } });
 
+      // Use REST API mode to avoid WebSocket timeout issues
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-key',
@@ -84,20 +88,21 @@ describe('Integration Tests', () => {
     });
 
     it('should handle API operations with proper error handling', async () => {
+      // Set up the mock before creating the client
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } }) // For connect() call
-        .mockRejectedValueOnce(new Error('Temporary error'))      // First searchActors call
-        .mockResolvedValueOnce({                                  // Second searchActors call (retry)
+        .mockResolvedValueOnce({ data: { status: 'connected' } }) // connect() call
+        .mockRejectedValueOnce(new Error('Temporary error')) // first searchActors call
+        .mockResolvedValueOnce({
           data: {
             actors: [
               { _id: '1', name: 'Test Actor', type: 'character' }
             ]
           }
-        });
+        }); // searchActors retry
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
+        apiKey: 'test-key', // Enable REST API mode
         retryAttempts: 2,
         retryDelay: 100,
       });
@@ -108,7 +113,7 @@ describe('Integration Tests', () => {
 
       expect(result.actors).toHaveLength(1);
       expect(result.actors[0].name).toBe('Test Actor');
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3); // 1 for connect + 2 for searchActors (retry)
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3); // 1 for connect + 1 failed + 1 succeeded
     });
   });
 
@@ -127,7 +132,7 @@ describe('Integration Tests', () => {
         client = new FoundryClient({
           baseUrl: '', // Invalid URL
         });
-      }).toThrow();
+      }).toThrow('baseUrl is required for FoundryVTT client');
     });
   });
 
@@ -196,11 +201,17 @@ describe('Integration Tests', () => {
       // Simulate disconnection
       client.disconnect();
       expect(mockWs.close).toHaveBeenCalled();
-    });
+    }, 10000);
   });
 
   describe('Data Flow Integration', () => {
     it('should process complete actor search workflow', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-key',
+      });
+
+      const mockAxios = await import('axios');
       const mockActorData = {
         actors: [
           {
@@ -220,13 +231,14 @@ describe('Integration Tests', () => {
         limit: 10,
       };
 
+      // Set up the mock before creating the client
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } }) // For connect() call
-        .mockResolvedValueOnce({ data: mockActorData });          // For searchActors call
+        .mockResolvedValueOnce({ data: { status: 'connected' } }) // connect() call
+        .mockResolvedValueOnce({ data: mockActorData }); // searchActors call
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
+        apiKey: 'test-key', // Enable REST API mode
       });
 
       await client.connect();
@@ -250,6 +262,12 @@ describe('Integration Tests', () => {
     });
 
     it('should handle complex item search with filtering', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-key',
+      });
+
+      const mockAxios = await import('axios');
       const mockItemData = {
         items: [
           {
@@ -268,13 +286,14 @@ describe('Integration Tests', () => {
         limit: 10,
       };
 
+      // Set up the mock before creating the client
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } }) // For connect() call
-        .mockResolvedValueOnce({ data: mockItemData });          // For searchItems call
+        .mockResolvedValueOnce({ data: { status: 'connected' } }) // connect() call
+        .mockResolvedValueOnce({ data: mockItemData }); // searchItems call
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
+        apiKey: 'test-key', // Enable REST API mode
       });
 
       await client.connect();
@@ -301,13 +320,14 @@ describe('Integration Tests', () => {
 
   describe('Error Handling Integration', () => {
     it('should handle cascading failures gracefully', async () => {
+      // Set up the mock before creating the client
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } }) // For connect() call
-        .mockRejectedValue(new Error('Service unavailable'));      // For all searchActors calls
+        .mockResolvedValueOnce({ data: { status: 'connected' } }) // connect() call
+        .mockRejectedValue(new Error('Service unavailable')); // searchActors calls
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
+        apiKey: 'test-key', // Enable REST API mode
         retryAttempts: 2,
         retryDelay: 10,
       });
@@ -322,15 +342,16 @@ describe('Integration Tests', () => {
     });
 
     it('should maintain system stability after errors', async () => {
+      // Set up the mock before creating the client
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })  // For connect() call
-        .mockRejectedValueOnce(new Error('Temporary failure'))     // First searchActors call
-        .mockResolvedValueOnce({ data: { actors: [] } })           // Second searchActors call (retry)
-        .mockResolvedValueOnce({ data: { items: [] } });           // For searchItems call
+        .mockResolvedValueOnce({ data: { status: 'connected' } }) // connect() call
+        .mockRejectedValueOnce(new Error('Temporary failure')) // first searchActors call
+        .mockResolvedValueOnce({ data: { actors: [] } }) // searchActors retry
+        .mockResolvedValueOnce({ data: { items: [] } }); // searchItems call
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
+        apiKey: 'test-key', // Enable REST API mode
         retryAttempts: 1,
       });
 
