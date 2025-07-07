@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.9.8](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.7...foundry-mcp-server-v0.9.8) (2025-07-06)
+
+
+### Bug Fixes
+
+* resolve integration test timeouts by adding missing apiKey configuration ([#60](https://github.com/laurigates/foundryvtt-mcp/issues/60)) ([d59dba7](https://github.com/laurigates/foundryvtt-mcp/commit/d59dba72a161ee8fcf500797c144469e7061a866))
+
+## [0.9.7](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.6...foundry-mcp-server-v0.9.7) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#45](https://github.com/laurigates/foundryvtt-mcp/issues/45) - API retry mechanism not working ([#58](https://github.com/laurigates/foundryvtt-mcp/issues/58)) ([3050ad0](https://github.com/laurigates/foundryvtt-mcp/commit/3050ad086d599aacb9aa275797da494ee83592a1))
+
+## [0.9.6](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.5...foundry-mcp-server-v0.9.6) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve integration test timeouts by adding missing apiKey configuration ([#53](https://github.com/laurigates/foundryvtt-mcp/issues/53)) ([0a46713](https://github.com/laurigates/foundryvtt-mcp/commit/0a46713d72311c0542a19336f2b90186d394ee08))
+* resolve issue [#43](https://github.com/laurigates/foundryvtt-mcp/issues/43) - FoundryClient connection lifecycle ([#55](https://github.com/laurigates/foundryvtt-mcp/issues/55)) ([b10b5eb](https://github.com/laurigates/foundryvtt-mcp/commit/b10b5eb510316e42efc56f8be9d6837982b584a4))
+* resolve issue [#44](https://github.com/laurigates/foundryvtt-mcp/issues/44) - WebSocket functionality not working properly ([#56](https://github.com/laurigates/foundryvtt-mcp/issues/56)) ([629e1df](https://github.com/laurigates/foundryvtt-mcp/commit/629e1df67a5ebf9e237662383d6a92afdd1903c2))
+
+## [0.9.5](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.4...foundry-mcp-server-v0.9.5) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#45](https://github.com/laurigates/foundryvtt-mcp/issues/45) - API retry mechanism not working ([#50](https://github.com/laurigates/foundryvtt-mcp/issues/50)) ([a22e478](https://github.com/laurigates/foundryvtt-mcp/commit/a22e4780df11031e3536f99ea127195b3c0a992e))
+
+## [0.9.4](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.3...foundry-mcp-server-v0.9.4) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#44](https://github.com/laurigates/foundryvtt-mcp/issues/44) - WebSocket functionality not working properly ([#48](https://github.com/laurigates/foundryvtt-mcp/issues/48)) ([ae93be9](https://github.com/laurigates/foundryvtt-mcp/commit/ae93be918ce0f281f942bad292dda45eac37c8a7))
+
+## [0.9.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.2...foundry-mcp-server-v0.9.3) (2025-07-05)
+
+
+### Bug Fixes
+
+* resolve issue [#43](https://github.com/laurigates/foundryvtt-mcp/issues/43) - FoundryClient connection lifecycle ([#46](https://github.com/laurigates/foundryvtt-mcp/issues/46)) ([9c315d6](https://github.com/laurigates/foundryvtt-mcp/commit/9c315d6a1ff1b38de7b537a900ef3bdff197d4b9))
+
 ## [0.9.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.1...foundry-mcp-server-v0.9.2) (2025-06-24)
 
 
