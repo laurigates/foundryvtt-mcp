@@ -132,7 +132,7 @@ describe('Integration Tests', () => {
         client = new FoundryClient({
           baseUrl: '', // Invalid URL
         });
-      }).toThrow('baseUrl is required for FoundryVTT client');
+      }).toThrow('baseUrl is required and cannot be empty');
     });
   });
 
@@ -210,8 +210,6 @@ describe('Integration Tests', () => {
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-key',
       });
-
-      const mockAxios = await import('axios');
       const mockActorData = {
         actors: [
           {
@@ -266,8 +264,6 @@ describe('Integration Tests', () => {
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-key',
       });
-
-      const mockAxios = await import('axios');
       const mockItemData = {
         items: [
           {

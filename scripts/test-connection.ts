@@ -105,7 +105,7 @@ async function testConnection() {
     if (!config.foundry.useRestModule) {
       console.log('\n💡 Tips for enhanced functionality:');
       console.log('   1. Install the "Foundry REST API" module in FoundryVTT');
-      console.log('   2. Get an API key from https://foundryvtt-rest-api-relay.fly.dev/');
+      console.log('   2. Get the API key from the module configuration page in FoundryVTT');
       console.log('   3. Set USE_REST_MODULE=true and FOUNDRY_API_KEY in .env');
       console.log('   4. Restart the MCP server');
     }

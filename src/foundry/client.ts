@@ -29,6 +29,8 @@ import { FoundryActor, FoundryScene, FoundryWorld, DiceRoll, ActorSearchResult, 
 export interface FoundryClientConfig {
   /** Base URL of the FoundryVTT server (e.g., 'http://localhost:30000') */
   baseUrl: string;
+  /** Whether to use the REST API module (optional, default: false) */
+  useRestModule?: boolean;
   /** API key for REST API module authentication (optional) */
   apiKey?: string;
   /** Username for basic authentication (optional) */
@@ -41,7 +43,7 @@ export interface FoundryClientConfig {
   retryAttempts?: number;
   /** Delay between retry attempts in milliseconds (default: 1000) */
   retryDelay?: number;
-  /** Custom WebSocket path (default: '/socket.io/') */
+  /** Custom WebSocket path (default: '/socket.io') */
   socketPath?: string;
 }
 
@@ -181,12 +183,13 @@ export class FoundryClient {
       timeout: 10000,
       retryAttempts: 3,
       retryDelay: 1000,
-      socketPath: '/socket.io/',
+      socketPath: '/socket.io',
+      useRestModule: false,
       ...config,
     };
 
     // Determine connection method based on configuration
-    if (this.config.apiKey) {
+    if (this.config.useRestModule) {
       this.connectionMethod = 'rest';
     } else if (this.config.username && this.config.password) {
       this.connectionMethod = 'hybrid'; // WebSocket + potential auth
@@ -267,11 +270,11 @@ export class FoundryClient {
       }
 
       // Test basic API endpoint
-      const response = await this.http.get('/api/status');
+      const response = await this.http.get('/');
       logger.debug('Connection test successful', { status: response.status });
       return true;
     } catch (error) {
-      logger.error('Failed to connect WebSocket:', error);
+      logger.error('Failed to connect to FoundryVTT:', error);
       throw error;
     }
   }
@@ -511,7 +514,7 @@ export class FoundryClient {
     try {
       logger.debug('Rolling dice', { formula, reason });
 
-      if (this.config.apiKey) {
+      if (this.config.useRestModule) {
         // Use REST API module if available
         const response = await this.http.post('/api/dice/roll', {
           formula,
@@ -600,7 +603,7 @@ export class FoundryClient {
   async searchActors(params: SearchActorsParams): Promise<ActorSearchResult> {
     logger.debug('Searching actors', params);
 
-    if (this.config.apiKey) {
+    if (this.config.useRestModule) {
       return await this.executeWithRetry(async () => {
         const queryParams = new URLSearchParams();
         if (params.query) {
@@ -636,7 +639,7 @@ export class FoundryClient {
    * ```
    */
   async getActor(actorId: string): Promise<FoundryActor> {
-    if (!this.config.apiKey) {
+    if (!this.config.useRestModule) {
       throw new Error('Actor retrieval requires REST API module');
     }
 
@@ -673,7 +676,7 @@ export class FoundryClient {
   async searchItems(params: SearchItemsParams): Promise<ItemSearchResult> {
     logger.debug('Searching items', params);
 
-    if (this.config.apiKey) {
+    if (this.config.useRestModule) {
       const response = await this.retryRequest(() => this.http.get(`/api/items`, { params }));
       return response.data;
     } else {
@@ -702,7 +705,7 @@ export class FoundryClient {
    * ```
    */
   async getCurrentScene(sceneId?: string): Promise<FoundryScene> {
-    if (!this.config.apiKey) {
+    if (!this.config.useRestModule) {
       // Return mock scene data when no API key available
       return {
         _id: 'mock-scene',
@@ -763,7 +766,7 @@ export class FoundryClient {
    * ```
    */
   async getWorldInfo(): Promise<FoundryWorld> {
-    if (!this.config.apiKey) {
+    if (!this.config.useRestModule) {
       // Return basic world info when no API key available
       return {
         id: 'unknown',
@@ -796,7 +799,7 @@ export class FoundryClient {
       return; // Already connected
     }
 
-    const wsUrl = this.config.baseUrl.replace(/^http/, 'ws') + '/socket.io/';
+    const wsUrl = this.config.baseUrl.replace(/^http/, 'ws') + '/socket.io/?EIO=4&transport=websocket';
 
     return new Promise((resolve, reject) => {
       try {
@@ -809,27 +812,53 @@ export class FoundryClient {
         });
 
         this.ws.on('message', (data) => {
-          // Check message size to prevent JSON bomb attacks
-          const dataLength = Buffer.isBuffer(data) ? data.length : data instanceof ArrayBuffer ? data.byteLength : data.toString().length;
-          if (dataLength > MAX_WEBSOCKET_MESSAGE_SIZE) {
-            logger.warn('WebSocket message too large, ignoring', { size: dataLength });
+          const rawData = data.toString();
+
+          // Handle socket.io packet types
+          if (rawData.startsWith('0{')) {
+            // Open packet, contains session info
+            logger.info('Socket.io session opened');
+            // We could parse this JSON if we needed the sid or ping interval
             return;
           }
 
-          try {
-            const message = JSON.parse(data.toString());
-            
-            // Validate message structure before processing
-            if (isValidWebSocketMessage(message)) {
-              this.handleWebSocketMessage(message);
-            } else {
-              logger.warn('Received malformed WebSocket message, ignoring', { 
-                messageType: typeof message,
-                hasType: message && typeof message.type
-              });
+          if (rawData === '2') {
+            // Ping from server, respond with Pong
+            this.ws?.send('3');
+            return;
+          }
+
+          // Check for custom message packet (type '4')
+          if (rawData.startsWith('4')) {
+            const jsonData = rawData.substring(1);
+            if (!jsonData) {
+              logger.debug('Received empty socket.io message packet');
+              return;
             }
-          } catch (error) {
-            logger.warn('Failed to parse WebSocket message:', error);
+
+            // Check message size to prevent JSON bomb attacks
+            if (jsonData.length > MAX_WEBSOCKET_MESSAGE_SIZE) {
+              logger.warn('WebSocket message too large, ignoring', { size: jsonData.length });
+              return;
+            }
+
+            try {
+              const message = JSON.parse(jsonData);
+              
+              // Validate message structure before processing
+              if (isValidWebSocketMessage(message)) {
+                this.handleWebSocketMessage(message);
+              } else {
+                logger.warn('Received malformed WebSocket message, ignoring', { 
+                  messageType: typeof message,
+                  hasType: message && typeof message.type
+                });
+              }
+            } catch (error) {
+              logger.warn('Failed to parse WebSocket message:', { error, jsonData });
+            }
+          } else {
+            logger.debug('Received unhandled socket.io packet', { rawData });
           }
         });
 

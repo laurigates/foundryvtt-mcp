@@ -5,11 +5,13 @@ This guide will walk you through setting up the FoundryVTT MCP Server with diffe
 ## Quick Start
 
 1. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 2. **Copy environment file**:
+
    ```bash
    cp .env.example .env
    ```
@@ -30,8 +32,9 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 **Best for**: Full functionality including data querying, dice rolling, and content management.
 
 **Setup**:
+
 1. Install the [Foundry REST API](https://foundryvtt.com/packages/foundry-rest-api) module in FoundryVTT
-2. Get an API key from [the relay server](https://foundryvtt-rest-api-relay.fly.dev/)
+2. Get the API key from the module configuration page in FoundryVTT
 3. Configure the module with your API key
 4. Update your `.env`:
    ```env
@@ -41,6 +44,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
    ```
 
 **Features Available**:
+
 - ✅ Search actors, items, scenes
 - ✅ Get detailed actor/item information
 - ✅ Dice rolling with FoundryVTT engine
@@ -52,6 +56,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 **Best for**: Basic functionality when REST API module isn't available.
 
 **Setup**:
+
 1. Ensure FoundryVTT is running and accessible
 2. Update your `.env`:
    ```env
@@ -62,6 +67,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
    ```
 
 **Features Available**:
+
 - ✅ Fallback dice rolling (client-side simulation)
 - ✅ Basic scene information
 - ✅ WebSocket connection for real-time events
@@ -72,20 +78,21 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 
 ### Environment Variables
 
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `FOUNDRY_URL` | ✅ | FoundryVTT server URL | - |
-| `USE_REST_MODULE` | ✅ | Enable REST API module | `false` |
-| `FOUNDRY_API_KEY` | ⭐ | REST API module key | - |
-| `FOUNDRY_USERNAME` | ⭐ | FoundryVTT username | - |
-| `FOUNDRY_PASSWORD` | ⭐ | FoundryVTT password | - |
-| `LOG_LEVEL` | ❌ | Logging level | `info` |
+| Variable           | Required | Description            | Default |
+| ------------------ | -------- | ---------------------- | ------- |
+| `FOUNDRY_URL`      | ✅       | FoundryVTT server URL  | -       |
+| `USE_REST_MODULE`  | ✅       | Enable REST API module | `false` |
+| `FOUNDRY_API_KEY`  | ⭐       | REST API module key    | -       |
+| `FOUNDRY_USERNAME` | ⭐       | FoundryVTT username    | -       |
+| `FOUNDRY_PASSWORD` | ⭐       | FoundryVTT password    | -       |
+| `LOG_LEVEL`        | ❌       | Logging level          | `info`  |
 
 ⭐ Required based on connection method
 
 ### FoundryVTT Configuration
 
 #### For REST API Module:
+
 1. Go to **Add-on Modules** in FoundryVTT
 2. Install **"Foundry REST API"**
 3. Enable the module in your world
@@ -93,6 +100,7 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 5. Restart FoundryVTT
 
 #### For WebSocket Only:
+
 1. Ensure FoundryVTT is accessible at the configured URL
 2. Create a user account with appropriate permissions
 3. The server will use basic HTTP and WebSocket connections
@@ -100,11 +108,13 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 ## Testing Your Setup
 
 ### 1. Test Connection
+
 ```bash
 npm run dev
 ```
 
 Look for these success messages:
+
 ```
 ✅ Connected to FoundryVTT successfully
 🚀 FoundryVTT MCP Server running
@@ -115,15 +125,18 @@ Look for these success messages:
 Once the server is running, test these commands with your AI assistant:
 
 **Basic Dice Rolling**:
+
 - "Roll 1d20+5 for an attack roll"
 - "Roll 4d6 drop lowest for ability scores"
 
 **Data Queries** (REST API module required):
+
 - "Search for goblin actors"
 - "Find all magic weapons"
 - "What's the current scene information?"
 
 **Content Generation**:
+
 - "Generate a random NPC"
 - "Create some loot for a level 5 party"
 
@@ -132,20 +145,24 @@ Once the server is running, test these commands with your AI assistant:
 ### Common Issues
 
 #### "Failed to connect to FoundryVTT"
+
 - **Check**: FoundryVTT is running at the configured URL
 - **Check**: No firewall blocking the connection
 - **Try**: Test URL in browser: `http://localhost:30000`
 
 #### "Empty search results"
+
 - **Cause**: REST API module not configured
 - **Solution**: Install and configure the REST API module, or accept limited functionality
 
 #### "Authentication failed"
+
 - **Check**: Username/password are correct
 - **Check**: User has necessary permissions in FoundryVTT
 - **Try**: Test login through FoundryVTT web interface
 
 #### "WebSocket connection issues"
+
 - **Check**: FoundryVTT allows WebSocket connections
 - **Check**: No proxy server blocking WebSocket upgrades
 - **Try**: Different port or connection method
@@ -160,13 +177,17 @@ Once the server is running, test these commands with your AI assistant:
 ## Advanced Configuration
 
 ### Custom Socket Path
+
 If FoundryVTT uses a custom socket path:
+
 ```env
 FOUNDRY_SOCKET_PATH=/custom/socket/path/
 ```
 
 ### Timeout Settings
+
 For slow connections, increase timeouts:
+
 ```env
 FOUNDRY_TIMEOUT=30000
 FOUNDRY_RETRY_ATTEMPTS=5
@@ -174,7 +195,9 @@ FOUNDRY_RETRY_DELAY=2000
 ```
 
 ### Production Deployment
+
 For production use:
+
 ```env
 NODE_ENV=production
 LOG_LEVEL=warn
