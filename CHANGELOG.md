@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.10](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.9...foundry-mcp-server-v0.9.10) (2025-07-09)
+
+
+### Bug Fixes
+
+* **config:** replace hardcoded port 30000 with proper URL handling for reverse proxy setups ([#67](https://github.com/laurigates/foundryvtt-mcp/issues/67)) ([f6e219a](https://github.com/laurigates/foundryvtt-mcp/commit/f6e219a0dc0d2effe31f52462e67593f16da140e))
+
 ## [0.9.9](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.8...foundry-mcp-server-v0.9.9) (2025-07-07)
 
 
