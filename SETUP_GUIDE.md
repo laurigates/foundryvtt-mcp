@@ -27,6 +27,26 @@ This guide will walk you through setting up the FoundryVTT MCP Server with diffe
 
 The FoundryVTT MCP Server supports two connection methods, each with different capabilities:
 
+### Setup Types
+
+Before configuring authentication, determine your FoundryVTT setup type:
+
+#### Local Development Setup
+- FoundryVTT running on your local machine
+- Typically uses `http://localhost:30000` or similar
+- No reverse proxy or SSL/TLS
+
+#### Reverse Proxy / Remote Setup
+- FoundryVTT behind a reverse proxy (nginx, Apache, Caddy, etc.)
+- Custom domains with SSL/TLS (e.g., `https://dnd.lakuz.com`)
+- Cloud hosting or remote server deployments
+- May use custom ports or paths
+
+#### Network/IP Setup
+- FoundryVTT accessible via local network IP
+- Different port configurations
+- Direct IP access without domain names
+
 ### Method 1: REST API Module (Recommended)
 
 **Best for**: Full functionality including data querying, dice rolling, and content management.
@@ -36,9 +56,25 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 1. Install the [Foundry REST API](https://foundryvtt.com/packages/foundry-rest-api) module in FoundryVTT
 2. Get the API key from the module configuration page in FoundryVTT
 3. Configure the module with your API key
-4. Update your `.env`:
+4. Update your `.env` based on your setup type:
+
+   **Local Development:**
    ```env
    FOUNDRY_URL=http://localhost:30000
+   USE_REST_MODULE=true
+   FOUNDRY_API_KEY=your_api_key_here
+   ```
+
+   **Reverse Proxy / Remote:**
+   ```env
+   FOUNDRY_URL=https://dnd.lakuz.com
+   USE_REST_MODULE=true
+   FOUNDRY_API_KEY=your_api_key_here
+   ```
+
+   **Network/IP:**
+   ```env
+   FOUNDRY_URL=http://192.168.1.100:30000
    USE_REST_MODULE=true
    FOUNDRY_API_KEY=your_api_key_here
    ```
@@ -58,9 +94,27 @@ The FoundryVTT MCP Server supports two connection methods, each with different c
 **Setup**:
 
 1. Ensure FoundryVTT is running and accessible
-2. Update your `.env`:
+2. Update your `.env` based on your setup type:
+
+   **Local Development:**
    ```env
    FOUNDRY_URL=http://localhost:30000
+   USE_REST_MODULE=false
+   FOUNDRY_USERNAME=your_username
+   FOUNDRY_PASSWORD=your_password
+   ```
+
+   **Reverse Proxy / Remote:**
+   ```env
+   FOUNDRY_URL=https://dnd.lakuz.com
+   USE_REST_MODULE=false
+   FOUNDRY_USERNAME=your_username
+   FOUNDRY_PASSWORD=your_password
+   ```
+
+   **Network/IP:**
+   ```env
+   FOUNDRY_URL=http://192.168.1.100:30000
    USE_REST_MODULE=false
    FOUNDRY_USERNAME=your_username
    FOUNDRY_PASSWORD=your_password
@@ -148,7 +202,8 @@ Once the server is running, test these commands with your AI assistant:
 
 - **Check**: FoundryVTT is running at the configured URL
 - **Check**: No firewall blocking the connection
-- **Try**: Test URL in browser: `http://localhost:30000`
+- **Try**: Test URL in browser (local: `http://localhost:30000`, remote: `https://dnd.lakuz.com`)
+- **For reverse proxy**: Ensure WebSocket upgrades are properly configured
 
 #### "Empty search results"
 
@@ -166,6 +221,23 @@ Once the server is running, test these commands with your AI assistant:
 - **Check**: FoundryVTT allows WebSocket connections
 - **Check**: No proxy server blocking WebSocket upgrades
 - **Try**: Different port or connection method
+
+#### "Reverse Proxy / SSL Issues"
+
+**SSL Certificate Problems:**
+- **Check**: SSL certificate is valid and not expired
+- **Check**: Certificate includes your domain name
+- **Try**: Test with curl: `curl -I https://dnd.lakuz.com`
+
+**Proxy Configuration:**
+- **Nginx**: Ensure `proxy_set_header Upgrade $http_upgrade;` and `proxy_set_header Connection "upgrade";`
+- **Apache**: Enable `mod_proxy_wstunnel` for WebSocket support
+- **Caddy**: WebSocket support is automatic with `reverse_proxy`
+
+**Port and Path Issues:**
+- **Check**: Reverse proxy forwards to correct FoundryVTT port (usually 30000)
+- **Check**: No path conflicts (e.g., `/socket.io/` path is preserved)
+- **Try**: Direct connection to bypass proxy temporarily
 
 ### Getting Help
 

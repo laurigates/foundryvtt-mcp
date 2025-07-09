@@ -23,7 +23,35 @@ const ConfigSchema = z.object({
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
 
   foundry: z.object({
-    url: z.string().url('Invalid FoundryVTT URL'),
+    url: z.string()
+      .url('Invalid FoundryVTT URL - must include protocol (http:// or https://)')
+      .refine(
+        (url) => {
+          try {
+            const parsed = new URL(url);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+          } catch {
+            return false;
+          }
+        },
+        'URL must use http:// or https:// protocol'
+      )
+      .refine(
+        (url) => {
+          try {
+            const parsed = new URL(url);
+            // Warning for localhost in production
+            if (process.env.NODE_ENV === 'production' && 
+                (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+              console.warn('⚠️  Warning: Using localhost URL in production environment');
+            }
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        'URL validation failed'
+      ),
     apiKey: z.string().optional(),
     username: z.string().optional(),
     password: z.string().optional(),
@@ -93,11 +121,24 @@ function loadConfig(): Config {
     return ConfigSchema.parse(rawConfig);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Configuration validation failed:');
+      console.error('❌ Configuration validation failed:');
       error.errors.forEach(err => {
         console.error(`  ${err.path.join('.')}: ${err.message}`);
+        
+        // Provide specific guidance for common URL errors
+        if (err.path.includes('url')) {
+          console.error('  💡 URL Examples:');
+          console.error('     • Local: http://localhost:30000');
+          console.error('     • Reverse Proxy: https://dnd.lakuz.com');
+          console.error('     • Network IP: http://192.168.1.100:30000');
+          console.error('     • Custom Port: https://foundry.example.com:8443');
+        }
       });
-      console.error('\nPlease check your environment variables and .env file.');
+      console.error('\n📋 Configuration Help:');
+      console.error('  • Check your environment variables and .env file');
+      console.error('  • Ensure FOUNDRY_URL includes protocol (http:// or https://)');
+      console.error('  • For setup guidance, see: SETUP_GUIDE.md');
+      console.error('  • Run the setup wizard: npm run setup');
     }
     process.exit(1);
   }

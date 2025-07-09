@@ -18,6 +18,23 @@ async function testConnection() {
   try {
     console.log('📋 Configuration:');
     console.log(`   URL: ${config.foundry.url}`);
+    
+    // Analyze URL type
+    const url = new URL(config.foundry.url);
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const isHTTPS = url.protocol === 'https:';
+    const hasCustomPort = url.port && url.port !== '80' && url.port !== '443';
+    
+    if (isLocal) {
+      console.log(`   Setup Type: 🏠 Local Development`);
+    } else if (isHTTPS) {
+      console.log(`   Setup Type: 🌐 Reverse Proxy / Remote (SSL)`);
+    } else if (hasCustomPort) {
+      console.log(`   Setup Type: 🖥️  Network/IP with custom port`);
+    } else {
+      console.log(`   Setup Type: 🖥️  Remote/Network`);
+    }
+    
     console.log(`   REST Module: ${config.foundry.useRestModule ? '✅' : '❌'}`);
     console.log(`   API Key: ${config.foundry.apiKey ? '✅ Configured' : '❌ Not set'}`);
     console.log(`   Username: ${config.foundry.username ? '✅ Configured' : '❌ Not set'}\n`);
@@ -113,10 +130,45 @@ async function testConnection() {
   } catch (error) {
     console.error('❌ Test failed:', error);
     console.log('\n🔧 Troubleshooting:');
-    console.log('   1. Ensure FoundryVTT is running');
-    console.log('   2. Check FOUNDRY_URL in .env file');
-    console.log('   3. Verify network connectivity');
-    console.log('   4. Review the setup guide: SETUP_GUIDE.md');
+    
+    try {
+      const url = new URL(config.foundry.url);
+      const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      const isHTTPS = url.protocol === 'https:';
+      
+      if (isLocal) {
+        console.log('   Local Development Issues:');
+        console.log('   1. Ensure FoundryVTT is running on your local machine');
+        console.log('   2. Check that the port (usually 30000) is correct');
+        console.log('   3. Try accessing FoundryVTT directly: http://localhost:30000');
+        console.log('   4. Verify no firewall blocking the connection');
+      } else if (isHTTPS) {
+        console.log('   Reverse Proxy / Remote Issues:');
+        console.log('   1. Ensure FoundryVTT is accessible at the configured URL');
+        console.log('   2. Check SSL certificate is valid and not expired');
+        console.log('   3. Verify reverse proxy is forwarding to FoundryVTT correctly');
+        console.log('   4. Test WebSocket upgrades are working (required for FoundryVTT)');
+        console.log('   5. Try accessing FoundryVTT directly in your browser');
+      } else {
+        console.log('   Network/Remote Issues:');
+        console.log('   1. Ensure FoundryVTT is running and accessible');
+        console.log('   2. Check network connectivity to the target server');
+        console.log('   3. Verify the port is open and not blocked by firewall');
+        console.log('   4. Test direct browser access to the URL');
+      }
+      
+      console.log('\n   General Steps:');
+      console.log('   • Double-check FOUNDRY_URL in .env file');
+      console.log('   • Review the setup guide: SETUP_GUIDE.md');
+      console.log('   • Run with LOG_LEVEL=debug for detailed logs');
+      
+    } catch (urlError) {
+      console.log('   1. Ensure FoundryVTT is running');
+      console.log('   2. Check FOUNDRY_URL in .env file');
+      console.log('   3. Verify network connectivity');
+      console.log('   4. Review the setup guide: SETUP_GUIDE.md');
+    }
+    
     process.exit(1);
   }
 }

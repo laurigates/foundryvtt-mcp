@@ -87,7 +87,36 @@ class SetupWizard {
   private async detectFoundryVTT(): Promise<void> {
     console.log('🔍 Step 1: FoundryVTT Server Detection\n');
 
-    // Try common URLs first
+    // Ask about setup type first
+    console.log('What type of FoundryVTT setup are you connecting to?');
+    console.log('1. Local FoundryVTT (running on this machine)');
+    console.log('2. Remote FoundryVTT (reverse proxy, cloud hosting, or remote server)');
+    console.log('3. I want to enter a custom URL\n');
+
+    const setupType = await this.question('Enter your choice (1, 2, or 3): ');
+    
+    switch (setupType.trim()) {
+      case '1':
+        await this.detectLocalFoundryVTT();
+        break;
+      case '2':
+        await this.configureRemoteFoundryVTT();
+        break;
+      case '3':
+        await this.configureCustomFoundryVTT();
+        break;
+      default:
+        console.log('❌ Invalid choice. Defaulting to custom URL entry.\n');
+        await this.configureCustomFoundryVTT();
+    }
+  }
+
+  /**
+   * Auto-detect local FoundryVTT installations
+   */
+  private async detectLocalFoundryVTT(): Promise<void> {
+    console.log('🔍 Scanning for local FoundryVTT servers...\n');
+
     const commonUrls = [
       'http://localhost:30000',
       'http://127.0.0.1:30000',
@@ -95,7 +124,6 @@ class SetupWizard {
       'http://localhost:3000'
     ];
 
-    console.log('Scanning common URLs...');
     for (const url of commonUrls) {
       if (await this.testUrl(url)) {
         const useDetected = await this.question(`✅ Found FoundryVTT at ${url}. Use this URL? (y/n): `);
@@ -107,15 +135,56 @@ class SetupWizard {
       }
     }
 
-    // Manual URL entry
-    console.log('❌ No FoundryVTT server detected at common locations.');
-    const manualUrl = await this.question('🌐 Enter your FoundryVTT URL (e.g., http://localhost:30000): ');
+    console.log('❌ No local FoundryVTT server detected at common ports.');
+    await this.configureCustomFoundryVTT();
+  }
+
+  /**
+   * Configure remote FoundryVTT (reverse proxy, cloud, etc.)
+   */
+  private async configureRemoteFoundryVTT(): Promise<void> {
+    console.log('🌐 Remote FoundryVTT Configuration\n');
+    console.log('For remote setups, you\'ll need the full URL including protocol.');
+    console.log('Examples:');
+    console.log('  • https://dnd.lakuz.com (reverse proxy with HTTPS)');
+    console.log('  • http://foundry.example.com (reverse proxy with HTTP)');
+    console.log('  • https://my-server.com:8443 (custom port with HTTPS)');
+    console.log('  • http://192.168.1.100:30000 (local network IP)\n');
+
+    const remoteUrl = await this.question('🌐 Enter your remote FoundryVTT URL: ');
     
-    if (!this.isValidUrl(manualUrl)) {
-      throw new Error('Invalid URL format. Please use format: http://hostname:port');
+    if (!this.isValidUrl(remoteUrl)) {
+      throw new Error('Invalid URL format. Please include protocol (http:// or https://)');
     }
 
-    this.config.foundryUrl = manualUrl.trim();
+    // Validate it's likely a remote URL
+    const parsedUrl = new URL(remoteUrl);
+    if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+      console.log('⚠️  Warning: This appears to be a local URL. Make sure this is correct for your setup.');
+    }
+
+    this.config.foundryUrl = remoteUrl.trim();
+    console.log(`📍 Using: ${this.config.foundryUrl}\n`);
+  }
+
+  /**
+   * Manual URL entry for custom setups
+   */
+  private async configureCustomFoundryVTT(): Promise<void> {
+    console.log('⚙️ Custom URL Configuration\n');
+    console.log('Examples:');
+    console.log('  • http://localhost:30000 (local development)');
+    console.log('  • https://dnd.lakuz.com (reverse proxy)');
+    console.log('  • http://192.168.1.100:30000 (network IP)');
+    console.log('  • https://my-foundry.com:8443 (custom port)\n');
+
+    const customUrl = await this.question('🌐 Enter your FoundryVTT URL: ');
+    
+    if (!this.isValidUrl(customUrl)) {
+      throw new Error('Invalid URL format. Please include protocol (http:// or https://)');
+    }
+
+    this.config.foundryUrl = customUrl.trim();
     console.log(`📍 Using: ${this.config.foundryUrl}\n`);
   }
 

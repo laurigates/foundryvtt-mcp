@@ -71,13 +71,23 @@ This is a **Model Context Protocol (MCP) server** that bridges AI assistants wit
 ## Key Environment Variables
 
 Required:
-- `FOUNDRY_URL` - FoundryVTT server URL (e.g., http://localhost:30000)
+- `FOUNDRY_URL` - FoundryVTT server URL 
+  - Local: `http://localhost:30000`
+  - Reverse Proxy: `https://dnd.lakuz.com`
+  - Network IP: `http://192.168.1.100:30000`
 - `FOUNDRY_API_KEY` OR `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`
 
 Optional:
 - `USE_REST_MODULE=true` - Enable REST API module features
 - `LOG_LEVEL=debug` - Detailed logging output
 - `FOUNDRY_TIMEOUT=10000` - Request timeout in milliseconds
+
+## Setup Types
+
+The setup wizard now properly handles different deployment scenarios:
+- **Local Development**: Auto-detects localhost:30000 and similar
+- **Reverse Proxy/Remote**: Prompts for custom URLs like https://dnd.lakuz.com
+- **Network/IP**: Supports custom IP addresses and ports
 
 ## Development Notes
 
