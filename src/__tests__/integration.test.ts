@@ -78,6 +78,7 @@ describe('Integration Tests', () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-key',
+        useRestModule: true,
       });
 
       await expect(client.connect()).resolves.not.toThrow();
@@ -102,7 +103,8 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key', // Enable REST API mode
+        apiKey: 'test-key',
+        useRestModule: true, // Enable REST API mode
         retryAttempts: 2,
         retryDelay: 100,
       });
@@ -236,7 +238,8 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key', // Enable REST API mode
+        apiKey: 'test-key',
+        useRestModule: true, // Enable REST API mode
       });
 
       await client.connect();
@@ -289,7 +292,8 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key', // Enable REST API mode
+        apiKey: 'test-key',
+        useRestModule: true, // Enable REST API mode
       });
 
       await client.connect();
@@ -323,7 +327,8 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key', // Enable REST API mode
+        apiKey: 'test-key',
+        useRestModule: true, // Enable REST API mode
         retryAttempts: 2,
         retryDelay: 10,
       });
@@ -347,7 +352,8 @@ describe('Integration Tests', () => {
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key', // Enable REST API mode
+        apiKey: 'test-key',
+        useRestModule: true, // Enable REST API mode
         retryAttempts: 1,
       });
 

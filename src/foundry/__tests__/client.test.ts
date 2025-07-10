@@ -168,6 +168,7 @@ describe('FoundryClient', () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
+        useRestModule: true,
       });
     });
 
@@ -234,6 +235,7 @@ describe('FoundryClient', () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
+        useRestModule: true,
         retryAttempts: 1,
         retryDelay: 10,
       });
@@ -250,6 +252,7 @@ describe('FoundryClient', () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
+        useRestModule: true,
         retryAttempts: 3,
         retryDelay: 100,
       });
@@ -324,7 +327,9 @@ describe('FoundryClient', () => {
         if (event === 'open') {
           setTimeout(() => callback(), 0);
         } else if (event === 'message') {
-          setTimeout(() => callback(JSON.stringify({ type: 'test', data: {} })), 10);
+          // Send socket.io format message with '4' prefix
+          const message = JSON.stringify({ type: 'test', data: {} });
+          setTimeout(() => callback('4' + message), 10);
         }
       });
 

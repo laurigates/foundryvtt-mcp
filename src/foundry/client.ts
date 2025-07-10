@@ -330,6 +330,10 @@ export class FoundryClient {
    */
   async disconnect(): Promise<void> {
     if (this.ws) {
+      // Clean up all event listeners if the method exists
+      if (typeof this.ws.removeAllListeners === 'function') {
+        this.ws.removeAllListeners();
+      }
       this.ws.close();
       this.ws = null;
     }
@@ -493,7 +497,8 @@ export class FoundryClient {
       this.sessionToken = response.data.token;
       logger.info('Successfully authenticated with FoundryVTT');
     } catch (error) {
-      logger.error('Authentication failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+      logger.error(`Authentication failed: ${errorMessage}`);
       throw new Error('Failed to authenticate with FoundryVTT');
     }
   }
@@ -511,6 +516,12 @@ export class FoundryClient {
    * ```
    */
   async rollDice(formula: string, reason?: string): Promise<DiceRoll> {
+    // Validate dice formula to prevent injection attacks
+    const DICE_FORMULA_REGEX = /^[0-9d\s+\-()]+$/;
+    if (!formula || formula.length > 100 || !DICE_FORMULA_REGEX.test(formula)) {
+      throw new Error(`Invalid dice formula: ${formula}`);
+    }
+
     try {
       logger.debug('Rolling dice', { formula, reason });
 
@@ -677,17 +688,14 @@ export class FoundryClient {
     logger.debug('Searching items', params);
 
     if (this.config.useRestModule) {
-      const response = await this.retryRequest(() => this.http.get(`/api/items`, { params }));
-      return response.data;
+      return this.executeWithRetry(async () => {
+        const response = await this.http.get(`/api/items`, { params });
+        return response.data;
+      });
     } else {
       logger.warn('Item search requires REST API module - returning empty results');
       return { items: [], total: 0, page: 1, limit: params.limit || 10 };
     }
-
-    return this.executeWithRetry(async () => {
-      const response = await this.http.get(`/api/items`, { params });
-      return response.data;
-    });
   }
 
   /**
@@ -945,37 +953,4 @@ export class FoundryClient {
     });
   }
 
-  /**
-   * Retry mechanism for HTTP requests
-   *
-   * @private
-   * @param requestFn - Function that performs the HTTP request
-   * @returns Promise resolving to the response
-   */
-  private async retryRequest(requestFn: () => Promise<any>): Promise<any> {
-    let lastError: any;
-    const maxAttempts = (this.config.retryAttempts || 3) + 1; // +1 for initial attempt
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const response = await requestFn();
-        if (!response) {
-          throw new Error('Request returned undefined response');
-        }
-        return response;
-      } catch (error) {
-        lastError = error;
-        
-        if (attempt === maxAttempts) {
-          logger.error(`Request failed after ${maxAttempts} attempts:`, error);
-          throw error;
-        }
-        
-        logger.warn(`Request attempt ${attempt} failed, retrying...`, error);
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay || 1000));
-      }
-    }
-    
-    throw lastError;
-  }
 }
