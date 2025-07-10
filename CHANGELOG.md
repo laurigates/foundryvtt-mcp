@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.11](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.10...foundry-mcp-server-v0.9.11) (2025-07-10)
+
+
+### Bug Fixes
+
+* resolve test failures and security vulnerabilities ([#71](https://github.com/laurigates/foundryvtt-mcp/issues/71)) ([6a4f79e](https://github.com/laurigates/foundryvtt-mcp/commit/6a4f79e1be5a33cebb074be71db0d275cd4c49e3))
+
 ## [0.9.10](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.9...foundry-mcp-server-v0.9.10) (2025-07-09)
 
 
