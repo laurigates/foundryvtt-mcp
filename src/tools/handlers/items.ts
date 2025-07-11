@@ -11,7 +11,12 @@ import { logger } from '../../utils/logger.js';
 /**
  * Handles item search requests
  */
-export async function handleSearchItems(args: any, foundryClient: FoundryClient) {
+export async function handleSearchItems(args: {
+  query?: string;
+  type?: string;
+  rarity?: string;
+  limit?: number;
+}, foundryClient: FoundryClient) {
   const { query, type, rarity, limit = 10 } = args;
 
   try {

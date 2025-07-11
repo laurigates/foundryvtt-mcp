@@ -37,7 +37,7 @@ export interface FoundryActor {
   name: string;
   type: string;
   img?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   // Common actor properties
   hp?: {
     value: number;
@@ -47,7 +47,7 @@ export interface FoundryActor {
   ac?: {
     value: number;
   };
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
   abilities?: Record<string, {
     value: number;
     mod: number;
@@ -92,7 +92,7 @@ export interface FoundryItem {
   name: string;
   type: string;
   img?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   // Common item properties
   description?: string;
   rarity?: string;
@@ -327,7 +327,13 @@ export interface FoundryDrawing {
   width?: number;
   height?: number;
   points?: number[];
-  shape?: any;
+  shape?: {
+    type: string;
+    points?: number[];
+    radius?: number;
+    width?: number;
+    height?: number;
+  };
   fillType: number;
   fillColor?: string;
   strokeWidth: number;
@@ -558,7 +564,7 @@ export interface ItemSearchResult {
  * };
  * ```
  */
-export interface FoundryAPIResponse<T = any> {
+export interface FoundryAPIResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -585,7 +591,7 @@ export interface FoundryAPIResponse<T = any> {
  */
 export interface FoundryWebSocketMessage {
   type: string;
-  data?: any;
+  data?: unknown;
   user?: string;
   timestamp: string;
 }

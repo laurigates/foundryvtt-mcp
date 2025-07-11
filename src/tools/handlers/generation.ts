@@ -11,7 +11,11 @@ import { logger } from '../../utils/logger.js';
 /**
  * Handles NPC generation requests
  */
-export async function handleGenerateNPC(args: any, _foundryClient: FoundryClient) {
+export async function handleGenerateNPC(args: {
+  level?: number;
+  race?: string;
+  class?: string;
+}, _foundryClient: FoundryClient) {
   const { level = 1, race, class: characterClass } = args;
 
   try {
@@ -55,7 +59,10 @@ export async function handleGenerateNPC(args: any, _foundryClient: FoundryClient
 /**
  * Handles loot generation requests
  */
-export async function handleGenerateLoot(args: any, _foundryClient: FoundryClient) {
+export async function handleGenerateLoot(args: {
+  challengeRating?: number;
+  treasureType?: string;
+}, _foundryClient: FoundryClient) {
   const { challengeRating = 1, treasureType = 'individual' } = args;
 
   try {
@@ -93,7 +100,10 @@ ${loot.items.map(item => `- ${item.name} (${item.rarity})`).join('\n')}
 /**
  * Handles rule lookup requests
  */
-export async function handleLookupRule(args: any, _foundryClient: FoundryClient) {
+export async function handleLookupRule(args: {
+  query: string;
+  system?: string;
+}, _foundryClient: FoundryClient) {
   const { query, system = 'D&D 5e' } = args;
 
   if (!query || typeof query !== 'string') {

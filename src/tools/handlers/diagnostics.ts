@@ -13,16 +13,21 @@ import { logger } from '../../utils/logger.js';
 /**
  * Handles recent log retrieval requests
  */
-export async function handleGetRecentLogs(args: any, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetRecentLogs(args: {
+  limit?: number;
+  level?: string;
+  since?: string;
+}, diagnosticsClient: DiagnosticsClient) {
   const { limit = 20, level, since } = args;
 
   try {
     logger.info('Getting recent logs', { limit, level, since });
     const logs = await diagnosticsClient.getRecentLogs();
 
-    const logEntries = Array.isArray(logs) ? logs.map((log: any) => 
-      `[${log.timestamp || new Date().toISOString()}] **${(log.level || 'INFO').toUpperCase()}** ${log.message || log}`
-    ).join('\n') : 'No logs available';
+    const logEntries = Array.isArray(logs) ? logs.map((log: unknown) => {
+      const logEntry = log as { timestamp?: string; level?: string; message?: string };
+      return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
+    }).join('\n') : 'No logs available';
 
     return {
       content: [
@@ -49,7 +54,11 @@ ${logEntries || 'No log entries found.'}`,
 /**
  * Handles log search requests
  */
-export async function handleSearchLogs(args: any, diagnosticsClient: DiagnosticsClient) {
+export async function handleSearchLogs(args: {
+  query: string;
+  level?: string;
+  limit?: number;
+}, diagnosticsClient: DiagnosticsClient) {
   const { query, level, limit = 50 } = args;
 
   if (!query || typeof query !== 'string') {
@@ -60,9 +69,10 @@ export async function handleSearchLogs(args: any, diagnosticsClient: Diagnostics
     logger.info('Searching logs', { query, level, limit });
     const logs = await diagnosticsClient.searchLogs({ pattern: query });
 
-    const logEntries = Array.isArray(logs) ? logs.map((log: any) => 
-      `[${log.timestamp || new Date().toISOString()}] **${(log.level || 'INFO').toUpperCase()}** ${log.message || log}`
-    ).join('\n') : 'No logs available';
+    const logEntries = Array.isArray(logs) ? logs.map((log: unknown) => {
+      const logEntry = log as { timestamp?: string; level?: string; message?: string };
+      return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
+    }).join('\n') : 'No logs available';
 
     const logCount = Array.isArray(logs) ? logs.length : 0;
 
@@ -91,7 +101,7 @@ ${logEntries || 'No matching log entries found.'}`,
 /**
  * Handles system health requests
  */
-export async function handleGetSystemHealth(args: any, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetSystemHealth(args: Record<string, unknown>, diagnosticsClient: DiagnosticsClient) {
   try {
     logger.info('Getting system health');
     const health = await diagnosticsClient.getSystemHealth();
@@ -102,17 +112,17 @@ export async function handleGetSystemHealth(args: any, diagnosticsClient: Diagno
           type: 'text',
           text: `🏥 **System Health Status**
 **Overall Status:** ${health.status || 'Unknown'}
-**CPU Usage:** ${(health as any).cpu || 'N/A'}%
-**Memory Usage:** ${(health as any).memory || 'N/A'}%
-**Disk Usage:** ${(health as any).disk || 'N/A'}%
-**Uptime:** ${(health as any).uptime || 'N/A'} seconds
+**CPU Usage:** ${(health as { cpu?: number }).cpu || 'N/A'}%
+**Memory Usage:** ${(health as { memory?: number }).memory || 'N/A'}%
+**Disk Usage:** ${(health as { disk?: number }).disk || 'N/A'}%
+**Uptime:** ${(health as { uptime?: number }).uptime || 'N/A'} seconds
 
-**Active Connections:** ${(health as any).connections || 'N/A'}
-**Last Error:** ${(health as any).lastError || 'None'}
+**Active Connections:** ${(health as { connections?: number }).connections || 'N/A'}
+**Last Error:** ${(health as { lastError?: string }).lastError || 'None'}
 
 **Performance Metrics:**
-- **Response Time:** ${(health as any).responseTime || 'N/A'}ms
-- **Throughput:** ${(health as any).throughput || 'N/A'} requests/sec`,
+- **Response Time:** ${(health as { responseTime?: number }).responseTime || 'N/A'}ms
+- **Throughput:** ${(health as { throughput?: number }).throughput || 'N/A'} requests/sec`,
         },
       ],
     };
@@ -128,7 +138,9 @@ export async function handleGetSystemHealth(args: any, diagnosticsClient: Diagno
 /**
  * Handles error diagnosis requests
  */
-export async function handleDiagnoseErrors(args: any, _diagnosticSystem: DiagnosticSystem) {
+export async function handleDiagnoseErrors(args: {
+  category?: string;
+}, _diagnosticSystem: DiagnosticSystem) {
   const { category } = args;
 
   try {
@@ -140,7 +152,7 @@ export async function handleDiagnoseErrors(args: any, _diagnosticSystem: Diagnos
       systemStatus: 'Operational'
     };
 
-    const errorsByCategory = diagnosis.errors.reduce((acc: any, error: any) => {
+    const errorsByCategory = diagnosis.errors.reduce((acc: Record<string, unknown[]>, error: { category: string }) => {
       if (!acc[error.category]) {
         acc[error.category] = [];
       }
@@ -149,7 +161,7 @@ export async function handleDiagnoseErrors(args: any, _diagnosticSystem: Diagnos
     }, {});
 
     const errorSummary = Object.entries(errorsByCategory)
-      .map(([cat, errors]: [string, any]) => 
+      .map(([cat, errors]: [string, unknown[]]) => 
         `**${cat}:** ${errors.length} error(s)`
       ).join('\n') || 'No errors found';
 
@@ -183,7 +195,7 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
 /**
  * Handles comprehensive health status requests
  */
-export async function handleGetHealthStatus(args: any, foundryClient: FoundryClient, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetHealthStatus(args: Record<string, unknown>, foundryClient: FoundryClient, diagnosticsClient: DiagnosticsClient) {
   try {
     logger.info('Getting comprehensive health status');
     
@@ -211,9 +223,9 @@ ${worldInfo ? `
 **System Health:**
 ${systemHealth ? `
 - **Status:** ${systemHealth.status || 'Unknown'}
-- **CPU:** ${(systemHealth as any).cpu || 'N/A'}%
-- **Memory:** ${(systemHealth as any).memory || 'N/A'}%
-- **Uptime:** ${Math.floor(((systemHealth as any).uptime || 0) / 3600)} hours` : 'ℹ️ Not available'}`,
+- **CPU:** ${(systemHealth as { cpu?: number }).cpu || 'N/A'}%
+- **Memory:** ${(systemHealth as { memory?: number }).memory || 'N/A'}%
+- **Uptime:** ${Math.floor(((systemHealth as { uptime?: number }).uptime || 0) / 3600)} hours` : 'ℹ️ Not available'}`,
         },
       ],
     };

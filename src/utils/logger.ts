@@ -75,7 +75,7 @@ class Logger {
    * @param meta - Optional metadata object
    * @returns Formatted log message string
    */
-  private formatMessage(level: LogLevel, message: string, meta?: any): string {
+  private formatMessage(level: LogLevel, message: string, meta?: unknown): string {
     const timestamp = new Date().toISOString();
     const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${metaStr}`;
@@ -94,7 +94,7 @@ class Logger {
    * logger.debug('Processing user request', { userId: '123', action: 'search' });
    * ```
    */
-  debug(message: string, meta?: any): void {
+  debug(message: string, meta?: unknown): void {
     if (this.shouldLog('debug')) {
       console.debug(this.formatMessage('debug', message, meta));
     }
@@ -113,7 +113,7 @@ class Logger {
    * logger.info('Server started successfully', { port: 3000 });
    * ```
    */
-  info(message: string, meta?: any): void {
+  info(message: string, meta?: unknown): void {
     if (this.shouldLog('info')) {
       console.info(this.formatMessage('info', message, meta));
     }
@@ -132,7 +132,7 @@ class Logger {
    * logger.warn('Deprecated API endpoint used', { endpoint: '/old-api' });
    * ```
    */
-  warn(message: string, meta?: any): void {
+  warn(message: string, meta?: unknown): void {
     if (this.shouldLog('warn')) {
       console.warn(this.formatMessage('warn', message, meta));
     }
@@ -152,7 +152,7 @@ class Logger {
    * logger.error('Invalid user input', { input: userData, validation: errors });
    * ```
    */
-  error(message: string, error?: any): void {
+  error(message: string, error?: unknown): void {
     if (this.shouldLog('error')) {
       const errorDetails = error instanceof Error
         ? { message: error.message, stack: error.stack }

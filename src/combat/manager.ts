@@ -43,7 +43,7 @@ export interface CombatEvent {
   type: 'combat_start' | 'combat_end' | 'turn_start' | 'turn_end' | 'round_start' | 'round_end' | 'damage_dealt' | 'condition_applied' | 'initiative_changed';
   timestamp: Date;
   combat: CombatState;
-  data?: any;
+  data?: unknown;
 }
 
 export class CombatManager extends EventEmitter {
@@ -378,7 +378,7 @@ export class CombatManager extends EventEmitter {
     return `combatant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private emitCombatEvent(type: CombatEvent['type'], combat: CombatState, data?: any): void {
+  private emitCombatEvent(type: CombatEvent['type'], combat: CombatState, data?: unknown): void {
     const event: CombatEvent = {
       type,
       timestamp: new Date(),
@@ -398,7 +398,17 @@ export class CombatManager extends EventEmitter {
   }
 
   // Analysis Methods
-  getCombatStatistics(): any {
+  getCombatStatistics(): {
+    totalRounds: number;
+    totalTurns: number;
+    averageTurnTime: number;
+    combatants: Array<{
+      name: string;
+      initiative: number;
+      hp: { current: number; max: number };
+      status: string[];
+    }>;
+  } | null {
     if (!this.currentCombat) {
       return null;
     }

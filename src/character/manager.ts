@@ -140,7 +140,7 @@ export class CharacterManager extends EventEmitter {
     name: string;
     type: string;
     quantity?: number;
-    properties?: any;
+    properties?: Record<string, unknown>;
     equipped?: boolean;
   }): Promise<EquipmentTransaction> {
     logger.info(`Adding ${itemData.name} to actor ${actorId}`);
@@ -213,7 +213,10 @@ export class CharacterManager extends EventEmitter {
       this.resourceTracking.set(actorId, []);
     }
 
-    const resources = this.resourceTracking.get(actorId)!;
+    const resources = this.resourceTracking.get(actorId);
+    if (!resources) {
+      throw new Error(`Resources not found for actor ${actorId}`);
+    }
     const existingIndex = resources.findIndex(r => r.resource === resourceName);
 
     if (existingIndex >= 0) {

@@ -31,7 +31,7 @@ import { handleReadResource } from './handlers/resources.js';
  */
 export async function routeToolRequest(
   name: string,
-  args: any,
+  args: Record<string, unknown>,
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
   diagnosticSystem: DiagnosticSystem

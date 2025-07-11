@@ -11,7 +11,9 @@ import { logger } from '../../utils/logger.js';
 /**
  * Handles scene information requests
  */
-export async function handleGetSceneInfo(args: any, foundryClient: FoundryClient) {
+export async function handleGetSceneInfo(args: {
+  sceneId?: string;
+}, foundryClient: FoundryClient) {
   const { sceneId } = args;
 
   try {

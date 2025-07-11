@@ -12,7 +12,10 @@ import { logger } from '../../utils/logger.js';
 /**
  * Handles dice rolling requests
  */
-export async function handleRollDice(args: any, foundryClient: FoundryClient) {
+export async function handleRollDice(args: {
+  formula: string;
+  reason?: string;
+}, foundryClient: FoundryClient) {
   const { formula, reason } = args;
 
   if (!formula || typeof formula !== 'string') {
