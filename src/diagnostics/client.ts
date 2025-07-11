@@ -101,8 +101,8 @@ export class DiagnosticsClient {
       const response = await this.foundryClient.get(url);
       
       logger.debug('DiagnosticsClient | Retrieved logs', {
-        count: response.data.total,
-        bufferSize: response.data.bufferSize
+        count: (response.data as LogResponse).total,
+        bufferSize: (response.data as LogResponse).bufferSize
       });
 
       return response.data as LogResponse;
@@ -161,7 +161,7 @@ export class DiagnosticsClient {
       
       logger.debug('DiagnosticsClient | Search completed', {
         pattern: params.pattern,
-        matches: response.data.matches
+        matches: (response.data as LogSearchResponse).matches
       });
 
       return response.data as LogSearchResponse;
@@ -197,9 +197,9 @@ export class DiagnosticsClient {
       const response = await this.foundryClient.get('/api/diagnostics/health');
       
       logger.debug('DiagnosticsClient | System health retrieved', {
-        status: response.data.status,
-        activeUsers: response.data.users?.active,
-        recentErrors: response.data.logs?.recentErrors
+        status: (response.data as SystemHealth).status,
+        activeUsers: (response.data as SystemHealth).users?.active,
+        recentErrors: (response.data as SystemHealth).logs?.recentErrors
       });
 
       return response.data as SystemHealth;
@@ -243,9 +243,9 @@ export class DiagnosticsClient {
       const response = await this.foundryClient.get(url);
       
       logger.debug('DiagnosticsClient | Error diagnosis completed', {
-        totalErrors: response.data.summary?.totalErrors,
-        healthScore: response.data.healthScore,
-        suggestionCount: response.data.suggestions?.length
+        totalErrors: (response.data as ErrorDiagnosis).summary?.totalErrors,
+        healthScore: (response.data as ErrorDiagnosis).healthScore,
+        suggestionCount: (response.data as ErrorDiagnosis).suggestions?.length
       });
 
       return response.data as ErrorDiagnosis;

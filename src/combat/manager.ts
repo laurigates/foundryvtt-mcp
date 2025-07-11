@@ -417,11 +417,11 @@ export class CombatManager extends EventEmitter {
       totalRounds: this.currentCombat.round,
       totalTurns: this.currentCombat.round * this.currentCombat.combatants.length + this.currentCombat.turn,
       averageTurnTime: this.calculateAverageTurnTime(),
-      combatantStatus: this.currentCombat.combatants.map(c => ({
+      combatants: this.currentCombat.combatants.map(c => ({
         name: c.name,
-        hpPercent: Math.round((c.hp.current / c.hp.max) * 100),
-        conditions: c.conditions.length,
-        defeated: c.defeated
+        initiative: c.initiative || 0,
+        hp: { current: c.hp.current, max: c.hp.max },
+        status: c.conditions
       })),
       activeEffects: this.currentCombat.combatants.reduce((acc, c) => acc + c.conditions.length, 0)
     };
