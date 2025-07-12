@@ -20,7 +20,14 @@ export async function handleSearchActors(args: {
 
   try {
     logger.info('Searching actors', { query, type, limit });
-    const result = await foundryClient.searchActors({ query, type, limit });
+    const searchParams: { query: string; type?: string; limit: number } = { 
+      query: query || '',
+      limit 
+    };
+    if (type) {
+      searchParams.type = type;
+    }
+    const result = await foundryClient.searchActors(searchParams);
 
     const actorList = result.actors.map(actor => 
       `- **${actor.name}** (${actor.type}) - Level ${actor.level || 'Unknown'} - HP: ${actor.hp?.value || 'Unknown'}/${actor.hp?.max || 'Unknown'}`

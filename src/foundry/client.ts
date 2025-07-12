@@ -138,11 +138,12 @@ const MAX_WEBSOCKET_MESSAGE_SIZE = 1024 * 1024; // 1MB
  * @returns True if the object is a valid WebSocket message
  */
 function isValidWebSocketMessage(obj: unknown): obj is WebSocketMessage {
-  return obj && 
-         typeof obj === 'object' && 
-         typeof obj.type === 'string' && 
-         obj.type.length > 0 &&
-         obj.type.length < 100; // Prevent extremely long type strings
+  return typeof obj === 'object' && 
+         obj !== null && 
+         'type' in obj &&
+         typeof (obj as Record<string, unknown>).type === 'string' && 
+         ((obj as Record<string, unknown>).type as string).length > 0 &&
+         ((obj as Record<string, unknown>).type as string).length < 100; // Prevent extremely long type strings
 }
 
 export class FoundryClient {
@@ -306,10 +307,10 @@ export class FoundryClient {
         logger.info('Combat state updated');
         break;
       case 'actorUpdate':
-        logger.info('Actor updated:', message.data?.name);
+        logger.info('Actor updated:', (message.data as Record<string, unknown>)?.name);
         break;
       case 'sceneUpdate':
-        logger.info('Scene updated:', message.data?.name);
+        logger.info('Scene updated:', (message.data as Record<string, unknown>)?.name);
         break;
       default:
         logger.debug('Unknown WebSocket message type:', message.type);
@@ -365,7 +366,7 @@ export class FoundryClient {
    * @throws {Error} If all retry attempts fail
    */
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
-    let lastError: Error;
+    let lastError: Error | undefined;
     const maxAttempts = (this.config.retryAttempts || 3) + 1; // Include initial attempt
     const baseDelay = this.config.retryDelay || 1000;
     

@@ -311,7 +311,7 @@ export class DiagnosticSystem {
   private async testRestApiAvailability(): Promise<boolean> {
     try {
       const response = await this.foundryClient.get('/api/status');
-      return response && response.status === 'ok';
+      return response && (response as unknown as { status: string }).status === 'ok';
     } catch (error) {
       logger.debug('REST API not available:', error);
       return false;

@@ -156,7 +156,7 @@ export async function handleDiagnoseErrors(args: {
       if (!acc[error.category]) {
         acc[error.category] = [];
       }
-      acc[error.category].push(error);
+      acc[error.category]!.push(error);
       return acc;
     }, {});
 

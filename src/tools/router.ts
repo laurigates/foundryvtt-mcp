@@ -41,13 +41,19 @@ export async function routeToolRequest(
   switch (name) {
     // Dice tools
     case 'roll_dice':
-      return handleRollDice(args, foundryClient);
+      if (!('formula' in args) || typeof args.formula !== 'string') {
+        throw new Error('Missing required parameter: formula');
+      }
+      return handleRollDice(args as { formula: string; reason?: string }, foundryClient);
 
     // Actor tools
     case 'search_actors':
       return handleSearchActors(args, foundryClient);
     case 'get_actor_details':
-      return handleGetActorDetails(args, foundryClient);
+      if (!('actorId' in args) || typeof args.actorId !== 'string') {
+        throw new Error('Missing required parameter: actorId');
+      }
+      return handleGetActorDetails(args as { actorId: string }, foundryClient);
 
     // Item tools
     case 'search_items':
@@ -59,21 +65,27 @@ export async function routeToolRequest(
 
     // Generation tools
     case 'generate_npc':
-      return handleGenerateNPC(args, foundryClient);
+      return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, foundryClient);
     case 'generate_loot':
-      return handleGenerateLoot(args, foundryClient);
+      return handleGenerateLoot(args as { challengeRating?: number; treasureType?: string }, foundryClient);
     case 'lookup_rule':
-      return handleLookupRule(args, foundryClient);
+      if (!('query' in args) || typeof args.query !== 'string') {
+        throw new Error('Missing required parameter: query');
+      }
+      return handleLookupRule(args as { query: string; system?: string }, foundryClient);
 
     // Diagnostics tools
     case 'get_recent_logs':
       return handleGetRecentLogs(args, diagnosticsClient);
     case 'search_logs':
-      return handleSearchLogs(args, diagnosticsClient);
+      if (!('query' in args) || typeof args.query !== 'string') {
+        throw new Error('Missing required parameter: query');
+      }
+      return handleSearchLogs(args as { query: string; level?: string; limit?: number }, diagnosticsClient);
     case 'get_system_health':
       return handleGetSystemHealth(args, diagnosticsClient);
     case 'diagnose_errors':
-      return handleDiagnoseErrors(args, diagnosticSystem);
+      return handleDiagnoseErrors(args as { category?: string }, diagnosticSystem);
     case 'get_health_status':
       return handleGetHealthStatus(args, foundryClient, diagnosticsClient);
 

@@ -113,7 +113,7 @@ class FoundryMCPServer {
       try {
         return await routeToolRequest(
           name,
-          args,
+          args || {},
           this.foundryClient,
           this.diagnosticsClient,
           this.diagnosticSystem

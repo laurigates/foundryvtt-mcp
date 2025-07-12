@@ -21,7 +21,17 @@ export async function handleSearchItems(args: {
 
   try {
     logger.info('Searching items', { query, type, rarity, limit });
-    const result = await foundryClient.searchItems({ query, type, rarity, limit });
+    const searchParams: { query: string; type?: string; rarity?: string; limit: number } = { 
+      query: query || '',
+      limit 
+    };
+    if (type) {
+      searchParams.type = type;
+    }
+    if (rarity) {
+      searchParams.rarity = rarity;
+    }
+    const result = await foundryClient.searchItems(searchParams);
 
     const itemList = result.items.map(item => {
       const price = item.price ? `${item.price.value} ${item.price.denomination}` : 'Unknown price';
