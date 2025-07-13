@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.11...foundry-mcp-server-v0.10.0) (2025-07-12)
+
+
+### Features
+
+* **test:** comprehensive E2E testing framework and development tooling + type safety improvements ([#74](https://github.com/laurigates/foundryvtt-mcp/issues/74)) ([0a4c856](https://github.com/laurigates/foundryvtt-mcp/commit/0a4c856b76c6fcec5e2dad3675c684df0ed7f353))
+
 ## [0.9.11](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.10...foundry-mcp-server-v0.9.11) (2025-07-10)
 
 
