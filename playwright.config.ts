@@ -23,6 +23,9 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.FOUNDRY_URL || 'http://localhost:30000',
 
+    /* Run tests in headless mode by default (no browser window opens) */
+    headless: true,
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     

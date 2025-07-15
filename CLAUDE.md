@@ -72,11 +72,18 @@ This is a **Model Context Protocol (MCP) server** that bridges AI assistants wit
 - Environment variables: `FOUNDRY_API_KEY` or `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`
 
 ### Testing Strategy
-- Unit tests for individual components
+- Unit tests for individual components using Vitest framework
 - Integration tests for FoundryVTT connectivity
-- End-to-end testing with Playwright for UI validation
+- End-to-end testing with Playwright for UI validation (headless by default)
 - Mocked external dependencies in test environment
 - Test coverage reporting with V8
+
+**Playwright Configuration:**
+- **Headless Mode**: Tests run without opening browser windows by default
+- **Multi-Browser**: Tests run on Chromium, Firefox, and WebKit
+- **Auto-Server**: Automatically starts FoundryVTT server before tests
+- **Screenshots**: Captured on test failures for debugging
+- **Videos**: Recorded on failures for detailed analysis
 
 ## Key Environment Variables
 
@@ -131,19 +138,34 @@ npm run test-connection
 - Browser automation tools available
 - Test world/data configured
 
-**Manual E2E Testing:**
+**E2E Testing (Headless by Default):**
 ```bash
-# 1. Start FoundryVTT server
-fvtt launch
-
-# 2. Wait for server to be fully ready (usually 30-60 seconds)
-# 3. Verify FoundryVTT is accessible at configured URL
-
-# 4. Run Playwright tests
+# Run tests in headless mode (no browser windows open)
 npm run test:e2e
 
-# 5. Generate visual test reports
+# Run with visible browser for debugging
+npm run test:e2e:headed
+
+# Interactive test runner with UI
+npm run test:e2e:ui
+
+# Debug mode with breakpoints
+npm run test:e2e:debug
+
+# Generate and view test reports
 npm run test:e2e:report
+```
+
+**Manual E2E Setup (if needed):**
+```bash
+# 1. Start FoundryVTT server manually
+fvtt launch
+
+# 2. Wait for server to be fully ready (usually 30-60 seconds)  
+# 3. Verify FoundryVTT is accessible at configured URL
+
+# 4. Run tests (auto-starts server by default)
+npm run test:e2e
 
 # Alternative: Use test runner script (includes server checks)
 tsx scripts/run-e2e-tests.ts
@@ -162,6 +184,7 @@ For CI/CD integration, tests should include:
 - **API Endpoints**: Test REST API endpoint accessibility and responses
 - **Authentication**: Validate login flows and API key usage
 - **Module Installation**: Verify module files and manifest are properly installed
+- **Issue-Specific Testing**: Targeted tests for known issues and bug reproduction
 
 **Test Data Requirements:**
 - Test world with sample actors, items, and scenes
@@ -180,16 +203,62 @@ npm run test:memory
 npm run test:benchmark
 ```
 
+### Browser Modes for E2E Testing
+
+**Headless Mode (Default):**
+- Fastest execution, no visual distractions
+- Perfect for CI/CD pipelines and automated testing
+- Use for regular development and verification
+
+**Headed Mode (Visual):**
+- Opens actual browser windows to see test execution
+- Useful for debugging failing tests or understanding test flow
+- Use when developing new tests or investigating issues
+
+**Interactive Mode (UI):**
+- Playwright's test runner interface with step-by-step control
+- Best for developing and debugging complex test scenarios
+- Allows pausing, stepping through, and inspecting test state
+
+**Debug Mode:**
+- Opens browser with developer tools and breakpoints
+- Enables step-by-step debugging with Playwright inspector
+- Essential for diagnosing complex test failures
+
 ### Development Testing Workflow
-1. **Start FoundryVTT**: `fvtt launch`
-2. **Run unit tests**: `npm test`
+1. **Start FoundryVTT**: `fvtt launch` (optional - auto-started by tests)
+2. **Run unit tests**: `npm test`  
 3. **Test MCP connection**: `npm run test-connection`
-4. **Run E2E tests**: `npm run test:e2e` or `tsx scripts/run-e2e-tests.ts`
-5. **Review test results**: `npm run test:e2e:report`
+4. **Run E2E tests**: `npm run test:e2e` (headless by default)
+5. **Debug if needed**: `npm run test:e2e:headed` or `npm run test:e2e:debug`
+6. **Review test results**: `npm run test:e2e:report`
+
+### Issue-Specific Testing
+
+**Issue #7 - JSON Parsing Errors:**
+```bash
+# Test for JSON parsing errors specifically
+npm run test:issue-7
+
+# Run with visible browser for debugging
+npm run test:issue-7:headed
+
+# Using Makefile
+make test-issue-7
+make test-issue-7-headed
+```
+
+This test specifically targets the malformed JSON error reported in GitHub issue #7:
+- Tests all REST API endpoints for JSON parsing errors
+- Validates array response formats 
+- Checks for malformation patterns like missing commas, extra commas, unclosed objects
+- Monitors console errors related to REST API
+- Tests timing issues during module initialization
 
 ### Available Test Files
 - `tests/e2e/rest-api-module.spec.ts` - Module visibility and functionality tests
 - `tests/e2e/module-settings.spec.ts` - Comprehensive module settings validation
+- `tests/e2e/issue-7-json-parsing.spec.ts` - **NEW:** Issue #7 JSON parsing error reproduction
 - `tests/e2e/helpers/foundry-helpers.ts` - Reusable test utilities for FoundryVTT
 
 ## Reference Links

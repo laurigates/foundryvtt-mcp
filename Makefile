@@ -74,6 +74,14 @@ test-e2e-debug: ## Run E2E tests in debug mode
 test-e2e-report: ## View last E2E test report
 	npm run test:e2e:report
 
+# Issue-specific testing
+.PHONY: test-issue-7 test-issue-7-headed
+test-issue-7: ## Test for JSON parsing errors from issue #7
+	npm run test:issue-7
+
+test-issue-7-headed: ## Test issue #7 with visible browser
+	npm run test:issue-7:headed
+
 # Advanced E2E testing
 .PHONY: test-e2e-full test-e2e-with-server foundry-start foundry-stop foundry-status
 test-e2e-full: foundry-start test-e2e foundry-stop ## Full E2E test cycle with server management

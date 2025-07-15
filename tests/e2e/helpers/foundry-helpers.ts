@@ -124,6 +124,97 @@ export class FoundryTestHelpers {
   }
 
   /**
+   * Test REST API endpoint and return raw response for JSON parsing validation
+   */
+  async testApiEndpointRaw(endpoint: string): Promise<{ 
+    status: number; 
+    rawText: string; 
+    parsedData?: any; 
+    parseError?: string;
+    contentType?: string;
+  }> {
+    const baseUrl = process.env.FOUNDRY_URL || 'http://localhost:30000';
+    const fullUrl = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    
+    try {
+      const response = await this.page.request.get(fullUrl);
+      const rawText = await response.text();
+      const contentType = response.headers()['content-type'] || 'unknown';
+      
+      let parsedData;
+      let parseError;
+      
+      // Attempt to parse JSON
+      if (contentType.includes('application/json') || rawText.trim().startsWith('{') || rawText.trim().startsWith('[')) {
+        try {
+          parsedData = JSON.parse(rawText);
+        } catch (error) {
+          parseError = error instanceof Error ? error.message : 'JSON parse error';
+        }
+      }
+      
+      return {
+        status: response.status(),
+        rawText,
+        parsedData,
+        parseError,
+        contentType
+      };
+    } catch (error) {
+      return {
+        status: 0,
+        rawText: '',
+        parseError: error instanceof Error ? error.message : 'Network error'
+      };
+    }
+  }
+
+  /**
+   * Validate JSON array format specifically for issue #7 debugging
+   */
+  async validateJsonArrayFormat(rawJson: string): Promise<{
+    isValid: boolean;
+    errors: string[];
+    patterns: string[];
+  }> {
+    const errors: string[] = [];
+    const patterns: string[] = [];
+    
+    // Check for malformation patterns that could cause "Expected ',' or ']'" errors
+    const malformationChecks = [
+      { pattern: /\[\s*,/, description: 'Array starts with comma' },
+      { pattern: /,\s*\]/, description: 'Array ends with comma' },
+      { pattern: /,\s*,/, description: 'Double commas in array' },
+      { pattern: /\}\s*\{/, description: 'Missing comma between objects' },
+      { pattern: /\[\s*\{[^}]*$/, description: 'Unclosed object in array' },
+      { pattern: /^[^[]*\]/, description: 'Closing bracket without opening' },
+      { pattern: /\[\s*[^{\]"]/, description: 'Invalid array start' },
+    ];
+    
+    for (const check of malformationChecks) {
+      if (check.pattern.test(rawJson)) {
+        errors.push(check.description);
+        patterns.push(check.pattern.toString());
+      }
+    }
+    
+    // Try to parse and get specific parsing error
+    try {
+      JSON.parse(rawJson);
+    } catch (parseError) {
+      if (parseError instanceof Error) {
+        errors.push(`Parse error: ${parseError.message}`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      patterns
+    };
+  }
+
+  /**
    * Wait for a specific condition with timeout
    */
   async waitForCondition(
