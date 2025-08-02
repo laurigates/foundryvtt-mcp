@@ -286,3 +286,25 @@ export function getAllTools() {
     ...diagnosticsTools,
   ];
 }
+
+/**
+ * Get modernized tool definitions from registry (when available)
+ */
+export async function getModernizedTools() {
+  try {
+    const { toolRegistry } = await import('./registry.js');
+    const modernTools = toolRegistry.getToolDefinitions();
+    
+    // Filter out tools that have been modernized to avoid duplicates
+    const modernToolNames = new Set(modernTools.map(tool => tool.name));
+    const legacyTools = getAllTools().filter(tool => !modernToolNames.has(tool.name));
+    
+    return [
+      ...modernTools,
+      ...legacyTools,
+    ];
+  } catch (error) {
+    // Fallback to legacy definitions if registry is not available
+    return getAllTools();
+  }
+}
