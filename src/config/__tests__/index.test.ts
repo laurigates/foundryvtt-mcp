@@ -23,11 +23,19 @@ describe('Config', () => {
   let originalEnv: NodeJS.ProcessEnv;
   let exitSpy: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalEnv = process.env;
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
+    
+    // Reset any cached config
+    try {
+      const { resetConfig } = await import('../index.js');
+      resetConfig();
+    } catch {
+      // Ignore import errors during setup
+    }
   });
 
   afterEach(() => {
@@ -40,7 +48,8 @@ describe('Config', () => {
     it('should load configuration from environment variables', async () => {
       process.env = { ...mockEnv };
 
-      const { config } = await import('../index.js');
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
 
       expect(config.serverName).toBe('test-server');
       expect(config.serverVersion).toBe('1.0.0');
@@ -62,7 +71,8 @@ describe('Config', () => {
     it('should use default values when environment variables are not set', async () => {
       process.env = { FOUNDRY_URL: 'http://localhost:30000' };
 
-      const { config } = await import('../index.js');
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
 
       expect(config.serverName).toBe('foundry-mcp-server');
       expect(config.serverVersion).toBe('0.1.0');
@@ -79,50 +89,60 @@ describe('Config', () => {
   });
 
   describe('configuration validation', () => {
-    it('should exit process when FOUNDRY_URL is missing', async () => {
-      process.env = {};
+    it('should throw error when FOUNDRY_URL is missing in test environment', async () => {
+      process.env = { NODE_ENV: 'test' };
 
-      await expect(async () => {
-        await import('../index.js');
-      }).rejects.toThrow('process.exit called');
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
+      
+      expect(() => config.foundry.url).toThrow();
+    });
 
+    it('should exit process when FOUNDRY_URL is missing in non-test environment', async () => {
+      process.env = { NODE_ENV: 'production' };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
+      
+      expect(() => config.foundry.url).toThrow('process.exit called');
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('should exit process when FOUNDRY_URL is invalid', async () => {
-      process.env = { FOUNDRY_URL: 'invalid-url' };
-
-      await expect(async () => {
-        await import('../index.js');
-      }).rejects.toThrow('process.exit called');
-
-      expect(exitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it('should exit process when LOG_LEVEL is invalid', async () => {
-      process.env = {
-        FOUNDRY_URL: 'http://localhost:30000',
-        LOG_LEVEL: 'invalid-level'
+    it('should throw error when FOUNDRY_URL is invalid in test environment', async () => {
+      process.env = { 
+        FOUNDRY_URL: 'invalid-url',
+        NODE_ENV: 'test'
       };
 
-      await expect(async () => {
-        await import('../index.js');
-      }).rejects.toThrow('process.exit called');
-
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
+      
+      expect(() => config.foundry.url).toThrow();
     });
 
-    it('should exit process when NODE_ENV is invalid', async () => {
+    it('should throw error when LOG_LEVEL is invalid in test environment', async () => {
+      process.env = {
+        FOUNDRY_URL: 'http://localhost:30000',
+        LOG_LEVEL: 'invalid-level',
+        NODE_ENV: 'test'
+      };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
+      
+      expect(() => config.logLevel).toThrow();
+    });
+
+    it('should throw error when NODE_ENV is invalid in test environment', async () => {
       process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
         NODE_ENV: 'invalid-env'
       };
 
-      await expect(async () => {
-        await import('../index.js');
-      }).rejects.toThrow('process.exit called');
-
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
+      
+      expect(() => config.nodeEnv).toThrow();
     });
   });
 
@@ -137,7 +157,8 @@ describe('Config', () => {
         CACHE_MAX_SIZE: '5000',
       };
 
-      const { config } = await import('../index.js');
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
 
       expect(config.foundry.timeout).toBe(15000);
       expect(config.foundry.retryAttempts).toBe(10);
@@ -153,7 +174,8 @@ describe('Config', () => {
         CACHE_ENABLED: 'false',
       };
 
-      const { config } = await import('../index.js');
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig(); // Reset any cached config
 
       expect(config.cache.enabled).toBe(false);
     });

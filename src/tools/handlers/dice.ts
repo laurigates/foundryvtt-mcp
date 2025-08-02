@@ -5,7 +5,7 @@
  * or fallback mechanisms when the API is unavailable.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+// import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { BaseTool, ToolContext, ToolResult } from '../base.js';
 import { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';

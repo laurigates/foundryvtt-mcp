@@ -31,6 +31,10 @@ jobs:
 
     - name: Run tests
       run: npm test
+      env:
+        NODE_ENV: test
+        FOUNDRY_URL: http://localhost:30000
+        LOG_LEVEL: error
 
     - name: Run linter
       run: npm run lint

@@ -80,11 +80,11 @@ type Config = z.infer<typeof ConfigSchema>;
  * Loads and validates configuration from environment variables
  *
  * Reads configuration from process.env, applies defaults where appropriate,
- * and validates the result against the ConfigSchema. Exits the process
- * with error details if validation fails.
+ * and validates the result against the ConfigSchema. In test environments,
+ * throws errors instead of exiting the process to allow proper test handling.
  *
  * @returns Validated configuration object
- * @throws Process exits with code 1 if validation fails
+ * @throws Error in test environment, process exits with code 1 in production
  * @example
  * ```typescript
  * const config = loadConfig();
@@ -140,16 +140,28 @@ function loadConfig(): Config {
       console.error('  • For setup guidance, see: SETUP_GUIDE.md');
       console.error('  • Run the setup wizard: npm run setup');
     }
+    
+    // In test environment, throw error instead of exiting process
+    if (process.env.NODE_ENV === 'test') {
+      throw error;
+    }
+    
     process.exit(1);
   }
 }
 
 /**
- * Global configuration instance
+ * Cached configuration instance
+ */
+let _config: Config | null = null;
+
+/**
+ * Gets the global configuration instance
  *
- * This is the main configuration object used throughout the application.
- * It's loaded once at module initialization and contains all validated settings.
+ * This loads and caches the configuration on first access, allowing tests
+ * to set environment variables before triggering configuration validation.
  *
+ * @returns Validated configuration object
  * @example
  * ```typescript
  * import { config } from './config/index.js';
@@ -162,7 +174,22 @@ function loadConfig(): Config {
  * }
  * ```
  */
-export const config = loadConfig();
+export const config = new Proxy({} as Config, {
+  get(target, prop) {
+    if (_config === null) {
+      _config = loadConfig();
+    }
+    return _config[prop as keyof Config];
+  }
+});
+
+/**
+ * Resets the cached configuration - used for testing
+ * @internal
+ */
+export function resetConfig(): void {
+  _config = null;
+}
 
 /**
  * Export the Config type for use in other modules
