@@ -10,7 +10,9 @@
 
 import axios, { AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
 import WebSocket from 'ws';
+import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
+import { cache, CacheKeys } from '../utils/cache-instance.js';
 import { FoundryActor, FoundryScene, FoundryWorld, DiceRoll, ActorSearchResult, ItemSearchResult } from './types.js';
 
 /**
@@ -146,7 +148,7 @@ function isValidWebSocketMessage(obj: unknown): obj is WebSocketMessage {
          ((obj as Record<string, unknown>).type as string).length < 100; // Prevent extremely long type strings
 }
 
-export class FoundryClient {
+export class FoundryClient extends EventEmitter {
   private http: AxiosInstance;
   private ws: WebSocket | null = null;
   private config: FoundryClientConfig;
@@ -168,6 +170,8 @@ export class FoundryClient {
    * ```
    */
   constructor(config: FoundryClientConfig) {
+    super(); // Call EventEmitter constructor
+    
     // Validate required configuration
     if (!config.baseUrl || config.baseUrl.trim() === '') {
       throw new Error('baseUrl is required and cannot be empty');
@@ -289,16 +293,15 @@ export class FoundryClient {
   private handleWebSocketMessage(message: WebSocketMessage): void {
     logger.debug('WebSocket message received:', message);
 
-    // Call registered message handlers first
-    if (this.messageHandlers && this.messageHandlers.has(message.type)) {
-      const handler = this.messageHandlers.get(message.type);
-      if (handler) {
-        try {
-          handler(message.data);
-        } catch (error) {
-          logger.error('Error in message handler:', error);
-        }
-      }
+    // Emit events for message handlers
+    try {
+      // Emit specific message type event
+      this.emit(`message:${message.type}`, message.data);
+      
+      // Emit general message event
+      this.emit('message', message);
+    } catch (error) {
+      logger.error('Error emitting WebSocket message events:', error);
     }
 
     // Handle built-in message types
@@ -338,6 +341,10 @@ export class FoundryClient {
       this.ws.close();
       this.ws = null;
     }
+    
+    // Clean up all EventEmitter listeners
+    this.removeAllListeners();
+    
     this._isConnected = false;
     logger.info('FoundryVTT client disconnected');
   }
@@ -466,15 +473,23 @@ export class FoundryClient {
    * });
    * ```
    */
-  onMessage(type: string, handler: Function): void {
-    // Simple event handling - in a real implementation you'd want a proper event system
-    if (!this.messageHandlers) {
-      this.messageHandlers = new Map();
-    }
-    this.messageHandlers.set(type, handler);
+  onMessage(type: string, handler: (...args: any[]) => void): void {
+    this.on(`message:${type}`, handler);
   }
 
-  private messageHandlers?: Map<string, Function>;
+  /**
+   * Remove a message handler for a specific type
+   * 
+   * @param type - Message type to stop listening for
+   * @param handler - Optional specific handler to remove
+   */
+  offMessage(type: string, handler?: (...args: any[]) => void): void {
+    if (handler) {
+      this.off(`message:${type}`, handler);
+    } else {
+      this.removeAllListeners(`message:${type}`);
+    }
+  }
 
   /**
    * Authenticates with FoundryVTT using username and password
@@ -615,26 +630,42 @@ export class FoundryClient {
     logger.debug('Searching actors', params);
 
     if (this.config.useRestModule) {
-      return await this.executeWithRetry(async () => {
-        const queryParams = new URLSearchParams();
-        if (params.query) {
-          queryParams.append('search', params.query);
-        }
-        if (params.type) {
-          queryParams.append('type', params.type);
-        }
-        if (params.limit) {
-          queryParams.append('limit', params.limit.toString());
-        }
-
-        const response = await this.http.get(`/api/actors`, { params });
-        return response.data;
-      });
+      // Use cache for actor search results (2 minutes TTL)
+      const cacheKey = CacheKeys.actorSearch(
+        params.query || '', 
+        params.type, 
+        params.limit
+      );
+      
+      return cache.getOrSet(cacheKey, async () => {
+        return this.searchActorsUncached(params);
+      }, 120); // 2 minutes
     } else {
       // Fallback: return mock data or empty array
       logger.warn('Actor search requires REST API module - returning empty results');
       return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
     }
+  }
+
+  /**
+   * Search actors without caching
+   */
+  private async searchActorsUncached(params: SearchActorsParams): Promise<ActorSearchResult> {
+    return await this.executeWithRetry(async () => {
+      const queryParams = new URLSearchParams();
+      if (params.query) {
+        queryParams.append('search', params.query);
+      }
+      if (params.type) {
+        queryParams.append('type', params.type);
+      }
+      if (params.limit) {
+        queryParams.append('limit', params.limit.toString());
+      }
+
+      const response = await this.http.get(`/api/actors`, { params });
+      return response.data;
+    });
   }
 
   /**
@@ -654,6 +685,16 @@ export class FoundryClient {
       throw new Error('Actor retrieval requires REST API module');
     }
 
+    // Use cache for actor details (5 minutes TTL)
+    return cache.getOrSet(CacheKeys.actor(actorId), async () => {
+      return this.getActorUncached(actorId);
+    }, 300); // 5 minutes
+  }
+
+  /**
+   * Get actor details without caching
+   */
+  private async getActorUncached(actorId: string): Promise<FoundryActor> {
     return this.executeWithRetry(async () => {
       try {
         const response = await this.http.get(`/api/actors/${actorId}`);
@@ -788,6 +829,17 @@ export class FoundryClient {
         modified: new Date().toISOString(),
       };
     }
+
+    // Use cache for world info (10 minutes TTL)
+    return cache.getOrSet(CacheKeys.worldInfo(), async () => {
+      return this.getWorldInfoUncached();
+    }, 600); // 10 minutes
+  }
+
+  /**
+   * Get world information without caching
+   */
+  private async getWorldInfoUncached(): Promise<FoundryWorld> {
 
     return this.executeWithRetry(async () => {
       const response = await this.http.get('/api/world');

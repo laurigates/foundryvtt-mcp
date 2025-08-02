@@ -1,8 +1,8 @@
 /**
- * @fileoverview Tool routing and handler coordination
+ * @fileoverview New tool routing implementation using registry pattern
  * 
- * This module routes tool requests to appropriate handlers and manages
- * the coordination between different tool categories.
+ * This module provides a cleaner routing system that uses the tool registry
+ * and eliminates the need for manual switch statements and validation.
  */
 
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
@@ -13,8 +13,7 @@ import { logger } from '../utils/logger.js';
 import { toolRegistry } from './registry.js';
 import { ToolContext } from './base.js';
 
-// Import all tool handlers
-import { handleRollDice } from './handlers/dice.js';
+// Import legacy handlers for tools not yet converted
 import { handleSearchActors, handleGetActorDetails } from './handlers/actors.js';
 import { handleSearchItems } from './handlers/items.js';
 import { handleGetSceneInfo } from './handlers/scenes.js';
@@ -29,7 +28,7 @@ import {
 import { handleReadResource } from './handlers/resources.js';
 
 /**
- * Routes tool requests to appropriate handlers
+ * Routes tool requests using the new registry system
  */
 export async function routeToolRequest(
   name: string,
@@ -40,14 +39,14 @@ export async function routeToolRequest(
 ) {
   logger.debug(`Routing tool request: ${name}`, { args });
 
-  // Try the new registry system first
+  const context: ToolContext = {
+    foundryClient,
+    diagnosticsClient,
+    diagnosticSystem,
+  };
+
+  // Try to execute using the new registry system
   if (toolRegistry.has(name)) {
-    const context: ToolContext = {
-      foundryClient,
-      diagnosticsClient,
-      diagnosticSystem,
-    };
-    
     try {
       return await toolRegistry.execute(name, args, context);
     } catch (error) {
@@ -61,15 +60,22 @@ export async function routeToolRequest(
     }
   }
 
-  // Fall back to legacy switch statement for tools not yet converted
-  switch (name) {
-    // Dice tools
-    case 'roll_dice':
-      if (!('formula' in args) || typeof args.formula !== 'string') {
-        throw new Error('Missing required parameter: formula');
-      }
-      return handleRollDice(args as { formula: string; reason?: string }, foundryClient);
+  // Fallback to legacy handlers for tools not yet converted
+  return await routeLegacyTool(name, args, foundryClient, diagnosticsClient, diagnosticSystem);
+}
 
+/**
+ * Legacy routing for tools not yet converted to the new system
+ * @deprecated This will be removed once all tools are converted
+ */
+async function routeLegacyTool(
+  name: string,
+  args: Record<string, unknown>,
+  foundryClient: FoundryClient,
+  diagnosticsClient: DiagnosticsClient,
+  diagnosticSystem: DiagnosticSystem
+) {
+  switch (name) {
     // Actor tools
     case 'search_actors':
       return handleSearchActors(args, foundryClient);
