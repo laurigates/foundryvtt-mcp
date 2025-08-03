@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.10.0...foundry-mcp-server-v0.11.0) (2025-08-03)
+
+
+### Features
+
+* modernize tool system with schema validation, caching, and enhanced WebSocket events ([#79](https://github.com/laurigates/foundryvtt-mcp/issues/79)) ([dbbfc9f](https://github.com/laurigates/foundryvtt-mcp/commit/dbbfc9f0670f8dbbfd14c53b9a63f1edb712caac))
+
 ## [0.10.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.9.11...foundry-mcp-server-v0.10.0) (2025-07-12)
 
 
