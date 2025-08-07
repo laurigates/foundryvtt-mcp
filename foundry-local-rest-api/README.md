@@ -31,7 +31,7 @@ A **purely local** REST API module for FoundryVTT that provides HTTP endpoints f
 1. In FoundryVTT, go to **Setup** → **Add-on Modules** → **Install Module**
 2. Paste this manifest URL:
    ```
-   https://github.com/lgates/foundryvtt-mcp/releases/latest/download/module.json
+   https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json
    ```
 3. Click **Install**
 
