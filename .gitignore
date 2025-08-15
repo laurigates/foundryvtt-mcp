@@ -105,3 +105,8 @@ data/
 # Test files
 test-results/
 playwright-report/
+
+# Integration test secrets and data
+secrets.json
+tests/fixtures/foundry-data/
+.env.test

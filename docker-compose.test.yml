@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  foundryvtt:
+    image: felddy/foundryvtt:release
+    container_name: foundryvtt-test
+    hostname: foundryvtt-test
+    ports:
+      - "30001:30000"
+    environment:
+      # FoundryVTT configuration
+      - FOUNDRY_HOSTNAME=0.0.0.0
+      - FOUNDRY_LOCAL_HOSTNAME=localhost
+      - FOUNDRY_ROUTE_PREFIX=
+      - FOUNDRY_SSL_CERT=
+      - FOUNDRY_SSL_KEY=
+      - FOUNDRY_PROXY_SSL=false
+      - FOUNDRY_PROXY_PORT=443
+      - FOUNDRY_AWS_CONFIG=false
+      - FOUNDRY_WORLD=test-world
+      - FOUNDRY_ADMIN_KEY=test-admin-key-123
+      - FOUNDRY_MINIFY_STATIC_FILES=true
+      - FOUNDRY_UPNP=false
+      - FOUNDRY_DEMO_MODE=false
+      
+      # Authentication (use secrets in CI)
+      - FOUNDRY_USERNAME=${FOUNDRY_USERNAME:-}
+      - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD:-}
+      - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY:-}
+      
+      # Logging
+      - FOUNDRY_LOG_LEVEL=warn
+      - CONTAINER_VERBOSE=false
+    volumes:
+      # Mount test data directory
+      - type: bind
+        source: ./tests/fixtures/foundry-data
+        target: /data
+      # Mount any test modules/systems
+      - type: bind
+        source: ./tests/fixtures/modules
+        target: /data/Data/modules
+        read_only: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    restart: "no"
+
+networks:
+  default:
+    name: foundryvtt-test-network
