@@ -1,0 +1,135 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  integration-tests:
+    name: FoundryVTT Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    # Use environment for manual approval on forks (security)
+    environment: 
+      name: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'requires-approval' || 'auto-approved' }}
+
+    services:
+      foundryvtt:
+        image: felddy/foundryvtt:release
+        ports:
+          - 30001:30000
+        env:
+          FOUNDRY_HOSTNAME: 0.0.0.0
+          FOUNDRY_LOCAL_HOSTNAME: localhost
+          FOUNDRY_ADMIN_KEY: test-admin-key-123
+          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+          FOUNDRY_LOG_LEVEL: warn
+          CONTAINER_VERBOSE: false
+          FOUNDRY_MINIFY_STATIC_FILES: true
+          FOUNDRY_UPNP: false
+          FOUNDRY_DEMO_MODE: false
+        options: >-
+          --health-cmd "curl -f http://localhost:30000 || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 60s
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Wait for FoundryVTT to be ready
+        run: |
+          echo "Waiting for FoundryVTT to be fully ready..."
+          timeout 180 bash -c 'until curl -f http://localhost:30001 >/dev/null 2>&1; do 
+            echo "Waiting for FoundryVTT..."; 
+            sleep 5; 
+          done'
+          echo "FoundryVTT is ready!"
+
+      - name: Verify FoundryVTT health
+        run: |
+          curl -f http://localhost:30001 || (echo "FoundryVTT health check failed" && exit 1)
+
+      - name: Run integration tests
+        env:
+          FOUNDRY_URL: http://localhost:30001
+          FOUNDRY_ADMIN_KEY: test-admin-key-123
+          LOG_LEVEL: warn
+        run: npm run test:integration
+        timeout-minutes: 15
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            test-results/
+            coverage/
+          retention-days: 7
+
+  # Optional: Run integration tests with Docker Compose locally
+  integration-tests-compose:
+    name: Docker Compose Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Create test environment file
+        run: |
+          cp .env.test.template .env.test
+          echo "FOUNDRY_USERNAME=${{ secrets.FOUNDRY_USERNAME }}" >> .env.test
+          echo "FOUNDRY_PASSWORD=${{ secrets.FOUNDRY_PASSWORD }}" >> .env.test
+          echo "FOUNDRY_LICENSE_KEY=${{ secrets.FOUNDRY_LICENSE_KEY }}" >> .env.test
+
+      - name: Run Docker Compose integration tests
+        run: npm run test:integration:docker
+
+      - name: Upload Docker Compose test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-compose-test-results
+          path: |
+            test-results/
+            coverage/
+          retention-days: 7
