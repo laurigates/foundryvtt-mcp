@@ -17,16 +17,17 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
-    "test:issue-7": "playwright test tests/e2e/issue-7-json-parsing.spec.ts",
-    "test:issue-7:headed": "playwright test tests/e2e/issue-7-json-parsing.spec.ts --headed",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --watch --config vitest.integration.config.ts",
+    "test:integration:ui": "vitest --ui --config vitest.integration.config.ts",
+    "test:integration:docker": "docker-compose -f docker-compose.test.yml up -d && npm run test:integration && docker-compose -f docker-compose.test.yml down",
     "test-connection": "tsx scripts/test-connection.ts",
     "setup-wizard": "tsx scripts/setup-wizard.ts",
     "lint": "eslint src --ext .ts",
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
     "docs:serve": "npm run docs && npx http-server docs",
-    "setup": "npm run clean && npm run build && npm run test-connection",
-    "process-template": "node scripts/process-template.cjs"
+    "setup": "npm run clean && npm run build && npm run test-connection"
   },
   "keywords": [
     "foundry",

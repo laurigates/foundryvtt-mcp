@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+* **architecture:** extracted foundry-local-rest-api module to standalone repository
+  - Moved `foundry-local-rest-api/` directory to https://github.com/yourusername/foundryvtt-local-rest-api
+  - Removed module build infrastructure (process-template.cjs, build-foundry-module.yml)
+  - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
+  - This change improves repository focus and allows independent versioning of the FoundryVTT module
+
 ## [0.11.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.10.0...foundry-mcp-server-v0.11.0) (2025-08-03)
 
 
