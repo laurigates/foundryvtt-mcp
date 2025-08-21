@@ -10,6 +10,17 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.0.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.11.0...foundry-mcp-server-v1.0.0) (2025-08-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* The foundry-local-rest-api module has been moved to its own repository to improve focus and enable independent versioning.
+
+### Features
+
+* extract foundry-local-rest-api module to standalone repository ([#84](https://github.com/laurigates/foundryvtt-mcp/issues/84)) ([4aae7d9](https://github.com/laurigates/foundryvtt-mcp/commit/4aae7d9e9ec73f3e8b886d020d9e42355c404313))
+
 ## [0.11.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.10.0...foundry-mcp-server-v0.11.0) (2025-08-03)
 
 
