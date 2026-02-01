@@ -84,6 +84,9 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
+
+# Claude local settings (user-specific)
+.claude/settings.local.json
 *.swp
 *.swo
 *~
