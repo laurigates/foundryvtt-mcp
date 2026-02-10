@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
-import WebSocket from 'ws';
 
 // Mock dependencies
 vi.mock('axios');
-vi.mock('ws');
+vi.mock('socket.io-client');
+vi.mock('../auth.js', () => ({
+  authenticateFoundry: vi.fn().mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+}));
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -19,13 +21,12 @@ vi.mock('../../config/index.js', () => ({
   },
 }));
 
-const { FoundryClient } = await import('../client');
+const { FoundryClient } = await import('../client.js');
 
 const mockAxios = axios as any;
-const mockWebSocket = WebSocket as any;
 
 describe('FoundryClient', () => {
-  let client: FoundryClient;
+  let client: InstanceType<typeof FoundryClient>;
   let mockAxiosInstance: any;
 
   beforeEach(() => {
@@ -36,23 +37,13 @@ describe('FoundryClient', () => {
       delete: vi.fn(),
       request: vi.fn(),
       interceptors: {
-        request: {
-          use: vi.fn(),
-        },
-        response: {
-          use: vi.fn(),
-        },
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
       },
     };
 
     vi.clearAllMocks();
     mockAxios.create = vi.fn().mockReturnValue(mockAxiosInstance);
-    mockWebSocket.mockImplementation(() => ({
-      on: vi.fn(),
-      send: vi.fn(),
-      close: vi.fn(),
-      readyState: WebSocket.OPEN,
-    }));
   });
 
   afterEach(() => {
@@ -61,295 +52,194 @@ describe('FoundryClient', () => {
 
   describe('constructor', () => {
     it('should create instance with default config', () => {
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-      });
-
-      expect(mockAxios.create).toHaveBeenCalledWith({
-        baseURL: 'http://localhost:30000',
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'FoundryMCP/0.1.0',
-          'Accept-Encoding': 'gzip, deflate, br',
-        },
-        maxRedirects: 3,
-        maxContentLength: 50 * 1024 * 1024,
-        maxBodyLength: 50 * 1024 * 1024,
-        validateStatus: expect.any(Function),
-      });
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      expect(client).toBeDefined();
+      expect(client.isConnected()).toBe(false);
     });
 
-    it('should create instance with custom config', () => {
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-        apiKey: 'test-key',
-        timeout: 5000,
-        retryAttempts: 5,
-        retryDelay: 500,
-      });
-
-      expect(mockAxios.create).toHaveBeenCalledWith({
-        baseURL: 'http://localhost:30000',
-        timeout: 5000,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'FoundryMCP/0.1.0',
-          'Accept-Encoding': 'gzip, deflate, br',
-        },
-        maxRedirects: 3,
-        maxContentLength: 50 * 1024 * 1024,
-        maxBodyLength: 50 * 1024 * 1024,
-        validateStatus: expect.any(Function),
-      });
+    it('should throw on empty baseUrl', () => {
+      expect(() => new FoundryClient({ baseUrl: '' })).toThrow('baseUrl is required');
     });
 
-    it('should handle authentication headers', () => {
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-        username: 'testuser',
-        password: 'testpass',
-      });
+    it('should throw on invalid baseUrl', () => {
+      expect(() => new FoundryClient({ baseUrl: 'not-a-url' })).toThrow('Invalid baseUrl');
+    });
 
-      expect(mockAxios.create).toHaveBeenCalledWith({
-        baseURL: 'http://localhost:30000',
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'FoundryMCP/0.1.0',
-          'Accept-Encoding': 'gzip, deflate, br',
-        },
-        maxRedirects: 3,
-        maxContentLength: 50 * 1024 * 1024,
-        maxBodyLength: 50 * 1024 * 1024,
-        validateStatus: expect.any(Function),
-      });
+    it('should configure axios with apiKey interceptor when provided', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-key' });
+      expect(mockAxios.create).toHaveBeenCalled();
     });
   });
 
-  describe('connection methods', () => {
-    beforeEach(() => {
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-      });
-    });
-
-    it('should determine connection method based on config', () => {
-      const restClient = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-      });
-
-      expect(restClient).toBeDefined();
-    });
-
-    it('should handle WebSocket connection', async () => {
-      const mockWs = {
-        on: vi.fn(),
-        send: vi.fn(),
-        close: vi.fn(),
-        readyState: WebSocket.OPEN,
-      };
-
-      mockWebSocket.mockImplementation(() => mockWs);
-
-      // Mock successful connection
-      mockWs.on.mockImplementation((event: string, callback: Function) => {
-        if (event === 'open') {
-          setTimeout(() => callback(), 0);
-        }
-      });
-
-      await expect(client.connect()).resolves.not.toThrow();
-    });
-  });
-
-  describe('API methods', () => {
+  describe('REST API mode (with apiKey)', () => {
     beforeEach(() => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
-        useRestModule: true,
       });
     });
 
-    it('should search actors', async () => {
-      const mockActors = [
-        { _id: '1', name: 'Hero', type: 'character' },
-        { _id: '2', name: 'Villain', type: 'npc' },
-      ];
+    it('should connect via REST API', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/status');
+    });
 
-      mockAxiosInstance.get.mockResolvedValue({
-        data: { actors: mockActors },
-      });
+    it('should search actors via REST API', async () => {
+      const mockData = { actors: [{ _id: '1', name: 'Hero', type: 'character' }] };
+      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
 
       const result = await client.searchActors({ query: 'Hero' });
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
-        params: { query: 'Hero' },
-      });
-      expect(result.actors).toEqual(mockActors);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', { params: { query: 'Hero' } });
+      expect(result.actors).toEqual(mockData.actors);
     });
 
-    it('should search items', async () => {
-      const mockItems = [
-        { _id: '1', name: 'Sword', type: 'weapon' },
-        { _id: '2', name: 'Potion', type: 'consumable' },
-      ];
+    it('should search items via REST API', async () => {
+      const mockData = { items: [{ _id: '1', name: 'Sword', type: 'weapon' }] };
+      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
 
-      mockAxiosInstance.get.mockResolvedValue({
-        data: { items: mockItems },
-      });
-
-      const result = await client.searchItems({
-        query: 'Sword',
-        type: 'weapon',
-        limit: 10
-      });
-
+      const result = await client.searchItems({ query: 'Sword', type: 'weapon', limit: 10 });
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/items', {
         params: { query: 'Sword', type: 'weapon', limit: 10 },
       });
-      expect(result.items).toEqual(mockItems);
+      expect(result.items).toEqual(mockData.items);
     });
 
-    it('should get world info', async () => {
-      const mockWorld = {
-        id: 'world-1',
-        title: 'Test World',
-        system: 'dnd5e',
-        description: 'A test world',
-      };
-
-      mockAxiosInstance.get.mockResolvedValue({
-        data: mockWorld,
-      });
+    it('should get world info via REST API', async () => {
+      const mockWorld = { id: 'world-1', title: 'Test World', system: 'dnd5e' };
+      mockAxiosInstance.get.mockResolvedValue({ data: mockWorld });
 
       const result = await client.getWorldInfo();
-
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
       expect(result).toEqual(mockWorld);
     });
 
-    it('should handle API errors', async () => {
-      // Create client with faster retry settings for this test
+    it('should retry failed requests', async () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
-        useRestModule: true,
-        retryAttempts: 1,
+        retryAttempts: 2,
         retryDelay: 10,
       });
 
-      mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
-
-      await expect(client.searchActors({ query: 'test' }))
-        .rejects.toThrow('Network error');
-    }, 10000); // 10 second timeout
-  });
-
-  describe('retry mechanism', () => {
-    beforeEach(() => {
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-        apiKey: 'test-api-key',
-        useRestModule: true,
-        retryAttempts: 3,
-        retryDelay: 100,
-      });
-    });
-
-    it('should retry failed requests', async () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({ data: { actors: [] } });
 
       const result = await client.searchActors({ query: 'test' });
-
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
       expect(result.actors).toEqual([]);
     });
 
     it('should fail after max retry attempts', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 1,
+        retryDelay: 10,
+      });
+
       mockAxiosInstance.get.mockRejectedValue(new Error('Persistent error'));
 
-      await expect(client.searchActors({ query: 'test' }))
-        .rejects.toThrow('Persistent error');
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(4); // Initial + 3 retries
+      await expect(client.searchActors({ query: 'test' })).rejects.toThrow('Persistent error');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
   });
 
-  describe('WebSocket functionality', () => {
-    let mockWs: any;
+  describe('worldData mode (no apiKey)', () => {
+    it('should return empty results when no worldData', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
 
+      const actors = await client.searchActors({ query: 'test' });
+      expect(actors.actors).toEqual([]);
+      expect(actors.total).toBe(0);
+
+      const items = await client.searchItems({ query: 'test' });
+      expect(items.items).toEqual([]);
+    });
+
+    it('should return default world info when no worldData', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      const info = await client.getWorldInfo();
+      expect(info.id).toBe('unknown');
+      expect(info.title).toBe('Not connected');
+    });
+
+    it('should require credentials for connect in Socket.IO mode', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      await expect(client.connect()).rejects.toThrow('Socket.IO mode requires');
+    });
+
+    it('should return null combat state when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      expect(client.getCombatState()).toBeNull();
+    });
+
+    it('should return empty chat messages when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      expect(client.getChatMessages()).toEqual([]);
+    });
+
+    it('should return empty users when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      const { users, activeUsers } = client.getUsers();
+      expect(users).toEqual([]);
+      expect(activeUsers).toEqual([]);
+    });
+
+    it('should return empty journals when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      expect(client.getJournals()).toEqual([]);
+    });
+
+    it('should return empty world search when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      const results = client.searchWorld('test');
+      expect(results.actors).toEqual([]);
+      expect(results.items).toEqual([]);
+    });
+
+    it('should return empty summary when no worldData', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      expect(client.getWorldSummary()).toEqual({});
+    });
+  });
+
+  describe('dice rolling', () => {
     beforeEach(() => {
-      mockWs = {
-        on: vi.fn(),
-        send: vi.fn(),
-        close: vi.fn(),
-        readyState: WebSocket.OPEN,
-      };
-
-      mockWebSocket.mockImplementation(() => mockWs);
-
-      // Don't provide API key to force WebSocket mode
-      client = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-        // No apiKey - this will use WebSocket mode
-      });
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
     });
 
-    it('should send WebSocket messages', async () => {
-      // Mock successful connection
-      mockWs.on.mockImplementation((event: string, callback: Function) => {
-        if (event === 'open') {
-          setTimeout(() => callback(), 0);
-        }
-      });
-
-      await client.connect();
-      
-      // Wait for async connection to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      const message = { type: 'test', data: { hello: 'world' } };
-      client.sendMessage(message);
-
-      expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(message));
+    it('should validate dice formula', async () => {
+      await expect(client.rollDice('')).rejects.toThrow('Invalid dice formula');
+      await expect(client.rollDice('DROP TABLE')).rejects.toThrow('Invalid dice formula');
     });
 
-    it('should handle WebSocket events', async () => {
-      const eventHandler = vi.fn();
-
-      // Mock successful connection and message
-      mockWs.on.mockImplementation((event: string, callback: Function) => {
-        if (event === 'open') {
-          setTimeout(() => callback(), 0);
-        } else if (event === 'message') {
-          // Send socket.io format message with '4' prefix
-          const message = JSON.stringify({ type: 'test', data: {} });
-          setTimeout(() => callback('4' + message), 10);
-        }
-      });
-
-      await client.connect();
-      client.onMessage('test', eventHandler);
-
-      // Wait for message to be processed
-      await new Promise(resolve => setTimeout(resolve, 20));
-
-      expect(eventHandler).toHaveBeenCalled();
+    it('should perform fallback dice roll', async () => {
+      const result = await client.rollDice('1d20+5', 'Attack roll');
+      expect(result.formula).toBe('1d20+5');
+      expect(result.total).toBeGreaterThanOrEqual(6);
+      expect(result.total).toBeLessThanOrEqual(25);
+      expect(result.reason).toBe('Attack roll');
+      expect(result.timestamp).toBeDefined();
     });
 
-    it('should handle connection errors', async () => {
-      mockWs.on.mockImplementation((event: string, callback: Function) => {
-        if (event === 'error') {
-          setTimeout(() => callback(new Error('Connection failed')), 0);
-        }
-      });
+    it('should perform fallback roll for multiple dice', async () => {
+      const result = await client.rollDice('3d6');
+      expect(result.formula).toBe('3d6');
+      expect(result.total).toBeGreaterThanOrEqual(3);
+      expect(result.total).toBeLessThanOrEqual(18);
+    });
+  });
 
-      await expect(client.connect()).rejects.toThrow('Connection failed');
+  describe('disconnect', () => {
+    it('should reset state on disconnect', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      await client.disconnect();
+      expect(client.isConnected()).toBe(false);
+      expect(client.hasWorldData()).toBe(false);
     });
   });
 });

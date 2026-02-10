@@ -1,8 +1,5 @@
 /**
- * @fileoverview Tools module entry point
- * 
- * Exports all tool definitions, handlers, and routing functionality
- * in a clean, organized interface.
+ * Tools module entry point
  */
 
 // Export tool and resource definitions
@@ -17,6 +14,11 @@ export * from './handlers/dice.js';
 export * from './handlers/actors.js';
 export * from './handlers/items.js';
 export * from './handlers/scenes.js';
+export * from './handlers/combat.js';
+export * from './handlers/chat.js';
+export * from './handlers/users.js';
+export * from './handlers/journals.js';
+export * from './handlers/world.js';
 export * from './handlers/generation.js';
 export * from './handlers/diagnostics.js';
 export * from './handlers/resources.js';

@@ -25,7 +25,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
-import { FoundryClient } from './foundry/client.js';
+import { FoundryClient, FoundryClientConfig } from './foundry/client.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
 import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
@@ -64,16 +64,18 @@ class FoundryMCPServer {
     );
 
     // Initialize FoundryVTT client with configuration
-    this.foundryClient = new FoundryClient({
+    const clientConfig: FoundryClientConfig = {
       baseUrl: config.foundry.url,
-      apiKey: config.foundry.apiKey || '',
-      username: config.foundry.username || '',
-      password: config.foundry.password || '',
       socketPath: config.foundry.socketPath,
       timeout: config.foundry.timeout,
       retryAttempts: config.foundry.retryAttempts,
       retryDelay: config.foundry.retryDelay,
-    });
+    };
+    if (config.foundry.apiKey) clientConfig.apiKey = config.foundry.apiKey;
+    if (config.foundry.username) clientConfig.username = config.foundry.username;
+    if (config.foundry.password) clientConfig.password = config.foundry.password;
+    if (config.foundry.userId) clientConfig.userId = config.foundry.userId;
+    this.foundryClient = new FoundryClient(clientConfig);
 
     // Initialize DiagnosticsClient
     this.diagnosticsClient = new DiagnosticsClient(this.foundryClient);

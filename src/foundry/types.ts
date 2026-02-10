@@ -649,3 +649,207 @@ export interface GeneratedQuest {
   complications?: string[];
   timeLimit?: string;
 }
+
+// ============================================================================
+// WorldData types — returned by the Socket.IO 'world' event
+// ============================================================================
+
+/**
+ * Raw actor document from worldData.
+ * The `system` field shape varies by game system (dnd5e, pf2e, etc.).
+ */
+export interface WorldActor {
+  _id: string;
+  name: string;
+  type: string;
+  img?: string;
+  system: Record<string, unknown>;
+  items?: WorldItem[];
+  effects?: WorldEffect[];
+  folder?: string | null;
+  sort?: number;
+  ownership?: Record<string, number>;
+  flags?: Record<string, unknown>;
+  prototypeToken?: Record<string, unknown>;
+}
+
+/**
+ * Raw item document from worldData.
+ */
+export interface WorldItem {
+  _id: string;
+  name: string;
+  type: string;
+  img?: string;
+  system: Record<string, unknown>;
+  effects?: WorldEffect[];
+  folder?: string | null;
+  sort?: number;
+  ownership?: Record<string, number>;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Raw scene document from worldData.
+ */
+export interface WorldScene {
+  _id: string;
+  name: string;
+  active: boolean;
+  navigation: boolean;
+  img?: string;
+  background?: Record<string, unknown>;
+  width: number;
+  height: number;
+  padding: number;
+  grid?: Record<string, unknown>;
+  tokens?: Array<Record<string, unknown>>;
+  walls?: Array<Record<string, unknown>>;
+  lights?: Array<Record<string, unknown>>;
+  drawings?: Array<Record<string, unknown>>;
+  sounds?: Array<Record<string, unknown>>;
+  notes?: Array<Record<string, unknown>>;
+  tiles?: Array<Record<string, unknown>>;
+  darkness: number;
+  globalLight: boolean;
+  globalLightThreshold?: number;
+  folder?: string | null;
+  sort?: number;
+  ownership?: Record<string, number>;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Raw journal entry from worldData.
+ */
+export interface WorldJournal {
+  _id: string;
+  name: string;
+  pages?: Array<{
+    _id: string;
+    name: string;
+    type: string;
+    title?: { show: boolean; level: number };
+    text?: { content: string; format: number };
+    image?: Record<string, unknown>;
+    video?: Record<string, unknown>;
+    src?: string;
+    sort?: number;
+  }>;
+  folder?: string | null;
+  sort?: number;
+  ownership?: Record<string, number>;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Raw chat message from worldData.
+ */
+export interface WorldMessage {
+  _id: string;
+  type: number;
+  user: string;
+  timestamp: number;
+  flavor?: string;
+  content: string;
+  speaker?: {
+    scene?: string;
+    actor?: string;
+    token?: string;
+    alias?: string;
+  };
+  rolls?: string[];
+  sound?: string;
+  whisper?: string[];
+  blind?: boolean;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Raw combat document from worldData.
+ */
+export interface WorldCombat {
+  _id: string;
+  scene?: string;
+  active: boolean;
+  round: number;
+  turn: number | null;
+  started: boolean;
+  combatants: Array<{
+    _id: string;
+    actorId?: string;
+    tokenId?: string;
+    sceneId?: string;
+    name: string;
+    img?: string;
+    initiative: number | null;
+    hidden: boolean;
+    defeated: boolean;
+    flags?: Record<string, unknown>;
+  }>;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Raw user document from worldData.
+ */
+export interface WorldUser {
+  _id: string;
+  name: string;
+  role: number;
+  color: string;
+  avatar?: string;
+  character?: string;
+  password?: string;
+  pronouns?: string;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Active effect on an actor or item.
+ */
+export interface WorldEffect {
+  _id: string;
+  name: string;
+  img?: string;
+  type?: string;
+  system?: Record<string, unknown>;
+  changes?: Array<{
+    key: string;
+    mode: number;
+    value: string;
+    priority?: number;
+  }>;
+  disabled?: boolean;
+  duration?: Record<string, unknown>;
+  flags?: Record<string, unknown>;
+}
+
+/**
+ * Complete world data returned by the Socket.IO 'world' event.
+ */
+export interface WorldData {
+  userId: string;
+  release: Record<string, unknown>;
+  world: Record<string, unknown>;
+  system: Record<string, unknown>;
+  modules: Array<Record<string, unknown>>;
+  demoMode: boolean;
+  actors: WorldActor[];
+  scenes: WorldScene[];
+  items: WorldItem[];
+  journal: WorldJournal[];
+  messages: WorldMessage[];
+  combats: WorldCombat[];
+  users: WorldUser[];
+  activeUsers: string[];
+  settings: unknown[];
+  folders: Array<Record<string, unknown>>;
+  macros: Array<Record<string, unknown>>;
+  playlists: Array<Record<string, unknown>>;
+  tables: Array<Record<string, unknown>>;
+  cards: Array<Record<string, unknown>>;
+  packs: Array<Record<string, unknown>>;
+  // Additional fields may be present depending on version
+  [key: string]: unknown;
+}

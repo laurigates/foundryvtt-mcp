@@ -6,35 +6,30 @@ A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing 
 
 ### Core Functionality
 
-- 🎲 **Dice Rolling** - Roll dice with standard RPG notation
-- 🔍 **Data Querying** - Search actors, items, scenes, and journal entries
-- 📊 **Game State** - Access current scene, combat status, and world information
-- 🎭 **Content Generation** - Generate NPCs, loot, and random encounters
-- 📝 **Rule Lookup** - Query game rules and mechanical information
+- **Dice Rolling** - Roll dice with standard RPG notation
+- **Data Querying** - Search and inspect actors, items, scenes, and journal entries
+- **Game State** - Access combat status, chat messages, user list, and world information
+- **Content Generation** - Generate NPCs, loot tables, and rule lookups
+- **World Search** - Full-text search across all game entities
 
 ### Real-time Integration
 
-- 🔄 **Live Updates** - WebSocket connection for real-time game state
-- ⚔️ **Combat Management** - Track initiative and combat state
-- 👥 **User Awareness** - See who's online and their status
-
-### AI-Powered Features
-
-- 🧠 **Tactical Suggestions** - Get combat advice and strategy tips
-- 🎪 **Story Assistance** - Generate plot hooks and narrative elements
-- 🎨 **World Building** - Create locations, NPCs, and quests on demand
+- **Live Connection** - Socket.IO connection loads complete world state on connect
+- **Combat Tracking** - Access initiative order and combat state
+- **User Awareness** - See who's online and their current status
+- **Chat Messages** - Read recent chat history
 
 ## Installation
 
 ### Prerequisites
 
 - Node.js 18+
-- FoundryVTT server running and accessible
+- FoundryVTT server running with an active world
 - MCP-compatible AI client (Claude Desktop, etc.)
 
 ### Quick Setup (Recommended)
 
-**🧙‍♂️ Interactive Setup Wizard:**
+**Interactive Setup Wizard:**
 ```bash
 git clone <repository-url>
 cd foundry-mcp-server
@@ -69,8 +64,6 @@ cp .env.example .env
 
 ```env
 FOUNDRY_URL=http://localhost:30000
-FOUNDRY_API_KEY=your_api_key_here
-# OR use username/password:
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 ```
@@ -91,64 +84,43 @@ npm run dev
 
 ## FoundryVTT Configuration
 
-The MCP server supports two secure, local-only authentication methods:
+The MCP server connects to FoundryVTT via Socket.IO using a standard FoundryVTT user account. No custom modules are required for full game data access.
 
-### Option 1: Local REST API Module (🔒 Recommended)
+### Setup
 
-**Benefits:**
+1. Ensure FoundryVTT is running with an active world (not on the setup screen)
+2. Create or use an existing FoundryVTT user account with appropriate permissions
+3. Add credentials to your `.env` file:
 
-- ✅ **100% Local** - No external dependencies or third-party services
-- ✅ **Maximum Privacy** - Your game data never leaves your network
-- ✅ **Full Control** - You own and manage all authentication
-- ✅ **Better Performance** - Direct local API access
-- ✅ **Complete API Access** - Full access to all FoundryVTT features
+```env
+FOUNDRY_URL=http://localhost:30000
+FOUNDRY_USERNAME=your_username
+FOUNDRY_PASSWORD=your_password
+```
 
-**Setup:**
+The server authenticates via a 4-step Socket.IO flow:
+1. Fetches the `/join` page to obtain a session cookie
+2. Extracts the session cookie from the response
+3. Resolves the username to a user ID (or uses `FOUNDRY_USER_ID` if set)
+4. Emits `joinGame` with credentials to receive the complete world state
 
-1. Install the **Foundry Local REST API** module:
-   - In FoundryVTT: **Setup** → **Add-on Modules** → **Install Module**
-   - Paste: `https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json`
-2. Enable the module in your world
-3. Go to **Settings** → **Configure Settings** → **Module Settings**
-4. Find **"Foundry Local REST API"** and check **"Enable REST API"**
-5. Copy the generated **API Key**
-6. Add to your `.env` file:
+### Optional: Diagnostics Tools
+
+Installing the **Foundry Local REST API** module adds 5 server monitoring tools (`get_recent_logs`, `search_logs`, `get_system_health`, `diagnose_errors`, `get_health_status`):
+
+1. In FoundryVTT: **Setup** > **Add-on Modules** > **Install Module**
+2. Paste: `https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json`
+3. Enable the module in your world and copy the generated API key
+4. Add to `.env`:
    ```env
-   FOUNDRY_URL=http://localhost:30000
-   FOUNDRY_API_KEY=your_local_api_key_here
+   FOUNDRY_API_KEY=your_api_key_here
    ```
 
-### Option 2: Username/Password (Fallback)
-
-**Use when:** Local REST API module is not available or for simple setups.
-
-**Limitations:** Some advanced features may not work properly.
-
-1. Ensure your FoundryVTT user has appropriate permissions
-2. Add credentials to `.env` file:
-   ```env
-   FOUNDRY_URL=http://localhost:30000
-   FOUNDRY_USERNAME=your_username
-   FOUNDRY_PASSWORD=your_password
-   ```
-
-### Comparison Table
-
-| Feature         | **Local REST API Module**  | **Username/Password**    |
-| --------------- | -------------------------- | ------------------------ |
-| **Privacy**     | ✅ 100% Local              | ✅ 100% Local            |
-| **Security**    | ✅ API Key auth            | ⚠️ Password auth         |
-| **Performance** | ✅ Direct API access       | ⚠️ WebSocket only        |
-| **Features**    | ✅ Complete API access     | ❌ Limited functionality |
-| **Setup**       | ⚠️ Module install required | ✅ Simple credentials    |
-| **Reliability** | ✅ Stable API              | ⚠️ Connection dependent  |
-
-### Required Permissions (All Methods)
+### Required Permissions
 
 Your FoundryVTT user needs these permissions:
 
 - View actors, items, scenes, and journals
-- Create and modify journal entries (for content generation)
 - Access compendium data
 - Use dice rolling API
 
@@ -175,69 +147,65 @@ Ask your AI assistant things like:
 
 - "Generate a random NPC merchant"
 - "Create loot for a CR 5 encounter"
-- "Generate a tavern with NPCs and plot hooks"
-
-### Advanced Features
-
-**Rule Lookups:**
-
 - "Look up the grappling rules"
-- "How does the Fireball spell work?"
-- "What are the conditions for being frightened?"
 
-**Tactical Advice:**
+**World Search:**
 
-- "Suggest tactics for fighting a dragon"
-- "What should our wizard do this turn?"
-- "Analyze this combat encounter"
-
-**World Building:**
-
-- "Create a mysterious forest location"
-- "Generate a side quest involving missing merchants"
-- "Design a magic item appropriate for level 8 characters"
+- "Search the world for anything related to dragons"
+- "Give me a summary of the current world state"
+- "Who's online right now?"
 
 ## Available Tools
 
 ### Data Access
 
 - `search_actors` - Find characters, NPCs, monsters
-- `search_items` - Find equipment, spells, consumables
-- `search_journals` - Search notes and handouts
-- `get_scene_info` - Current scene details
 - `get_actor_details` - Detailed character information
+- `search_items` - Find equipment, spells, consumables
+- `get_scene_info` - Current scene details
+- `search_journals` - Search notes and handouts
+- `get_journal` - Retrieve a specific journal entry
+- `get_users` - List online users and their status
+- `get_combat_state` - Combat state and initiative order
+- `get_chat_messages` - Recent chat history
+
+### World
+
+- `search_world` - Full-text search across all game entities
+- `get_world_summary` - Overview of the current world state
+- `refresh_world_data` - Reload world data from FoundryVTT
 
 ### Game Mechanics
 
 - `roll_dice` - Roll dice with any formula
-- `update_actor_hp` - Modify character health
-- `get_combat_status` - Combat state and initiative
 - `lookup_rule` - Game rules and spell descriptions
 
 ### Content Generation
 
 - `generate_npc` - Create random NPCs
 - `generate_loot` - Create treasure appropriate for level
-- `roll_table` - Random encounters, events, weather
-- `suggest_tactics` - Combat advice and strategy
 
-### Diagnostics & System Health
+### Diagnostics (Optional — requires REST API module)
 
-- `get_system_health` - Server performance and health metrics
 - `get_recent_logs` - Retrieve filtered FoundryVTT logs
 - `search_logs` - Search logs with regex patterns
+- `get_system_health` - Server performance and health metrics
 - `diagnose_errors` - Analyze errors with troubleshooting suggestions
+- `get_health_status` - Comprehensive health diagnostics
 
 ## Available Resources
 
 The server exposes these FoundryVTT resources:
 
-- `foundry://world/info` - World and campaign information
-- `foundry://world/actors` - All actors in the world
-- `foundry://scene/current` - Current active scene
-- `foundry://combat/current` - Active combat state
-- `foundry://compendium/spells` - Spell database
-- `foundry://compendium/monsters` - Monster database
+- `foundry://actors` - All actors in the world
+- `foundry://items` - All items in the world
+- `foundry://scenes` - All scenes
+- `foundry://scenes/current` - Current active scene
+- `foundry://journals` - All journal entries
+- `foundry://users` - Online users
+- `foundry://combat` - Active combat state
+- `foundry://world/settings` - World and campaign settings
+- `foundry://system/diagnostics` - System diagnostics (requires REST API module)
 
 ## Configuration
 
@@ -252,12 +220,10 @@ LOG_LEVEL=info  # debug, info, warn, error
 # Performance
 FOUNDRY_TIMEOUT=10000      # Request timeout (ms)
 FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
-CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 ```
 
 ### Security
 
-- Use API keys instead of passwords when possible
 - Limit FoundryVTT user permissions to minimum required
 - Run server on internal network only
 - Monitor logs for suspicious activity
@@ -266,7 +232,7 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 
 ### Built-in Diagnostics
 
-The server includes comprehensive diagnostic tools to help troubleshoot connection and performance issues:
+The server includes diagnostic tools to help troubleshoot connection and performance issues:
 
 **Connection Testing:**
 ```bash
@@ -278,26 +244,15 @@ npm run setup
 ```
 
 **Diagnostic Tools (via AI assistant):**
-- **System Health:** "Get the FoundryVTT system health status"
-- **Error Analysis:** "Diagnose recent errors and provide recommendations"
-- **Log Search:** "Search logs for 'connection' patterns in the last hour"
-- **Recent Issues:** "Show me recent error logs"
-
-### Advanced Diagnostics
-
-When using the **Local REST API module**, you get access to advanced diagnostic features:
-
-- 🔍 **Real-time Log Analysis** - Monitor FoundryVTT console output and notifications
-- 📊 **System Health Metrics** - Server performance, memory usage, and client connections
-- 🎯 **Error Pattern Recognition** - Automatic detection of common issues
-- 💡 **Smart Suggestions** - Context-aware troubleshooting recommendations
-- 📈 **Performance Monitoring** - Track server uptime and response times
+- **System Health:** "Get the FoundryVTT system health status" (requires REST API module)
+- **Error Analysis:** "Diagnose recent errors and provide recommendations" (requires REST API module)
+- **Log Search:** "Search logs for 'connection' patterns in the last hour" (requires REST API module)
 
 ### Connection Issues
 
 ```bash
-# Test FoundryVTT connection
-curl http://localhost:30000/api/status
+# Test FoundryVTT is accessible
+curl http://localhost:30000
 
 # Check server logs
 npm run dev  # Shows detailed logging
@@ -308,14 +263,14 @@ npm run dev  # Shows detailed logging
 **"Failed to connect to FoundryVTT"**
 
 - Verify FOUNDRY_URL is correct
-- Check if FoundryVTT is running
-- Ensure API access is enabled
+- Check if FoundryVTT is running with an active world
+- Ensure the URL is accessible from where the MCP server runs
 
 **"Authentication failed"**
 
-- Verify API key or username/password
+- Verify username and password match a FoundryVTT user exactly (case-sensitive)
 - Check user permissions in FoundryVTT
-- Ensure user is not banned/restricted
+- Try setting `FOUNDRY_USER_ID` to the 16-character document `_id`
 
 **"Tool not found" errors**
 
@@ -329,20 +284,27 @@ npm run dev  # Shows detailed logging
 
 ```
 src/
-├── config/           # Configuration management
-├── foundry/          # FoundryVTT client and types
-├── tools/            # MCP tool definitions
-├── resources/        # MCP resource definitions
-├── utils/            # Utilities and logging
-└── index.ts          # Main server entry point
+├── config/              # Zod-validated configuration
+├── foundry/
+│   ├── auth.ts          # Socket.IO 4-step authentication
+│   ├── client.ts        # FoundryVTT client with worldData cache
+│   └── types.ts         # TypeScript interfaces + WorldData
+├── tools/
+│   ├── definitions.ts   # Tool schemas by category
+│   ├── router.ts        # Tool request routing
+│   ├── resources.ts     # MCP resource definitions
+│   └── handlers/        # Per-tool handler implementations
+├── diagnostics/         # Optional REST API diagnostics
+├── utils/               # Logger, cache utilities
+└── index.ts             # MCP server entry point
 ```
 
 ### Adding New Tools
 
-1. Define tool schema in `src/tools/index.ts`
-2. Add handler method in `src/index.ts`
-3. Implement FoundryVTT API calls in `src/foundry/client.ts`
-4. Add TypeScript types in `src/foundry/types.ts`
+1. Define tool schema in `src/tools/definitions.ts`
+2. Add handler in `src/tools/handlers/`
+3. Wire the handler in `src/tools/router.ts`
+4. Add TypeScript types in `src/foundry/types.ts` if needed
 5. Test with your AI assistant
 
 ### Testing
@@ -372,19 +334,21 @@ npm run clean && npm run build
 
 ### Environment Variables
 
-| Variable                 | Required | Description                | Default       |
-| ------------------------ | -------- | -------------------------- | ------------- |
-| `FOUNDRY_URL`            | ✅       | FoundryVTT server URL      | -             |
-| `FOUNDRY_API_KEY`        | ⭐       | API key for authentication | -             |
-| `FOUNDRY_USERNAME`       | ⭐       | Username (if no API key)   | -             |
-| `FOUNDRY_PASSWORD`       | ⭐       | Password (if no API key)   | -             |
-| `LOG_LEVEL`              | ❌       | Logging verbosity          | `info`        |
-| `NODE_ENV`               | ❌       | Environment mode           | `development` |
-| `FOUNDRY_TIMEOUT`        | ❌       | Request timeout (ms)       | `10000`       |
-| `FOUNDRY_RETRY_ATTEMPTS` | ❌       | Retry failed requests      | `3`           |
-| `CACHE_TTL_SECONDS`      | ❌       | Cache duration             | `300`         |
-
-⭐ Either API key OR username/password required
+| Variable                 | Required | Description                         | Default       |
+| ------------------------ | -------- | ----------------------------------- | ------------- |
+| `FOUNDRY_URL`            | Yes      | FoundryVTT server URL               | -             |
+| `FOUNDRY_USERNAME`       | Yes      | FoundryVTT username                 | -             |
+| `FOUNDRY_PASSWORD`       | Yes      | FoundryVTT password                 | -             |
+| `FOUNDRY_USER_ID`        | No       | 16-char document `_id` (bypasses username resolution) | - |
+| `FOUNDRY_API_KEY`        | No       | REST API module key (enables diagnostics) | -       |
+| `LOG_LEVEL`              | No       | Logging verbosity                   | `info`        |
+| `NODE_ENV`               | No       | Environment mode                    | `development` |
+| `FOUNDRY_TIMEOUT`        | No       | Request timeout (ms)                | `10000`       |
+| `FOUNDRY_RETRY_ATTEMPTS` | No       | Retry failed requests               | `3`           |
+| `FOUNDRY_RETRY_DELAY`    | No       | Delay between retries (ms)          | `1000`        |
+| `CACHE_ENABLED`          | No       | Enable response caching             | `true`        |
+| `CACHE_TTL_SECONDS`      | No       | Cache duration (seconds)            | `300`         |
+| `CACHE_MAX_SIZE`         | No       | Maximum cache entries               | -             |
 
 ### Tool Schemas
 
@@ -397,6 +361,21 @@ npm run clean && npm run build
 }
 ```
 
+#### search_world
+
+```json
+{
+  "query": "dragon",
+  "limit": 10
+}
+```
+
+#### get_combat_state
+
+```json
+{}
+```
+
 #### search_actors
 
 ```json
@@ -404,17 +383,6 @@ npm run clean && npm run build
   "query": "goblin",
   "type": "npc",
   "limit": 10
-}
-```
-
-#### generate_npc
-
-```json
-{
-  "race": "human",
-  "level": 5,
-  "role": "merchant",
-  "alignment": "neutral good"
 }
 ```
 
@@ -432,10 +400,19 @@ Add to your Claude Desktop MCP settings:
       "args": ["/path/to/foundry-mcp-server/dist/index.js"],
       "env": {
         "FOUNDRY_URL": "http://localhost:30000",
-        "FOUNDRY_API_KEY": "your_api_key_here"
+        "FOUNDRY_USERNAME": "your_username",
+        "FOUNDRY_PASSWORD": "your_password"
       }
     }
   }
+}
+```
+
+To enable optional diagnostics tools, add `FOUNDRY_API_KEY` to the `env` block:
+
+```json
+{
+  "FOUNDRY_API_KEY": "your_api_key_here"
 }
 ```
 
@@ -477,34 +454,33 @@ const result = await client.request({
 
 ## Roadmap
 
-### Version 0.2.0
+### Completed
 
-- [ ] Combat management tools (start/end combat, advance initiative)
+- [x] Socket.IO authentication and world data loading
+- [x] Combat state tracking
+- [x] User awareness (online status)
+- [x] Journal access and search
+- [x] World-wide search across all entities
+- [x] Chat message history
+- [x] NPC and loot generation
+- [x] Rule lookups
+
+### Planned
+
+- [ ] Combat management (start/end combat, advance initiative)
 - [ ] Token manipulation (move, update status effects)
 - [ ] Scene navigation and switching
-- [ ] Playlist controls and ambient audio
-
-### Version 0.3.0
-
 - [ ] Character sheet editing (level up, add equipment)
 - [ ] Journal entry creation and editing
 - [ ] Macro execution and management
-- [ ] Advanced content generation (dungeons, NPCs with full stats)
-
-### Version 1.0.0
-
 - [ ] Multi-world support
-- [ ] User permission management
-- [ ] Webhook support for external triggers
-- [ ] Performance optimization and caching
-- [ ] Full test coverage
 - [ ] Docker deployment
 
 ## Documentation
 
 Complete API documentation is available in the `docs/` directory, auto-generated from TypeScript source code and JSDoc comments.
 
-### 📖 Viewing Documentation
+### Viewing Documentation
 
 **Local development:**
 
@@ -515,7 +491,7 @@ npm run docs:serve  # Generate and serve locally
 
 **Online:** Browse the `docs/` folder in this repository or visit the GitHub Pages site (if enabled).
 
-### 📚 What's Documented
+### What's Documented
 
 - **FoundryClient API** - Complete client documentation with examples
 - **TypeScript Interfaces** - All data structures and type definitions
@@ -548,22 +524,22 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Troubleshooting
 
-### 🔍 Quick Diagnostics
+### Quick Diagnostics
 ```bash
 npm run test-connection      # Test FoundryVTT connectivity
 npm run setup-wizard        # Re-run interactive setup
 ```
 
-### 🏥 Health Check
-Use the `get_health_status` MCP tool for comprehensive diagnostics, or check server logs during startup for detailed status information.
+### Health Check
+Use the `get_health_status` MCP tool for comprehensive diagnostics (requires REST API module), or check server logs during startup for detailed status information.
 
-### 📚 Common Issues
-- **Connection refused**: Ensure FoundryVTT is running on the configured port
-- **Authentication failed**: Verify API key or username/password in `.env`
-- **Empty search results**: Install and enable the "Foundry Local REST API" module
-- **Limited functionality**: REST API module required for full features
+### Common Issues
+- **Connection refused**: Ensure FoundryVTT is running with an active world on the configured port
+- **Authentication failed**: Verify username/password match a FoundryVTT user exactly
+- **Empty search results**: Ensure a world is active (not on setup screen) and the user has view permissions
+- **World data not loading**: Check that Socket.IO authentication completed successfully
 
-**📖 Detailed troubleshooting guide**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**Detailed troubleshooting guide**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## Support
 
@@ -577,7 +553,3 @@ Use the `get_health_status` MCP tool for comprehensive diagnostics, or check ser
 - FoundryVTT team for the excellent VTT platform
 - Anthropic for the Model Context Protocol
 - The tabletop gaming community for inspiration and feedback
-
----
-
-**Happy Gaming! 🎲**
