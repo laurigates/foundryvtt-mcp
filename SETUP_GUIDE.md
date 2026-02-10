@@ -1,6 +1,6 @@
 # FoundryVTT MCP Server Setup Guide
 
-This guide will walk you through setting up the FoundryVTT MCP Server with different connection methods.
+This guide walks you through setting up the FoundryVTT MCP Server.
 
 ## Quick Start
 
@@ -16,20 +16,25 @@ This guide will walk you through setting up the FoundryVTT MCP Server with diffe
    cp .env.example .env
    ```
 
-3. **Configure your connection** (see options below)
+3. **Configure your connection** (see below)
 
 4. **Start the server**:
    ```bash
    npm run dev
    ```
 
-## Connection Methods
+## Connection Setup
 
-The FoundryVTT MCP Server supports two connection methods, each with different capabilities:
+The MCP server connects to FoundryVTT via Socket.IO using a standard user account. No custom modules are required for full game data access.
+
+### Prerequisites
+
+- FoundryVTT server running with an **active world** (not on the setup screen)
+- A FoundryVTT user account with appropriate permissions
 
 ### Setup Types
 
-Before configuring authentication, determine your FoundryVTT setup type:
+Before configuring, determine your FoundryVTT deployment:
 
 #### Local Development Setup
 - FoundryVTT running on your local machine
@@ -47,117 +52,71 @@ Before configuring authentication, determine your FoundryVTT setup type:
 - Different port configurations
 - Direct IP access without domain names
 
-### Method 1: REST API Module (Recommended)
+### Configuration
 
-**Best for**: Full functionality including data querying, dice rolling, and content management.
+Update your `.env` file based on your setup type:
 
-**Setup**:
+**Local Development:**
+```env
+FOUNDRY_URL=http://localhost:30000
+FOUNDRY_USERNAME=your_username
+FOUNDRY_PASSWORD=your_password
+```
 
-1. Install the [Foundry REST API](https://foundryvtt.com/packages/foundry-rest-api) module in FoundryVTT
-2. Get the API key from the module configuration page in FoundryVTT
-3. Configure the module with your API key
-4. Update your `.env` based on your setup type:
+**Reverse Proxy / Remote:**
+```env
+FOUNDRY_URL=https://dnd.lakuz.com
+FOUNDRY_USERNAME=your_username
+FOUNDRY_PASSWORD=your_password
+```
 
-   **Local Development:**
-   ```env
-   FOUNDRY_URL=http://localhost:30000
-   USE_REST_MODULE=true
-   FOUNDRY_API_KEY=your_api_key_here
-   ```
+**Network/IP:**
+```env
+FOUNDRY_URL=http://192.168.1.100:30000
+FOUNDRY_USERNAME=your_username
+FOUNDRY_PASSWORD=your_password
+```
 
-   **Reverse Proxy / Remote:**
-   ```env
-   FOUNDRY_URL=https://dnd.lakuz.com
-   USE_REST_MODULE=true
-   FOUNDRY_API_KEY=your_api_key_here
-   ```
+### Features Available
 
-   **Network/IP:**
-   ```env
-   FOUNDRY_URL=http://192.168.1.100:30000
-   USE_REST_MODULE=true
-   FOUNDRY_API_KEY=your_api_key_here
-   ```
+All features work out of the box with username/password authentication:
 
-**Features Available**:
-
-- ✅ Search actors, items, scenes
-- ✅ Get detailed actor/item information
-- ✅ Dice rolling with FoundryVTT engine
-- ✅ World and scene information
-- ✅ Real-time data access
-
-### Method 2: WebSocket Only (Limited)
-
-**Best for**: Basic functionality when REST API module isn't available.
-
-**Setup**:
-
-1. Ensure FoundryVTT is running and accessible
-2. Update your `.env` based on your setup type:
-
-   **Local Development:**
-   ```env
-   FOUNDRY_URL=http://localhost:30000
-   USE_REST_MODULE=false
-   FOUNDRY_USERNAME=your_username
-   FOUNDRY_PASSWORD=your_password
-   ```
-
-   **Reverse Proxy / Remote:**
-   ```env
-   FOUNDRY_URL=https://dnd.lakuz.com
-   USE_REST_MODULE=false
-   FOUNDRY_USERNAME=your_username
-   FOUNDRY_PASSWORD=your_password
-   ```
-
-   **Network/IP:**
-   ```env
-   FOUNDRY_URL=http://192.168.1.100:30000
-   USE_REST_MODULE=false
-   FOUNDRY_USERNAME=your_username
-   FOUNDRY_PASSWORD=your_password
-   ```
-
-**Features Available**:
-
-- ✅ Fallback dice rolling (client-side simulation)
-- ✅ Basic scene information
-- ✅ WebSocket connection for real-time events
-- ❌ Limited actor/item searching
-- ❌ No direct data manipulation
-
-## Detailed Configuration
+- Search actors, items, scenes, and journals
+- Get detailed actor/item information
+- Dice rolling with FoundryVTT engine
+- Combat state and initiative tracking
+- Chat message history
+- User list and online status
+- Full-text world search
+- World summary and scene information
+- NPC and loot generation
+- Rule lookups
 
 ### Environment Variables
 
-| Variable           | Required | Description            | Default |
-| ------------------ | -------- | ---------------------- | ------- |
-| `FOUNDRY_URL`      | ✅       | FoundryVTT server URL  | -       |
-| `USE_REST_MODULE`  | ✅       | Enable REST API module | `false` |
-| `FOUNDRY_API_KEY`  | ⭐       | REST API module key    | -       |
-| `FOUNDRY_USERNAME` | ⭐       | FoundryVTT username    | -       |
-| `FOUNDRY_PASSWORD` | ⭐       | FoundryVTT password    | -       |
-| `LOG_LEVEL`        | ❌       | Logging level          | `info`  |
+| Variable           | Required | Description                                  | Default |
+| ------------------ | -------- | -------------------------------------------- | ------- |
+| `FOUNDRY_URL`      | Yes      | FoundryVTT server URL                        | -       |
+| `FOUNDRY_USERNAME` | Yes      | FoundryVTT username                          | -       |
+| `FOUNDRY_PASSWORD` | Yes      | FoundryVTT password                          | -       |
+| `FOUNDRY_USER_ID`  | No       | 16-char document `_id` (bypasses username resolution) | - |
+| `FOUNDRY_API_KEY`  | No       | REST API module key (enables diagnostics)    | -       |
+| `LOG_LEVEL`        | No       | Logging level                                | `info`  |
 
-⭐ Required based on connection method
+### Optional: Diagnostics Tools
 
-### FoundryVTT Configuration
+Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` enables 5 server monitoring tools:
 
-#### For REST API Module:
+- `get_recent_logs` - Retrieve filtered FoundryVTT logs
+- `search_logs` - Search logs with regex patterns
+- `get_system_health` - Server performance and health metrics
+- `diagnose_errors` - Error analysis with troubleshooting suggestions
+- `get_health_status` - Comprehensive health diagnostics
 
-1. Go to **Add-on Modules** in FoundryVTT
-2. Install **"Foundry REST API"**
-3. Enable the module in your world
-4. Configure module settings with your API key
-5. Restart FoundryVTT
-
-#### For WebSocket Only:
-
-1. Ensure FoundryVTT is accessible at the configured URL
-2. Create a user account with appropriate permissions
-3. The server will use basic HTTP and WebSocket connections
+To enable:
+1. Install the REST API module in FoundryVTT
+2. Enable it in your world and copy the generated API key
+3. Add `FOUNDRY_API_KEY=your_key` to your `.env` file
 
 ## Testing Your Setup
 
@@ -170,24 +129,25 @@ npm run dev
 Look for these success messages:
 
 ```
-✅ Connected to FoundryVTT successfully
-🚀 FoundryVTT MCP Server running
+Connected to FoundryVTT successfully
+FoundryVTT MCP Server running
 ```
 
 ### 2. Test with AI Assistant
 
 Once the server is running, test these commands with your AI assistant:
 
-**Basic Dice Rolling**:
+**Dice Rolling**:
 
 - "Roll 1d20+5 for an attack roll"
 - "Roll 4d6 drop lowest for ability scores"
 
-**Data Queries** (REST API module required):
+**Data Queries**:
 
 - "Search for goblin actors"
 - "Find all magic weapons"
 - "What's the current scene information?"
+- "Who's online?"
 
 **Content Generation**:
 
@@ -200,27 +160,35 @@ Once the server is running, test these commands with your AI assistant:
 
 #### "Failed to connect to FoundryVTT"
 
-- **Check**: FoundryVTT is running at the configured URL
+- **Check**: FoundryVTT is running at the configured URL with an active world
 - **Check**: No firewall blocking the connection
 - **Try**: Test URL in browser (local: `http://localhost:30000`, remote: `https://dnd.lakuz.com`)
 - **For reverse proxy**: Ensure WebSocket upgrades are properly configured
 
-#### "Empty search results"
-
-- **Cause**: REST API module not configured
-- **Solution**: Install and configure the REST API module, or accept limited functionality
-
 #### "Authentication failed"
 
-- **Check**: Username/password are correct
+- **Check**: Username matches a FoundryVTT user exactly (case-sensitive)
+- **Check**: Password is correct
 - **Check**: User has necessary permissions in FoundryVTT
-- **Try**: Test login through FoundryVTT web interface
+- **Try**: Set `FOUNDRY_USER_ID` to the 16-character document `_id` to bypass username resolution
+
+#### "World data not received"
+
+- **Check**: A world is active in FoundryVTT (not on the setup screen)
+- **Check**: Socket.IO authentication completed (check server logs)
+- **Try**: Restart both FoundryVTT and the MCP server
+
+#### "Empty search results"
+
+- **Check**: Data exists in your FoundryVTT world
+- **Check**: User has permission to view the data
+- **Check**: World data loaded on connect (look for worldData log on startup)
 
 #### "WebSocket connection issues"
 
 - **Check**: FoundryVTT allows WebSocket connections
 - **Check**: No proxy server blocking WebSocket upgrades
-- **Try**: Different port or connection method
+- **Try**: Different port or direct connection
 
 #### "Reverse Proxy / SSL Issues"
 
@@ -243,10 +211,17 @@ Once the server is running, test these commands with your AI assistant:
 
 1. **Check logs**: Run with `LOG_LEVEL=debug` for detailed information
 2. **Test manually**: Try accessing FoundryVTT directly in your browser
-3. **Module issues**: Check the REST API module documentation
-4. **Network issues**: Verify firewall and network configuration
+3. **Network issues**: Verify firewall and network configuration
 
 ## Advanced Configuration
+
+### Direct User ID
+
+If username resolution fails, set the user ID directly. Find the 16-character document `_id` for your user in FoundryVTT's data:
+
+```env
+FOUNDRY_USER_ID=abc123def456ghij
+```
 
 ### Custom Socket Path
 
@@ -287,7 +262,7 @@ Once you have a working connection:
 ## Supported FoundryVTT Versions
 
 - **FoundryVTT v11+**: Fully supported
-- **FoundryVTT v10**: Basic support (WebSocket only)
+- **FoundryVTT v10**: Basic support
 - **Earlier versions**: Not tested, may work with limitations
 
 ---

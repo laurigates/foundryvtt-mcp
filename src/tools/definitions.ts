@@ -274,6 +274,136 @@ export const diagnosticsTools = [
 ];
 
 /**
+ * Combat tool definitions
+ */
+export const combatTools = [
+  {
+    name: 'get_combat_state',
+    description: 'Get the current active combat state including initiative order, HP, and AC',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
+
+/**
+ * Chat message tool definitions
+ */
+export const chatTools = [
+  {
+    name: 'get_chat_messages',
+    description: 'Get recent chat messages from the game',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Number of messages to retrieve (default 20)',
+          default: 20,
+          minimum: 1,
+          maximum: 100,
+        },
+      },
+    },
+  },
+];
+
+/**
+ * User tool definitions
+ */
+export const userTools = [
+  {
+    name: 'get_users',
+    description: 'Get the list of users with their online status and roles',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
+
+/**
+ * Journal tool definitions
+ */
+export const journalTools = [
+  {
+    name: 'search_journals',
+    description: 'Search journal entries by name or content',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query for journal names and content',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results',
+          default: 10,
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'get_journal',
+    description: 'Get a specific journal entry with its pages',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        journalId: {
+          type: 'string',
+          description: 'The ID of the journal entry to retrieve',
+        },
+      },
+      required: ['journalId'],
+    },
+  },
+];
+
+/**
+ * World-level tool definitions
+ */
+export const worldTools = [
+  {
+    name: 'search_world',
+    description: 'Search across all collections (actors, items, scenes, journals) by name',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query to match against entity names',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum results per collection (default 5)',
+          default: 5,
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'get_world_summary',
+    description: 'Get world metadata and collection counts',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'refresh_world_data',
+    description: 'Force re-fetch of world data from the FoundryVTT server',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
+
+/**
  * Get all tool definitions combined
  */
 export function getAllTools() {
@@ -282,6 +412,11 @@ export function getAllTools() {
     ...actorTools,
     ...itemTools,
     ...sceneTools,
+    ...combatTools,
+    ...chatTools,
+    ...userTools,
+    ...journalTools,
+    ...worldTools,
     ...generationTools,
     ...diagnosticsTools,
   ];

@@ -4,31 +4,31 @@ This guide helps you diagnose and resolve common issues with the FoundryVTT MCP 
 
 ## Quick Diagnostics
 
-### 🧙‍♂️ Setup Wizard (Recommended for New Users)
+### Setup Wizard (Recommended for New Users)
 ```bash
 npm run setup-wizard
 ```
 The interactive setup wizard will detect your FoundryVTT installation and guide you through configuration.
 
-### 🔍 Health Check
+### Health Check
 ```bash
-# Use the MCP tool for comprehensive diagnostics
-# In your AI client, run: get_health_status
-
-# Or test connection directly:
+# Test connection directly:
 npm run test-connection
+
+# Or use the MCP tool for comprehensive diagnostics (requires REST API module):
+# In your AI client, run: get_health_status
 ```
 
-### 📊 Check Current Status
+### Check Current Status
 The server provides detailed diagnostics on startup. Look for:
-- Connection status (✅/⚠️/❌)
+- Connection status
 - Authentication method and status
+- World data loading confirmation
 - Feature availability summary
-- Recommendations for improvements
 
 ## Common Issues
 
-### 🔌 Connection Issues
+### Connection Issues
 
 #### "Connection Refused" or "ECONNREFUSED"
 **Symptoms**: Cannot connect to FoundryVTT server
@@ -59,86 +59,93 @@ The server provides detailed diagnostics on startup. Look for:
 2. **Check FoundryVTT performance**: Ensure FoundryVTT isn't overloaded
 3. **Network latency**: Consider network speed if using remote FoundryVTT
 
-### 🔐 Authentication Issues
+### Authentication Issues
 
-#### "Unauthorized" or "401 Error"
-**Symptoms**: Authentication fails
+#### "Session cookie not obtained"
+**Symptoms**: Cannot fetch the `/join` page or extract session cookie
 **Solutions**:
+1. **Check URL**: Verify `FOUNDRY_URL` points to a running FoundryVTT instance
+2. **Active world**: Ensure a world is active (not on the setup screen) — the `/join` page only exists when a world is loaded
+3. **Test manually**: Open `http://localhost:30000/join` in your browser
+4. **Proxy issues**: If behind a reverse proxy, ensure the `/join` path is forwarded correctly
 
-**For API Key Authentication**:
-1. **Check API key**: Verify the key in `.env` matches FoundryVTT module settings
-2. **Module status**: Ensure "Foundry Local REST API" module is:
-   - Installed in FoundryVTT
-   - Enabled in your world
-   - API toggle is turned ON
-3. **Regenerate key**: Generate a new API key in module settings
-4. **Module version**: Ensure you have the latest version of the REST API module
-
-**For Username/Password Authentication**:
-1. **Verify credentials**: Check username and password are correct
-2. **Case sensitivity**: Username is case-sensitive
-3. **User permissions**: Ensure user has required permissions in FoundryVTT
-4. **User status**: Verify the user account is active
-
-### 📦 Module Issues
-
-#### "REST API Not Available" or Limited Functionality
-**Symptoms**: Basic features work but actor/item search returns empty results
+#### "User ID resolution failed"
+**Symptoms**: Username cannot be resolved to a user ID
 **Solutions**:
-1. **Install module**: Download "Foundry Local REST API" from FoundryVTT's module browser
-2. **Enable module**: Activate it in your world's module settings
-3. **Module configuration**: 
-   - Go to Settings → Module Settings → Foundry Local REST API
-   - Enable the "REST API" toggle
-   - Copy the generated API key
-4. **Update configuration**: Add the API key to your `.env` file
-5. **Restart services**: Restart both FoundryVTT and the MCP server
+1. **Verify username**: Username must match a FoundryVTT user exactly (case-sensitive)
+2. **Active world**: The user must exist in the active world
+3. **Set user ID directly**: Set `FOUNDRY_USER_ID` to the 16-character document `_id` of your user:
+   ```env
+   FOUNDRY_USER_ID=abc123def456ghij
+   ```
+   Find the `_id` in FoundryVTT's user data or by inspecting the `/join` page response.
+4. **User status**: Verify the user account is active and not banned
 
-#### "Diagnostics API Unavailable"
-**Symptoms**: Health monitoring features don't work
+#### "Authentication failed" or "joinGame rejected"
+**Symptoms**: Socket.IO authentication fails after user ID resolution
 **Solutions**:
-1. **Update module**: Ensure you have the latest version (v0.8.1+)
-2. **Feature support**: Diagnostics require the REST API module with diagnostics endpoints
-3. **Alternative**: Use basic health check instead of detailed diagnostics
+1. **Verify password**: Check the password is correct
+2. **User permissions**: Ensure user has required permissions in FoundryVTT
+3. **Active sessions**: Check if the user already has an active session (some configurations limit concurrent sessions)
+4. **Debug logging**: Set `LOG_LEVEL=debug` to see the full authentication flow
 
-### 🎲 Feature-Specific Issues
+### World Data Issues
+
+#### "World data not received"
+**Symptoms**: Connection succeeds but no game data is available
+**Solutions**:
+1. **Active world**: Ensure a world is active in FoundryVTT (not on the setup screen)
+2. **Authentication completed**: Verify the full 4-step auth flow completed — check logs for `joinGame` success
+3. **User permissions**: The user must have permission to view world data
+4. **Restart**: Try restarting both FoundryVTT and the MCP server
+
+#### "Empty search results"
+**Symptoms**: Search commands return no results
+**Solutions**:
+1. **Data exists**: Verify actors/items/journals exist in your FoundryVTT world
+2. **Permissions**: Ensure the MCP user has permission to view the data
+3. **World data loaded**: Check server startup logs for worldData loading confirmation
+4. **Refresh data**: Use the `refresh_world_data` tool to reload from FoundryVTT
+5. **User context**: Try searching directly in FoundryVTT to confirm data visibility
+
+#### Scene Information Not Available
+**Symptoms**: Scene commands return limited data
+**Solutions**:
+1. **Active scene**: Ensure a scene is activated in FoundryVTT
+2. **Permissions**: Verify user can access scene information
+3. **Refresh**: Use `refresh_world_data` to reload the cached state
+
+### Feature-Specific Issues
 
 #### Dice Rolling Not Working
 **Symptoms**: Dice roll commands fail
 **Solutions**:
 1. **Check formula**: Ensure dice notation is valid (e.g., "1d20+5", "3d6")
 2. **FoundryVTT version**: Ensure FoundryVTT version 11+ for best compatibility
-3. **Fallback mode**: Dice rolling should work even without REST API
 
-#### Actor/Item Search Returns Empty Results
-**Symptoms**: Search commands return "No actors found"
+#### Diagnostics Tools Not Working
+**Symptoms**: Health monitoring and log tools fail
 **Solutions**:
-1. **Data exists**: Verify actors/items exist in your FoundryVTT world
-2. **Permissions**: Ensure MCP user has permission to view the data
-3. **REST API**: Full search requires the REST API module (see Module Issues above)
-4. **User context**: Try searching directly in FoundryVTT to confirm data visibility
-
-#### Scene Information Not Available
-**Symptoms**: Scene commands return mock or limited data
-**Solutions**:
-1. **Active scene**: Ensure a scene is activated in FoundryVTT
-2. **REST API**: Real-time scene data requires the REST API module
-3. **Permissions**: Verify user can access scene information
+1. **REST API module required**: These 5 tools require the optional Foundry Local REST API module
+2. **Install module**: Download from FoundryVTT's module browser
+3. **Enable module**: Activate it in your world's module settings
+4. **Set API key**: Add `FOUNDRY_API_KEY` to your `.env` file
+5. **Update module**: Ensure you have the latest version (v0.8.1+)
 
 ## Environment Configuration
 
-### 📄 .env File Template
+### .env File Template
 ```env
 # Required
 FOUNDRY_URL=http://localhost:30000
+FOUNDRY_USERNAME=your_username
+FOUNDRY_PASSWORD=your_password
 
-# Authentication (choose one method)
-# Method 1: API Key (Recommended)
-FOUNDRY_API_KEY=your_api_key_here
+# Optional: Direct user ID bypass
+# FOUNDRY_USER_ID=abc123def456ghij
 
-# Method 2: Username/Password
-# FOUNDRY_USERNAME=your_username
-# FOUNDRY_PASSWORD=your_password
+# Optional: Diagnostics (requires REST API module)
+# FOUNDRY_API_KEY=your_api_key_here
 
 # Optional Settings
 FOUNDRY_TIMEOUT=10000
@@ -147,7 +154,7 @@ FOUNDRY_RETRY_DELAY=1000
 LOG_LEVEL=info
 ```
 
-### 🔧 Configuration Validation
+### Configuration Validation
 Run the setup wizard to validate your configuration:
 ```bash
 npm run setup-wizard
@@ -155,14 +162,14 @@ npm run setup-wizard
 
 ## Advanced Diagnostics
 
-### 📋 Enable Debug Logging
+### Enable Debug Logging
 Add to your `.env` file:
 ```env
 LOG_LEVEL=debug
 ```
-This provides detailed logs for troubleshooting.
+This provides detailed logs including the full Socket.IO authentication flow.
 
-### 🔍 Manual Connection Testing
+### Manual Connection Testing
 Test individual components:
 
 1. **Basic connectivity**:
@@ -170,45 +177,52 @@ Test individual components:
    curl http://localhost:30000
    ```
 
-2. **REST API status**:
+2. **Join page accessibility** (confirms active world):
+   ```bash
+   curl -s http://localhost:30000/join | head -20
+   ```
+
+3. **REST API status** (if module installed):
    ```bash
    curl http://localhost:30000/api/status
    ```
 
-3. **Authenticated endpoint**:
+4. **Authenticated REST endpoint** (if module installed):
    ```bash
    curl -H "x-api-key: YOUR_API_KEY" http://localhost:30000/api/world
    ```
 
-### 🧪 Test Individual Features
+### Test Individual Features
 Use the MCP tools to test specific functionality:
 - `roll_dice` - Test dice rolling
 - `search_actors` - Test actor search
-- `get_health_status` - Comprehensive diagnostics
-- `get_system_health` - FoundryVTT system status
+- `get_combat_state` - Test combat tracking
+- `get_users` - Test user awareness
+- `search_world` - Test world-wide search
+- `get_health_status` - Comprehensive diagnostics (requires REST API module)
 
 ## Platform-Specific Issues
 
-### 🍎 macOS
+### macOS
 - **Firewall**: Check macOS firewall settings
 - **Permission**: Ensure FoundryVTT has network permissions
 
-### 🐧 Linux
+### Linux
 - **Port availability**: Ensure port 30000 isn't blocked
 - **User permissions**: Check file system permissions
 
-### 🪟 Windows
+### Windows
 - **Windows Defender**: Check firewall exceptions
 - **WSL users**: Verify network bridge configuration
 
 ## Getting Help
 
-### 📚 Documentation
+### Documentation
 - **Setup Guide**: [SETUP_GUIDE.md](SETUP_GUIDE.md)
 - **README**: [README.md](README.md)
 - **FoundryVTT Docs**: [https://foundryvtt.com/api/](https://foundryvtt.com/api/)
 
-### 🐛 Reporting Issues
+### Reporting Issues
 If you continue to experience problems:
 
 1. **Run diagnostics**:
@@ -218,20 +232,20 @@ If you continue to experience problems:
 
 2. **Gather information**:
    - Your `.env` configuration (redact sensitive values)
-   - MCP server logs
+   - MCP server logs (with `LOG_LEVEL=debug`)
    - FoundryVTT version and active modules
    - Error messages and stack traces
 
 3. **Report the issue**: [GitHub Issues](https://github.com/laurigates/foundryvtt-mcp/issues)
 
-### 💬 Community Support
+### Community Support
 - **Discord**: Join the FoundryVTT community
 - **Reddit**: r/FoundryVTT
 - **Forums**: FoundryVTT community forums
 
 ## Quick Reference
 
-### 🚀 Common Commands
+### Common Commands
 ```bash
 # Setup and configuration
 npm run setup-wizard          # Interactive setup
@@ -245,20 +259,19 @@ npm test                      # Run tests
 npm run lint                  # Code linting
 ```
 
-### ✅ Health Check Checklist
-- [ ] FoundryVTT is running and accessible
-- [ ] `.env` file exists with correct configuration
-- [ ] Authentication method is properly configured
-- [ ] REST API module is installed and enabled (for full features)
+### Health Check Checklist
+- [ ] FoundryVTT is running with an active world
+- [ ] `.env` file exists with `FOUNDRY_URL`, `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD`
+- [ ] Username matches a FoundryVTT user exactly (case-sensitive)
 - [ ] No firewall blocking connections
 - [ ] MCP server starts without errors
+- [ ] World data loads on connect (check startup logs)
 - [ ] Basic tools (dice rolling) work
 - [ ] Search tools return expected results
 
-### 🔗 Essential URLs
+### Essential URLs
 Verify these work in your browser:
 - FoundryVTT main: `http://localhost:30000`
-- API status: `http://localhost:30000/api/status`
-- API world (with auth): `http://localhost:30000/api/world`
+- Join page (confirms active world): `http://localhost:30000/join`
 
-Remember: Most issues are configuration-related. The setup wizard and health diagnostics can resolve 90% of common problems!
+Remember: Most issues are configuration-related. The setup wizard and health diagnostics can resolve most common problems!

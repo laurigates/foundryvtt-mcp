@@ -1,8 +1,5 @@
 /**
- * @fileoverview Tool routing and handler coordination
- * 
- * This module routes tool requests to appropriate handlers and manages
- * the coordination between different tool categories.
+ * Tool routing and handler coordination
  */
 
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
@@ -19,14 +16,19 @@ import { handleSearchActors, handleGetActorDetails } from './handlers/actors.js'
 import { handleSearchItems } from './handlers/items.js';
 import { handleGetSceneInfo } from './handlers/scenes.js';
 import { handleGenerateNPC, handleGenerateLoot, handleLookupRule } from './handlers/generation.js';
-import { 
-  handleGetRecentLogs, 
-  handleSearchLogs, 
+import {
+  handleGetRecentLogs,
+  handleSearchLogs,
   handleGetSystemHealth,
   handleDiagnoseErrors,
-  handleGetHealthStatus 
+  handleGetHealthStatus
 } from './handlers/diagnostics.js';
 import { handleReadResource } from './handlers/resources.js';
+import { handleGetCombatState } from './handlers/combat.js';
+import { handleGetChatMessages } from './handlers/chat.js';
+import { handleGetUsers } from './handlers/users.js';
+import { handleSearchJournals, handleGetJournal } from './handlers/journals.js';
+import { handleSearchWorld, handleGetWorldSummary, handleRefreshWorldData } from './handlers/world.js';
 
 /**
  * Routes tool requests to appropriate handlers
@@ -47,7 +49,7 @@ export async function routeToolRequest(
       diagnosticsClient,
       diagnosticSystem,
     };
-    
+
     try {
       return await toolRegistry.execute(name, args, context);
     } catch (error) {
@@ -61,7 +63,6 @@ export async function routeToolRequest(
     }
   }
 
-  // Fall back to legacy switch statement for tools not yet converted
   switch (name) {
     // Dice tools
     case 'roll_dice':
@@ -87,6 +88,41 @@ export async function routeToolRequest(
     case 'get_scene_info':
       return handleGetSceneInfo(args, foundryClient);
 
+    // Combat tools
+    case 'get_combat_state':
+      return handleGetCombatState(args, foundryClient);
+
+    // Chat tools
+    case 'get_chat_messages':
+      return handleGetChatMessages(args as { limit?: number }, foundryClient);
+
+    // User tools
+    case 'get_users':
+      return handleGetUsers(args, foundryClient);
+
+    // Journal tools
+    case 'search_journals':
+      if (!('query' in args) || typeof args.query !== 'string') {
+        throw new Error('Missing required parameter: query');
+      }
+      return handleSearchJournals(args as { query: string; limit?: number }, foundryClient);
+    case 'get_journal':
+      if (!('journalId' in args) || typeof args.journalId !== 'string') {
+        throw new Error('Missing required parameter: journalId');
+      }
+      return handleGetJournal(args as { journalId: string }, foundryClient);
+
+    // World tools
+    case 'search_world':
+      if (!('query' in args) || typeof args.query !== 'string') {
+        throw new Error('Missing required parameter: query');
+      }
+      return handleSearchWorld(args as { query: string; limit?: number }, foundryClient);
+    case 'get_world_summary':
+      return handleGetWorldSummary(args, foundryClient);
+    case 'refresh_world_data':
+      return handleRefreshWorldData(args, foundryClient);
+
     // Generation tools
     case 'generate_npc':
       return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, foundryClient);
@@ -98,7 +134,7 @@ export async function routeToolRequest(
       }
       return handleLookupRule(args as { query: string; system?: string }, foundryClient);
 
-    // Diagnostics tools
+    // Diagnostics tools (require REST API module)
     case 'get_recent_logs':
       return handleGetRecentLogs(args, diagnosticsClient);
     case 'search_logs':
