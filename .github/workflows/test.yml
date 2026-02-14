@@ -10,31 +10,24 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
     steps:
     - uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
 
     - name: Install dependencies
-      run: npm ci
+      run: bun install --frozen-lockfile
 
     - name: Build
-      run: npm run build
+      run: bun run build
 
     - name: Run tests
-      run: npm test
+      run: bun test
       env:
         NODE_ENV: test
         FOUNDRY_URL: http://localhost:30000
         LOG_LEVEL: error
 
     - name: Run linter
-      run: npm run lint
+      run: bun run lint
