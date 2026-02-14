@@ -50,7 +50,7 @@ export class CombatManager extends EventEmitter {
   private currentCombat: CombatState | null = null;
   private foundryClient: FoundryClient;
   private combatHistory: CombatEvent[] = [];
-  private turnTimer?: NodeJS.Timeout;
+  private turnTimer: NodeJS.Timeout | undefined;
   private readonly TURN_WARNING_TIME = 30000; // 30 seconds
   private readonly MAX_TURN_TIME = 120000; // 2 minutes
 
@@ -65,6 +65,20 @@ export class CombatManager extends EventEmitter {
     this.on('turn_start', this.handleTurnStart.bind(this));
     this.on('turn_end', this.handleTurnEnd.bind(this));
     this.on('round_end', this.handleRoundEnd.bind(this));
+  }
+
+  /**
+   * Destroy the combat manager and release resources
+   */
+  destroy(): void {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = undefined;
+    }
+    this.removeAllListeners();
+    this.currentCombat = null;
+    this.combatHistory = [];
+    logger.info('Combat manager destroyed');
   }
 
   // Public API Methods

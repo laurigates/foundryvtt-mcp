@@ -23,7 +23,7 @@ vi.mock('../../config/index.js', () => ({
 
 const { FoundryClient } = await import('../client.js');
 
-const mockAxios = axios as any;
+const mockAxios = vi.mocked(axios);
 
 describe('FoundryClient', () => {
   let client: InstanceType<typeof FoundryClient>;

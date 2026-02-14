@@ -62,14 +62,21 @@ async function resolveUserId(
       query: { session },
     });
 
+    const cleanup = () => {
+      socket.off('session', onSession);
+      socket.off('connect_error', onConnectError);
+    };
+
     const timeout = setTimeout(() => {
+      cleanup();
       socket.disconnect();
       reject(new Error('Timeout resolving user ID via getJoinData'));
     }, 10000);
 
-    socket.on('session', () => {
+    const onSession = () => {
       socket.emit('getJoinData', (data: { users?: Array<{ _id: string; name: string }> }) => {
         clearTimeout(timeout);
+        cleanup();
         socket.disconnect();
 
         if (!data?.users || !Array.isArray(data.users)) {
@@ -89,13 +96,17 @@ async function resolveUserId(
         logger.debug('Resolved user document _id', { displayName: user, _id: found._id });
         resolve(found._id);
       });
-    });
+    };
 
-    socket.on('connect_error', (err) => {
+    const onConnectError = (err: Error) => {
       clearTimeout(timeout);
+      cleanup();
       socket.disconnect();
       reject(new Error(`Socket.IO connection failed during user resolution: ${err.message}`));
-    });
+    };
+
+    socket.on('session', onSession);
+    socket.on('connect_error', onConnectError);
   });
 }
 

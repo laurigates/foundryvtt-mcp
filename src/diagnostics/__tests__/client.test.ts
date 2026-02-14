@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DiagnosticsClient } from '../client.js';
 import { FoundryClient } from '../../foundry/client.js';
-import type { LogEntry, SystemHealth, ErrorDiagnosis } from '../types.js';
+import type { LogEntry, SystemHealth, ErrorDiagnosis, LogPatternSearchParams } from '../types.js';
 
 // Mock the FoundryClient
 vi.mock('../../foundry/client.js');
@@ -153,7 +153,7 @@ describe('DiagnosticsClient', () => {
 
     it('should throw error when pattern is missing', async () => {
       await expect(
-        diagnosticsClient.searchLogs({} as any)
+        diagnosticsClient.searchLogs({} as LogPatternSearchParams)
       ).rejects.toThrow('Failed to search logs');
     });
   });

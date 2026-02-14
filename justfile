@@ -204,6 +204,37 @@ check-deps:
 security-audit:
     bun pm audit
 
+########## Anti-patterns ##########
+
+# Scan for common TypeScript anti-patterns using ast-grep
+[group: "quality"]
+antipatterns:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Scanning for anti-patterns..."
+    issues=0
+    echo ""
+    echo "=== as any ==="
+    check() { ast-grep -p "$1" --lang ts --globs '!**/__tests__/**' src/; }
+    echo "=== as any ==="
+    if check '$EXPR as any'; then ((issues+=1)); else echo "None found"; fi
+    echo ""
+    echo "=== as unknown as ==="
+    if check '$EXPR as unknown as $TYPE'; then ((issues+=1)); else echo "None found"; fi
+    echo ""
+    echo "=== empty catch blocks ==="
+    if check 'try { $$$ } catch ($E) { }'; then ((issues+=1)); else echo "None found"; fi
+    echo ""
+    echo "=== eval usage ==="
+    if check 'eval($$$)'; then ((issues+=1)); else echo "None found"; fi
+    echo ""
+    if [ "$issues" -eq 0 ]; then
+        echo "No anti-patterns found!"
+    else
+        echo "$issues anti-pattern category(s) found"
+        exit 1
+    fi
+
 ########## Composite Workflows ##########
 
 # Quick development check (lint + test)

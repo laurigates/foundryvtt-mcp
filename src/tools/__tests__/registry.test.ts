@@ -5,7 +5,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { toolRegistry } from '../registry.js';
 import { RollDiceTool } from '../handlers/dice.js';
-import { ToolContext } from '../base.js';
+import type { ToolContext } from '../base.js';
+import type { FoundryClient } from '../../foundry/client.js';
+import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 
 describe('Tool Registry', () => {
   let mockContext: ToolContext;
@@ -19,9 +22,9 @@ describe('Tool Registry', () => {
           breakdown: '(10) + 5',
           timestamp: '2025-01-01T00:00:00Z',
         }),
-      } as any,
-      diagnosticsClient: {} as any,
-      diagnosticSystem: {} as any,
+      } as unknown as FoundryClient,
+      diagnosticsClient: {} as unknown as DiagnosticsClient,
+      diagnosticSystem: {} as unknown as DiagnosticSystem,
     };
   });
 

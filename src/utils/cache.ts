@@ -49,16 +49,17 @@ export class CacheService {
     misses: 0,
     evictions: 0,
   };
-  
+  private cleanupInterval: ReturnType<typeof setInterval> | undefined;
+
   constructor(private config: CacheConfig) {
     if (config.enabled) {
       logger.info('Cache service initialized', {
         ttlSeconds: config.ttlSeconds,
         maxSize: config.maxSize,
       });
-      
+
       // Clean up expired entries periodically
-      setInterval(() => this.cleanup(), Math.max(config.ttlSeconds * 1000 / 4, 30000));
+      this.cleanupInterval = setInterval(() => this.cleanup(), Math.max(config.ttlSeconds * 1000 / 4, 30000));
     }
   }
 
@@ -191,6 +192,18 @@ export class CacheService {
    */
   isEnabled(): boolean {
     return this.config.enabled;
+  }
+
+  /**
+   * Destroy the cache service and release resources
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+    this.cache.clear();
+    logger.info('Cache service destroyed');
   }
 
   /**
