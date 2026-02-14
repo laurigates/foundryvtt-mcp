@@ -11,14 +11,23 @@
 import { FoundryClient } from '../foundry/client.js';
 import { logger } from '../utils/logger.js';
 import type {
-  LogEntry,
-  SystemHealth,
-  ErrorDiagnosis,
   LogSearchParams,
   LogPatternSearchParams,
-  LogResponse,
-  LogSearchResponse
 } from './types.js';
+import {
+  LogEntrySchema,
+  LogResponseSchema,
+  LogSearchResponseSchema,
+  SystemHealthSchema,
+  ErrorDiagnosisSchema
+} from './types.js';
+import type { z } from 'zod';
+
+type LogEntry = z.infer<typeof LogEntrySchema>;
+type LogResponse = z.infer<typeof LogResponseSchema>;
+type LogSearchResponse = z.infer<typeof LogSearchResponseSchema>;
+type SystemHealth = z.infer<typeof SystemHealthSchema>;
+type ErrorDiagnosis = z.infer<typeof ErrorDiagnosisSchema>;
 
 /**
  * Client for accessing FoundryVTT diagnostic and logging information
@@ -99,13 +108,14 @@ export class DiagnosticsClient {
       const url = `/api/diagnostics/logs${queryString ? `?${queryString}` : ''}`;
       
       const response = await this.foundryClient.get(url);
-      
+      const parsed = LogResponseSchema.parse(response.data);
+
       logger.debug('DiagnosticsClient | Retrieved logs', {
-        count: (response.data as LogResponse).total,
-        bufferSize: (response.data as LogResponse).bufferSize
+        count: parsed.total,
+        bufferSize: parsed.bufferSize
       });
 
-      return response.data as LogResponse;
+      return parsed;
     } catch (error) {
       logger.error('DiagnosticsClient | Failed to get recent logs:', error);
       throw new Error(`Failed to retrieve recent logs: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -158,13 +168,14 @@ export class DiagnosticsClient {
 
       const url = `/api/diagnostics/search?${searchParams.toString()}`;
       const response = await this.foundryClient.get(url);
-      
+      const parsed = LogSearchResponseSchema.parse(response.data);
+
       logger.debug('DiagnosticsClient | Search completed', {
         pattern: params.pattern,
-        matches: (response.data as LogSearchResponse).matches
+        matches: parsed.matches
       });
 
-      return response.data as LogSearchResponse;
+      return parsed;
     } catch (error) {
       logger.error('DiagnosticsClient | Failed to search logs:', error);
       throw new Error(`Failed to search logs: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -195,14 +206,15 @@ export class DiagnosticsClient {
       logger.debug('DiagnosticsClient | Getting system health');
 
       const response = await this.foundryClient.get('/api/diagnostics/health');
-      
+      const parsed = SystemHealthSchema.parse(response.data);
+
       logger.debug('DiagnosticsClient | System health retrieved', {
-        status: (response.data as SystemHealth).status,
-        activeUsers: (response.data as SystemHealth).users?.active,
-        recentErrors: (response.data as SystemHealth).logs?.recentErrors
+        status: parsed.status,
+        activeUsers: parsed.users?.active,
+        recentErrors: parsed.logs?.recentErrors
       });
 
-      return response.data as SystemHealth;
+      return parsed;
     } catch (error) {
       logger.error('DiagnosticsClient | Failed to get system health:', error);
       throw new Error(`Failed to retrieve system health: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -241,14 +253,15 @@ export class DiagnosticsClient {
 
       const url = `/api/diagnostics/errors?${searchParams.toString()}`;
       const response = await this.foundryClient.get(url);
-      
+      const parsed = ErrorDiagnosisSchema.parse(response.data);
+
       logger.debug('DiagnosticsClient | Error diagnosis completed', {
-        totalErrors: (response.data as ErrorDiagnosis).summary?.totalErrors,
-        healthScore: (response.data as ErrorDiagnosis).healthScore,
-        suggestionCount: (response.data as ErrorDiagnosis).suggestions?.length
+        totalErrors: parsed.summary?.totalErrors,
+        healthScore: parsed.healthScore,
+        suggestionCount: parsed.suggestions?.length
       });
 
-      return response.data as ErrorDiagnosis;
+      return parsed;
     } catch (error) {
       logger.error('DiagnosticsClient | Failed to diagnose errors:', error);
       throw new Error(`Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`);

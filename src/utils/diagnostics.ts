@@ -8,6 +8,7 @@
 import { FoundryClient } from '../foundry/client.js';
 import { config } from '../config/index.js';
 import { logger } from './logger.js';
+import { ApiStatusResponseSchema } from '../diagnostics/types.js';
 
 /**
  * Diagnostic result containing problem analysis and suggestions
@@ -311,7 +312,7 @@ export class DiagnosticSystem {
   private async testRestApiAvailability(): Promise<boolean> {
     try {
       const response = await this.foundryClient.get('/api/status');
-      return response && (response as unknown as { status: string }).status === 'ok';
+      return response?.data !== null && response?.data !== undefined && ApiStatusResponseSchema.parse(response.data).status === 'ok';
     } catch (error) {
       logger.debug('REST API not available:', error);
       return false;

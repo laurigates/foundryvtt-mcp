@@ -43,7 +43,7 @@ export async function handleReadResource(uri: string, foundryClient: FoundryClie
         throw new McpError(ErrorCode.InvalidParams, `Unknown resource URI: ${uri}`);
     }
   } catch (error) {
-    if (error instanceof McpError) throw error;
+    if (error instanceof McpError) {throw error;}
     logger.error('Failed to read resource:', error);
     throw new McpError(
       ErrorCode.InternalError,

@@ -8,6 +8,8 @@
 // import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { BaseTool, ToolContext, ToolResult } from '../base.js';
 import { FoundryClient } from '../../foundry/client.js';
+import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -60,8 +62,8 @@ export async function handleRollDice(args: {
   const tool = new RollDiceTool();
   const context: ToolContext = {
     foundryClient,
-    diagnosticsClient: null as any, // Not used in dice rolling
-    diagnosticSystem: null as any, // Not used in dice rolling
+    diagnosticsClient: null as unknown as DiagnosticsClient,
+    diagnosticSystem: null as unknown as DiagnosticSystem,
   };
   return tool.execute(args, context);
 }

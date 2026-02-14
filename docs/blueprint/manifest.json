@@ -1,0 +1,36 @@
+{
+  "format_version": "3.1.0",
+  "created_at": "2026-02-14T00:00:00.000Z",
+  "updated_at": "2026-02-14T00:01:00.000Z",
+  "created_by": {
+    "blueprint_plugin": "3.16.1"
+  },
+  "project": {
+    "name": "foundry-mcp-server",
+    "detected_stack": ["typescript", "node", "vitest", "playwright"]
+  },
+  "structure": {
+    "has_prds": true,
+    "has_adrs": true,
+    "has_prps": true,
+    "has_work_orders": true,
+    "has_ai_docs": false,
+    "has_modular_rules": true,
+    "has_feature_tracker": true,
+    "has_document_detection": true,
+    "claude_md_mode": "modular"
+  },
+  "feature_tracker": {
+    "file": "feature-tracker.json",
+    "source_document": "CLAUDE.md",
+    "sync_targets": ["TODO.md"]
+  },
+  "generated": {
+    "rules": {},
+    "commands": {}
+  },
+  "custom_overrides": {
+    "skills": [],
+    "commands": []
+  }
+}

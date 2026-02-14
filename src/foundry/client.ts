@@ -153,28 +153,40 @@ export class FoundryClient {
         query: { session },
       });
 
+      const cleanup = () => {
+        this.socket?.off('session', onSession);
+        this.socket?.off('connect_error', onConnectError);
+      };
+
       const timeout = setTimeout(() => {
+        cleanup();
         this.socket?.disconnect();
         reject(new Error('Timeout waiting for world data (15s)'));
       }, 15000);
 
-      this.socket.on('session', (data: { userId?: string } | null) => {
+      const onSession = (data: { userId?: string } | null) => {
         if (!data?.userId) {
           clearTimeout(timeout);
+          cleanup();
           this.socket?.disconnect();
           return reject(new Error('Authentication failed — session event returned no userId'));
         }
 
         this.socket!.emit('world', (worldData: WorldData) => {
           clearTimeout(timeout);
+          cleanup();
           resolve(worldData);
         });
-      });
+      };
 
-      this.socket.on('connect_error', (err) => {
+      const onConnectError = (err: Error) => {
         clearTimeout(timeout);
+        cleanup();
         reject(new Error(`Socket.IO connection failed: ${err.message}`));
-      });
+      };
+
+      this.socket.on('session', onSession);
+      this.socket.on('connect_error', onConnectError);
     });
   }
 
@@ -325,11 +337,11 @@ export class FoundryClient {
         name: i.name,
         type: i.type,
       };
-      if (i.img) item.img = i.img;
+      if (i.img) {item.img = i.img;}
       const desc = extractString(i.system, 'description', 'value');
-      if (desc) item.description = desc;
+      if (desc) {item.description = desc;}
       const rar = extractString(i.system, 'rarity');
-      if (rar) item.rarity = rar;
+      if (rar) {item.rarity = rar;}
       return item;
     });
 
@@ -423,7 +435,7 @@ export class FoundryClient {
   // ==========================================================================
 
   getCombatState(): WorldCombat | null {
-    if (!this.worldData) return null;
+    if (!this.worldData) {return null;}
     return this.worldData.combats.find((c) => c.active) ?? null;
   }
 
@@ -432,7 +444,7 @@ export class FoundryClient {
   // ==========================================================================
 
   getChatMessages(limit = 20): WorldMessage[] {
-    if (!this.worldData) return [];
+    if (!this.worldData) {return [];}
     return this.worldData.messages.slice(-limit);
   }
 
@@ -441,7 +453,7 @@ export class FoundryClient {
   // ==========================================================================
 
   getUsers(): { users: WorldUser[]; activeUsers: string[] } {
-    if (!this.worldData) return { users: [], activeUsers: [] };
+    if (!this.worldData) {return { users: [], activeUsers: [] };}
     return {
       users: this.worldData.users,
       activeUsers: this.worldData.activeUsers,
@@ -457,10 +469,10 @@ export class FoundryClient {
   }
 
   searchJournals(query: string): WorldJournal[] {
-    if (!this.worldData) return [];
+    if (!this.worldData) {return [];}
     const q = query.toLowerCase();
     return this.worldData.journal.filter((j) => {
-      if (j.name.toLowerCase().includes(q)) return true;
+      if (j.name.toLowerCase().includes(q)) {return true;}
       return j.pages?.some(
         (p) =>
           p.name.toLowerCase().includes(q) ||
@@ -502,7 +514,7 @@ export class FoundryClient {
   // ==========================================================================
 
   getWorldSummary(): Record<string, number> {
-    if (!this.worldData) return {};
+    if (!this.worldData) {return {};}
     return {
       actors: this.worldData.actors.length,
       items: this.worldData.items.length,
@@ -544,7 +556,7 @@ export class FoundryClient {
               .join(' + ') || formula,
           timestamp: new Date().toISOString(),
         };
-        if (reason) result.reason = reason;
+        if (reason) {result.reason = reason;}
         return result;
       } catch {
         // Fall through to local roll
@@ -582,7 +594,7 @@ export class FoundryClient {
       breakdown: breakdown.join(' | '),
       timestamp: new Date().toISOString(),
     };
-    if (reason) result.reason = reason;
+    if (reason) {result.reason = reason;}
     return result;
   }
 
@@ -628,7 +640,7 @@ export class FoundryClient {
           }
         }
 
-        if (attempt === maxAttempts) throw lastError;
+        if (attempt === maxAttempts) {throw lastError;}
 
         const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
         const jitter = Math.random() * 0.1 * exponentialDelay;
@@ -662,25 +674,23 @@ export class FoundryClient {
 
 function worldActorToFoundry(a: WorldActor): FoundryActor {
   const sys = a.system || {};
-  const hp = extractNested(sys, 'attributes', 'hp') as
-    | { value?: number; max?: number; temp?: number }
-    | undefined;
-  const ac = extractNested(sys, 'attributes', 'ac') as { value?: number } | undefined;
-  const details = (sys.details || {}) as Record<string, unknown>;
+  const hpRaw = extractNested(sys, 'attributes', 'hp');
+  const hp = isRecord(hpRaw) ? hpRaw : undefined;
+  const acRaw = extractNested(sys, 'attributes', 'ac');
+  const ac = isRecord(acRaw) ? acRaw : undefined;
+  const details = isRecord(sys.details) ? sys.details : {};
 
-  const abilities = sys.abilities as
-    | Record<string, { value?: number; mod?: number; save?: number }>
-    | undefined;
+  const abilitiesRaw = sys.abilities;
   let mappedAbilities: FoundryActor['abilities'];
-  if (abilities && typeof abilities === 'object') {
+  if (isRecord(abilitiesRaw)) {
     mappedAbilities = {};
-    for (const [key, val] of Object.entries(abilities)) {
-      if (val && typeof val === 'object') {
+    for (const [key, val] of Object.entries(abilitiesRaw)) {
+      if (isRecord(val)) {
         const entry: { value: number; mod: number; save?: number } = {
-          value: (val.value as number) ?? 10,
-          mod: (val.mod as number) ?? 0,
+          value: typeof val.value === 'number' ? val.value : 10,
+          mod: typeof val.mod === 'number' ? val.mod : 0,
         };
-        if (typeof val.save === 'number') entry.save = val.save;
+        if (typeof val.save === 'number') {entry.save = val.save;}
         mappedAbilities[key] = entry;
       }
     }
@@ -692,23 +702,24 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
     type: a.type,
   };
 
-  if (a.img) actor.img = a.img;
+  if (a.img) {actor.img = a.img;}
 
   if (hp) {
-    const hpObj: { value: number; max: number; temp?: number } = { value: hp.value ?? 0, max: hp.max ?? 0 };
-    if (typeof hp.temp === 'number') hpObj.temp = hp.temp;
+    const hpValue = typeof hp.value === 'number' ? hp.value : 0;
+    const hpMax = typeof hp.max === 'number' ? hp.max : 0;
+    const hpObj: { value: number; max: number; temp?: number } = { value: hpValue, max: hpMax };
+    if (typeof hp.temp === 'number') {hpObj.temp = hp.temp;}
     actor.hp = hpObj;
   }
 
-  if (ac?.value !== undefined) actor.ac = { value: ac.value };
+  if (ac && typeof ac.value === 'number') {actor.ac = { value: ac.value };}
 
-  const level = details.level as number | undefined;
-  if (typeof level === 'number') actor.level = level;
+  if (typeof details.level === 'number') {actor.level = details.level;}
 
-  if (mappedAbilities) actor.abilities = mappedAbilities;
+  if (mappedAbilities) {actor.abilities = mappedAbilities;}
 
   const bio = extractString(details, 'biography', 'value') || extractString(details, 'biography');
-  if (bio) actor.biography = bio;
+  if (bio) {actor.biography = bio;}
 
   return actor;
 }
@@ -727,23 +738,27 @@ function worldSceneToFoundry(s: WorldScene): FoundryScene {
     globalLight: s.globalLight,
     darkness: s.darkness,
   };
-  if (s.img) scene.img = s.img;
+  if (s.img) {scene.img = s.img;}
   const desc = (s.flags as Record<string, unknown>)?.description;
-  if (typeof desc === 'string') scene.description = desc;
+  if (typeof desc === 'string') {scene.description = desc;}
   return scene;
 }
 
 /**
  * Safely extracts a nested value from a Record tree.
  */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function extractNested(
   obj: Record<string, unknown>,
   ...keys: string[]
 ): unknown {
   let current: unknown = obj;
   for (const key of keys) {
-    if (current && typeof current === 'object' && key in (current as Record<string, unknown>)) {
-      current = (current as Record<string, unknown>)[key];
+    if (isRecord(current) && key in current) {
+      current = current[key];
     } else {
       return undefined;
     }
