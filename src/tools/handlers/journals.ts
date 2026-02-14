@@ -73,7 +73,7 @@ export async function handleGetJournal(
       ],
     };
   } catch (error) {
-    if (error instanceof McpError) throw error;
+    if (error instanceof McpError) {throw error;}
     logger.error('Failed to get journal:', error);
     throw new McpError(
       ErrorCode.InternalError,

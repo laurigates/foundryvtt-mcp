@@ -312,7 +312,7 @@ export class DiagnosticSystem {
   private async testRestApiAvailability(): Promise<boolean> {
     try {
       const response = await this.foundryClient.get('/api/status');
-      return response?.data != null && ApiStatusResponseSchema.parse(response.data).status === 'ok';
+      return response?.data !== null && response?.data !== undefined && ApiStatusResponseSchema.parse(response.data).status === 'ok';
     } catch (error) {
       logger.debug('REST API not available:', error);
       return false;

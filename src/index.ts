@@ -71,10 +71,10 @@ class FoundryMCPServer {
       retryAttempts: config.foundry.retryAttempts,
       retryDelay: config.foundry.retryDelay,
     };
-    if (config.foundry.apiKey) clientConfig.apiKey = config.foundry.apiKey;
-    if (config.foundry.username) clientConfig.username = config.foundry.username;
-    if (config.foundry.password) clientConfig.password = config.foundry.password;
-    if (config.foundry.userId) clientConfig.userId = config.foundry.userId;
+    if (config.foundry.apiKey) {clientConfig.apiKey = config.foundry.apiKey;}
+    if (config.foundry.username) {clientConfig.username = config.foundry.username;}
+    if (config.foundry.password) {clientConfig.password = config.foundry.password;}
+    if (config.foundry.userId) {clientConfig.userId = config.foundry.userId;}
     this.foundryClient = new FoundryClient(clientConfig);
 
     // Initialize DiagnosticsClient

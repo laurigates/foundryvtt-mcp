@@ -34,8 +34,8 @@ export async function handleGetCombatState(
             const hp = actor.system?.attributes as Record<string, unknown> | undefined;
             const hpData = hp?.hp as { value?: number; max?: number } | undefined;
             const acData = hp?.ac as { value?: number } | undefined;
-            if (hpData) hpAc += ` HP: ${hpData.value ?? '?'}/${hpData.max ?? '?'}`;
-            if (acData) hpAc += ` AC: ${acData.value ?? '?'}`;
+            if (hpData) {hpAc += ` HP: ${hpData.value ?? '?'}/${hpData.max ?? '?'}`;}
+            if (acData) {hpAc += ` AC: ${acData.value ?? '?'}`;}
           }
         }
 
