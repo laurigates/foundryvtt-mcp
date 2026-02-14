@@ -23,7 +23,7 @@ jobs:
       run: bun run build
 
     - name: Run tests
-      run: bun test
+      run: bun run test
       env:
         NODE_ENV: test
         FOUNDRY_URL: http://localhost:30000
