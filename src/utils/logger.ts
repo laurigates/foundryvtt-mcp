@@ -154,9 +154,8 @@ class Logger {
    */
   error(message: string, error?: unknown): void {
     if (this.shouldLog('error')) {
-      const errorDetails = error instanceof Error
-        ? { message: error.message, stack: error.stack }
-        : error;
+      const errorDetails =
+        error instanceof Error ? { message: error.message, stack: error.stack } : error;
       console.error(this.formatMessage('error', message, errorDetails));
     }
   }

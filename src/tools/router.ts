@@ -2,33 +2,36 @@
  * Tool routing and handler coordination
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../foundry/client.js';
-import { DiagnosticsClient } from '../diagnostics/client.js';
-import { DiagnosticSystem } from '../utils/diagnostics.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { DiagnosticsClient } from '../diagnostics/client.js';
+import type { FoundryClient } from '../foundry/client.js';
+import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
-import { toolRegistry } from './registry.js';
-import { ToolContext } from './base.js';
-
+import type { ToolContext } from './base.js';
+import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
+import { handleGetChatMessages } from './handlers/chat.js';
+import { handleGetCombatState } from './handlers/combat.js';
+import {
+  handleDiagnoseErrors,
+  handleGetHealthStatus,
+  handleGetRecentLogs,
+  handleGetSystemHealth,
+  handleSearchLogs,
+} from './handlers/diagnostics.js';
 // Import all tool handlers
 import { handleRollDice } from './handlers/dice.js';
-import { handleSearchActors, handleGetActorDetails } from './handlers/actors.js';
+import { handleGenerateLoot, handleGenerateNPC, handleLookupRule } from './handlers/generation.js';
 import { handleSearchItems } from './handlers/items.js';
-import { handleGetSceneInfo } from './handlers/scenes.js';
-import { handleGenerateNPC, handleGenerateLoot, handleLookupRule } from './handlers/generation.js';
-import {
-  handleGetRecentLogs,
-  handleSearchLogs,
-  handleGetSystemHealth,
-  handleDiagnoseErrors,
-  handleGetHealthStatus
-} from './handlers/diagnostics.js';
+import { handleGetJournal, handleSearchJournals } from './handlers/journals.js';
 import { handleReadResource } from './handlers/resources.js';
-import { handleGetCombatState } from './handlers/combat.js';
-import { handleGetChatMessages } from './handlers/chat.js';
+import { handleGetSceneInfo } from './handlers/scenes.js';
 import { handleGetUsers } from './handlers/users.js';
-import { handleSearchJournals, handleGetJournal } from './handlers/journals.js';
-import { handleSearchWorld, handleGetWorldSummary, handleRefreshWorldData } from './handlers/world.js';
+import {
+  handleGetWorldSummary,
+  handleRefreshWorldData,
+  handleSearchWorld,
+} from './handlers/world.js';
+import { toolRegistry } from './registry.js';
 
 /**
  * Routes tool requests to appropriate handlers
@@ -38,7 +41,7 @@ export async function routeToolRequest(
   args: Record<string, unknown>,
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
-  diagnosticSystem: DiagnosticSystem
+  diagnosticSystem: DiagnosticSystem,
 ) {
   logger.debug(`Routing tool request: ${name}`, { args });
 
@@ -58,7 +61,7 @@ export async function routeToolRequest(
       }
       throw new McpError(
         ErrorCode.InternalError,
-        `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -125,9 +128,15 @@ export async function routeToolRequest(
 
     // Generation tools
     case 'generate_npc':
-      return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, foundryClient);
+      return handleGenerateNPC(
+        args as { level?: number; race?: string; class?: string },
+        foundryClient,
+      );
     case 'generate_loot':
-      return handleGenerateLoot(args as { challengeRating?: number; treasureType?: string }, foundryClient);
+      return handleGenerateLoot(
+        args as { challengeRating?: number; treasureType?: string },
+        foundryClient,
+      );
     case 'lookup_rule':
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
@@ -141,7 +150,10 @@ export async function routeToolRequest(
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleSearchLogs(args as { query: string; level?: string; limit?: number }, diagnosticsClient);
+      return handleSearchLogs(
+        args as { query: string; level?: string; limit?: number },
+        diagnosticsClient,
+      );
     case 'get_system_health':
       return handleGetSystemHealth(args, diagnosticsClient);
     case 'diagnose_errors':
@@ -160,7 +172,7 @@ export async function routeToolRequest(
 export async function routeResourceRequest(
   uri: string,
   foundryClient: FoundryClient,
-  diagnosticsClient: DiagnosticsClient
+  diagnosticsClient: DiagnosticsClient,
 ) {
   logger.debug(`Routing resource request: ${uri}`);
   return handleReadResource(uri, foundryClient, diagnosticsClient);

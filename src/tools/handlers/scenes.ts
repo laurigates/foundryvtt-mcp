@@ -1,19 +1,22 @@
 /**
  * @fileoverview Scene management tool handlers
- * 
+ *
  * Handles scene information retrieval and management.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 /**
  * Handles scene information requests
  */
-export async function handleGetSceneInfo(args: {
-  sceneId?: string;
-}, foundryClient: FoundryClient) {
+export async function handleGetSceneInfo(
+  args: {
+    sceneId?: string;
+  },
+  foundryClient: FoundryClient,
+) {
   const { sceneId } = args;
 
   try {
@@ -42,7 +45,7 @@ export async function handleGetSceneInfo(args: {
     logger.error('Failed to get scene info:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to get scene info: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to get scene info: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }

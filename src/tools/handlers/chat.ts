@@ -2,8 +2,8 @@
  * Chat message tool handler
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 export async function handleGetChatMessages(
@@ -24,12 +24,17 @@ export async function handleGetChatMessages(
     const { users } = foundryClient.getUsers();
     const userMap = new Map(users.map((u) => [u._id, u.name]));
 
-    const formatted = messages.map((m) => {
-      const speaker = m.speaker?.alias || userMap.get(m.user) || 'Unknown';
-      const time = new Date(m.timestamp).toLocaleTimeString();
-      const content = m.content.replace(/<[^>]+>/g, '').trim().slice(0, 200);
-      return `[${time}] **${speaker}**: ${content}`;
-    }).join('\n');
+    const formatted = messages
+      .map((m) => {
+        const speaker = m.speaker?.alias || userMap.get(m.user) || 'Unknown';
+        const time = new Date(m.timestamp).toLocaleTimeString();
+        const content = m.content
+          .replace(/<[^>]+>/g, '')
+          .trim()
+          .slice(0, 200);
+        return `[${time}] **${speaker}**: ${content}`;
+      })
+      .join('\n');
 
     return {
       content: [

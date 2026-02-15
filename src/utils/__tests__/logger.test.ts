@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the config module before importing logger
 vi.mock('../../config/index.js', () => ({
@@ -24,7 +24,11 @@ class Logger {
     return this.levels[level] >= this.levels[this.logLevel];
   }
 
-  private formatMessage(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: any): string {
+  private formatMessage(
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    meta?: any,
+  ): string {
     const timestamp = new Date().toISOString();
     const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${metaStr}`;
@@ -50,9 +54,8 @@ class Logger {
 
   error(message: string, error?: any): void {
     if (this.shouldLog('error')) {
-      const errorDetails = error instanceof Error
-        ? { message: error.message, stack: error.stack }
-        : error;
+      const errorDetails =
+        error instanceof Error ? { message: error.message, stack: error.stack } : error;
       console.error(this.formatMessage('error', message, errorDetails));
     }
   }

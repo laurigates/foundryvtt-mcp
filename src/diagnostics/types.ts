@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 /**
  * Log entry interface representing a single log message with metadata
- * 
+ *
  * @interface LogEntry
  * @example
  * ```typescript
@@ -40,7 +40,7 @@ export interface LogEntry {
 
 /**
  * Server information including FoundryVTT and system versions
- * 
+ *
  * @interface ServerInfo
  */
 export interface ServerInfo {
@@ -56,7 +56,7 @@ export interface ServerInfo {
 
 /**
  * User session information and statistics
- * 
+ *
  * @interface UserInfo
  */
 export interface UserInfo {
@@ -70,7 +70,7 @@ export interface UserInfo {
 
 /**
  * Module information and statistics
- * 
+ *
  * @interface ModuleInfo
  */
 export interface ModuleInfo {
@@ -82,7 +82,7 @@ export interface ModuleInfo {
 
 /**
  * Performance metrics for system monitoring
- * 
+ *
  * @interface PerformanceInfo
  */
 export interface PerformanceInfo {
@@ -94,7 +94,7 @@ export interface PerformanceInfo {
 
 /**
  * Log buffer statistics and metrics
- * 
+ *
  * @interface LogInfo
  */
 export interface LogInfo {
@@ -110,7 +110,7 @@ export interface LogInfo {
 
 /**
  * Overall system health status and metrics
- * 
+ *
  * @interface SystemHealth
  * @example
  * ```typescript
@@ -144,7 +144,7 @@ export interface SystemHealth {
 
 /**
  * Error categorization for diagnostics
- * 
+ *
  * @interface ErrorCategories
  */
 export interface ErrorCategories {
@@ -153,7 +153,7 @@ export interface ErrorCategories {
 
 /**
  * Diagnostic suggestion for resolving issues
- * 
+ *
  * @interface DiagnosticSuggestion
  */
 export interface DiagnosticSuggestion {
@@ -167,7 +167,7 @@ export interface DiagnosticSuggestion {
 
 /**
  * Summary of error analysis
- * 
+ *
  * @interface ErrorSummary
  */
 export interface ErrorSummary {
@@ -181,7 +181,7 @@ export interface ErrorSummary {
 
 /**
  * Complete error diagnosis with analysis and suggestions
- * 
+ *
  * @interface ErrorDiagnosis
  * @example
  * ```typescript
@@ -216,7 +216,7 @@ export interface ErrorDiagnosis {
 
 /**
  * Parameters for searching logs
- * 
+ *
  * @interface LogSearchParams
  */
 export interface LogSearchParams {
@@ -234,7 +234,7 @@ export interface LogSearchParams {
 
 /**
  * Parameters for log pattern searching
- * 
+ *
  * @interface LogPatternSearchParams
  */
 export interface LogPatternSearchParams {
@@ -250,7 +250,7 @@ export interface LogPatternSearchParams {
 
 /**
  * Response structure for log retrieval operations
- * 
+ *
  * @interface LogResponse
  */
 export interface LogResponse {
@@ -266,7 +266,7 @@ export interface LogResponse {
 
 /**
  * Response structure for log search operations
- * 
+ *
  * @interface LogSearchResponse
  */
 export interface LogSearchResponse {
@@ -321,13 +321,15 @@ const ModuleInfoSchema = z.object({
 });
 
 const PerformanceInfoSchema = z.object({
-  memory: z.object({
-    rss: z.number(),
-    heapTotal: z.number(),
-    heapUsed: z.number(),
-    external: z.number(),
-    arrayBuffers: z.number(),
-  }).optional(),
+  memory: z
+    .object({
+      rss: z.number(),
+      heapTotal: z.number(),
+      heapUsed: z.number(),
+      external: z.number(),
+      arrayBuffers: z.number(),
+    })
+    .optional(),
   connectedClients: z.number(),
 });
 

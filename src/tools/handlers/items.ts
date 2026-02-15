@@ -1,29 +1,32 @@
 /**
  * @fileoverview Item management tool handlers
- * 
+ *
  * Handles searching for items and retrieving detailed item information.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 /**
  * Handles item search requests
  */
-export async function handleSearchItems(args: {
-  query?: string;
-  type?: string;
-  rarity?: string;
-  limit?: number;
-}, foundryClient: FoundryClient) {
+export async function handleSearchItems(
+  args: {
+    query?: string;
+    type?: string;
+    rarity?: string;
+    limit?: number;
+  },
+  foundryClient: FoundryClient,
+) {
   const { query, type, rarity, limit = 10 } = args;
 
   try {
     logger.info('Searching items', { query, type, rarity, limit });
-    const searchParams: { query: string; type?: string; rarity?: string; limit: number } = { 
+    const searchParams: { query: string; type?: string; rarity?: string; limit: number } = {
       query: query || '',
-      limit 
+      limit,
     };
     if (type) {
       searchParams.type = type;
@@ -33,10 +36,14 @@ export async function handleSearchItems(args: {
     }
     const result = await foundryClient.searchItems(searchParams);
 
-    const itemList = result.items.map(item => {
-      const price = item.price ? `${item.price.value} ${item.price.denomination}` : 'Unknown price';
-      return `- **${item.name}** (${item.type}) - ${item.rarity || 'Common'} - ${price}`;
-    }).join('\n');
+    const itemList = result.items
+      .map((item) => {
+        const price = item.price
+          ? `${item.price.value} ${item.price.denomination}`
+          : 'Unknown price';
+        return `- **${item.name}** (${item.type}) - ${item.rarity || 'Common'} - ${price}`;
+      })
+      .join('\n');
 
     return {
       content: [
@@ -58,7 +65,7 @@ ${itemList || 'No items found matching the criteria.'}
     logger.error('Failed to search items:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to search items: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to search items: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }

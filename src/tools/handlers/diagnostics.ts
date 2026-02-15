@@ -1,33 +1,40 @@
 /**
  * @fileoverview Diagnostics and logging tool handlers
- * 
+ *
  * Handles system diagnostics, logging, and health monitoring.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
-import { DiagnosticsClient } from '../../diagnostics/client.js';
-import { DiagnosticSystem } from '../../utils/diagnostics.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { FoundryClient } from '../../foundry/client.js';
+import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { logger } from '../../utils/logger.js';
 
 /**
  * Handles recent log retrieval requests
  */
-export async function handleGetRecentLogs(args: {
-  limit?: number;
-  level?: string;
-  since?: string;
-}, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetRecentLogs(
+  args: {
+    limit?: number;
+    level?: string;
+    since?: string;
+  },
+  diagnosticsClient: DiagnosticsClient,
+) {
   const { limit = 20, level, since } = args;
 
   try {
     logger.info('Getting recent logs', { limit, level, since });
     const logs = await diagnosticsClient.getRecentLogs();
 
-    const logEntries = Array.isArray(logs) ? logs.map((log: unknown) => {
-      const logEntry = log as { timestamp?: string; level?: string; message?: string };
-      return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
-    }).join('\n') : 'No logs available';
+    const logEntries = Array.isArray(logs)
+      ? logs
+          .map((log: unknown) => {
+            const logEntry = log as { timestamp?: string; level?: string; message?: string };
+            return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
+          })
+          .join('\n')
+      : 'No logs available';
 
     return {
       content: [
@@ -46,7 +53,7 @@ ${logEntries || 'No log entries found.'}`,
     logger.error('Failed to get recent logs:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to get recent logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to get recent logs: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -54,11 +61,14 @@ ${logEntries || 'No log entries found.'}`,
 /**
  * Handles log search requests
  */
-export async function handleSearchLogs(args: {
-  query: string;
-  level?: string;
-  limit?: number;
-}, diagnosticsClient: DiagnosticsClient) {
+export async function handleSearchLogs(
+  args: {
+    query: string;
+    level?: string;
+    limit?: number;
+  },
+  diagnosticsClient: DiagnosticsClient,
+) {
   const { query, level, limit = 50 } = args;
 
   if (!query || typeof query !== 'string') {
@@ -69,10 +79,14 @@ export async function handleSearchLogs(args: {
     logger.info('Searching logs', { query, level, limit });
     const logs = await diagnosticsClient.searchLogs({ pattern: query });
 
-    const logEntries = Array.isArray(logs) ? logs.map((log: unknown) => {
-      const logEntry = log as { timestamp?: string; level?: string; message?: string };
-      return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
-    }).join('\n') : 'No logs available';
+    const logEntries = Array.isArray(logs)
+      ? logs
+          .map((log: unknown) => {
+            const logEntry = log as { timestamp?: string; level?: string; message?: string };
+            return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
+          })
+          .join('\n')
+      : 'No logs available';
 
     const logCount = Array.isArray(logs) ? logs.length : 0;
 
@@ -93,7 +107,7 @@ ${logEntries || 'No matching log entries found.'}`,
     logger.error('Failed to search logs:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to search logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to search logs: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -101,7 +115,10 @@ ${logEntries || 'No matching log entries found.'}`,
 /**
  * Handles system health requests
  */
-export async function handleGetSystemHealth(args: Record<string, unknown>, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetSystemHealth(
+  _args: Record<string, unknown>,
+  diagnosticsClient: DiagnosticsClient,
+) {
   try {
     logger.info('Getting system health');
     const health = await diagnosticsClient.getSystemHealth();
@@ -130,7 +147,7 @@ export async function handleGetSystemHealth(args: Record<string, unknown>, diagn
     logger.error('Failed to get system health:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to get system health: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to get system health: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -138,9 +155,12 @@ export async function handleGetSystemHealth(args: Record<string, unknown>, diagn
 /**
  * Handles error diagnosis requests
  */
-export async function handleDiagnoseErrors(args: {
-  category?: string;
-}, _diagnosticSystem: DiagnosticSystem) {
+export async function handleDiagnoseErrors(
+  args: {
+    category?: string;
+  },
+  _diagnosticSystem: DiagnosticSystem,
+) {
   const { category } = args;
 
   try {
@@ -149,21 +169,24 @@ export async function handleDiagnoseErrors(args: {
     const diagnosis = {
       errors: [],
       recommendations: ['No specific errors detected', 'System appears to be functioning normally'],
-      systemStatus: 'Operational'
+      systemStatus: 'Operational',
     };
 
-    const errorsByCategory = diagnosis.errors.reduce((acc: Record<string, unknown[]>, error: { category: string }) => {
-      if (!acc[error.category]) {
-        acc[error.category] = [];
-      }
-      acc[error.category]!.push(error);
-      return acc;
-    }, {});
+    const errorsByCategory = diagnosis.errors.reduce(
+      (acc: Record<string, unknown[]>, error: { category: string }) => {
+        if (!acc[error.category]) {
+          acc[error.category] = [];
+        }
+        acc[error.category]?.push(error);
+        return acc;
+      },
+      {},
+    );
 
-    const errorSummary = Object.entries(errorsByCategory)
-      .map(([cat, errors]: [string, unknown[]]) => 
-        `**${cat}:** ${errors.length} error(s)`
-      ).join('\n') || 'No errors found';
+    const errorSummary =
+      Object.entries(errorsByCategory)
+        .map(([cat, errors]: [string, unknown[]]) => `**${cat}:** ${errors.length} error(s)`)
+        .join('\n') || 'No errors found';
 
     return {
       content: [
@@ -187,7 +210,7 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
     logger.error('Failed to diagnose errors:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -195,10 +218,14 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
 /**
  * Handles comprehensive health status requests
  */
-export async function handleGetHealthStatus(args: Record<string, unknown>, foundryClient: FoundryClient, diagnosticsClient: DiagnosticsClient) {
+export async function handleGetHealthStatus(
+  _args: Record<string, unknown>,
+  foundryClient: FoundryClient,
+  diagnosticsClient: DiagnosticsClient,
+) {
   try {
     logger.info('Getting comprehensive health status');
-    
+
     const [worldInfo, systemHealth] = await Promise.all([
       foundryClient.getWorldInfo().catch(() => null),
       diagnosticsClient.getSystemHealth().catch(() => null),
@@ -214,18 +241,26 @@ export async function handleGetHealthStatus(args: Record<string, unknown>, found
 ${foundryClient.isConnected() ? '✅ Connected' : '❌ Disconnected'}
 
 **World Information:**
-${worldInfo ? `
+${
+  worldInfo
+    ? `
 - **Title:** ${worldInfo.title}
 - **System:** ${worldInfo.system}
 - **Core Version:** ${worldInfo.coreVersion}
-- **Playtime:** ${Math.floor(worldInfo.playtime / 3600)} hours` : 'ℹ️ Not available'}
+- **Playtime:** ${Math.floor(worldInfo.playtime / 3600)} hours`
+    : 'ℹ️ Not available'
+}
 
 **System Health:**
-${systemHealth ? `
+${
+  systemHealth
+    ? `
 - **Status:** ${systemHealth.status || 'Unknown'}
 - **CPU:** ${(systemHealth as { cpu?: number }).cpu || 'N/A'}%
 - **Memory:** ${(systemHealth as { memory?: number }).memory || 'N/A'}%
-- **Uptime:** ${Math.floor(((systemHealth as { uptime?: number }).uptime || 0) / 3600)} hours` : 'ℹ️ Not available'}`,
+- **Uptime:** ${Math.floor(((systemHealth as { uptime?: number }).uptime || 0) / 3600)} hours`
+    : 'ℹ️ Not available'
+}`,
         },
       ],
     };
@@ -233,7 +268,7 @@ ${systemHealth ? `
     logger.error('Failed to get health status:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to get health status: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to get health status: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }

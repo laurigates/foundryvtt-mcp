@@ -5,26 +5,26 @@
  * caches worldData in memory, and serves all queries from the snapshot.
  */
 
-import axios, { AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
-import { io, Socket } from 'socket.io-client';
+import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
+import { io, type Socket } from 'socket.io-client';
 import { logger } from '../utils/logger.js';
-import {
+import { authenticateFoundry } from './auth.js';
+import type {
+  ActorSearchResult,
+  DiceRoll,
   FoundryActor,
   FoundryScene,
   FoundryWorld,
-  DiceRoll,
-  ActorSearchResult,
   ItemSearchResult,
-  WorldData,
   WorldActor,
+  WorldCombat,
+  WorldData,
   WorldItem,
-  WorldScene,
   WorldJournal,
   WorldMessage,
-  WorldCombat,
+  WorldScene,
   WorldUser,
 } from './types.js';
-import { authenticateFoundry } from './auth.js';
 
 export interface FoundryClientConfig {
   baseUrl: string;
@@ -123,15 +123,11 @@ export class FoundryClient {
     if (!user || !this.config.password) {
       throw new Error(
         'Socket.IO mode requires username/userId and password. ' +
-        'Set FOUNDRY_USERNAME + FOUNDRY_PASSWORD or FOUNDRY_USER_ID + FOUNDRY_PASSWORD.',
+          'Set FOUNDRY_USERNAME + FOUNDRY_PASSWORD or FOUNDRY_USER_ID + FOUNDRY_PASSWORD.',
       );
     }
 
-    const { session } = await authenticateFoundry(
-      this.config.baseUrl,
-      user,
-      this.config.password,
-    );
+    const { session } = await authenticateFoundry(this.config.baseUrl, user, this.config.password);
 
     // Connect authenticated socket and load world data
     this.worldData = await this.connectAndLoadWorld(session);
@@ -172,7 +168,7 @@ export class FoundryClient {
           return reject(new Error('Authentication failed — session event returned no userId'));
         }
 
-        this.socket!.emit('world', (worldData: WorldData) => {
+        this.socket?.emit('world', (worldData: WorldData) => {
           clearTimeout(timeout);
           cleanup();
           resolve(worldData);
@@ -225,7 +221,7 @@ export class FoundryClient {
 
     this.worldData = await new Promise<WorldData>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Refresh timeout')), 15000);
-      this.socket!.emit('world', (data: WorldData) => {
+      this.socket?.emit('world', (data: WorldData) => {
         clearTimeout(timeout);
         resolve(data);
       });
@@ -332,16 +328,29 @@ export class FoundryClient {
     const total = results.length;
     const limit = params.limit || 10;
     const items = results.slice(0, limit).map((i) => {
-      const item: { _id: string; name: string; type: string; img?: string; description?: string; rarity?: string } = {
+      const item: {
+        _id: string;
+        name: string;
+        type: string;
+        img?: string;
+        description?: string;
+        rarity?: string;
+      } = {
         _id: i._id,
         name: i.name,
         type: i.type,
       };
-      if (i.img) {item.img = i.img;}
+      if (i.img) {
+        item.img = i.img;
+      }
       const desc = extractString(i.system, 'description', 'value');
-      if (desc) {item.description = desc;}
+      if (desc) {
+        item.description = desc;
+      }
       const rar = extractString(i.system, 'rarity');
-      if (rar) {item.rarity = rar;}
+      if (rar) {
+        item.rarity = rar;
+      }
       return item;
     });
 
@@ -435,7 +444,9 @@ export class FoundryClient {
   // ==========================================================================
 
   getCombatState(): WorldCombat | null {
-    if (!this.worldData) {return null;}
+    if (!this.worldData) {
+      return null;
+    }
     return this.worldData.combats.find((c) => c.active) ?? null;
   }
 
@@ -444,7 +455,9 @@ export class FoundryClient {
   // ==========================================================================
 
   getChatMessages(limit = 20): WorldMessage[] {
-    if (!this.worldData) {return [];}
+    if (!this.worldData) {
+      return [];
+    }
     return this.worldData.messages.slice(-limit);
   }
 
@@ -453,7 +466,9 @@ export class FoundryClient {
   // ==========================================================================
 
   getUsers(): { users: WorldUser[]; activeUsers: string[] } {
-    if (!this.worldData) {return { users: [], activeUsers: [] };}
+    if (!this.worldData) {
+      return { users: [], activeUsers: [] };
+    }
     return {
       users: this.worldData.users,
       activeUsers: this.worldData.activeUsers,
@@ -469,14 +484,16 @@ export class FoundryClient {
   }
 
   searchJournals(query: string): WorldJournal[] {
-    if (!this.worldData) {return [];}
+    if (!this.worldData) {
+      return [];
+    }
     const q = query.toLowerCase();
     return this.worldData.journal.filter((j) => {
-      if (j.name.toLowerCase().includes(q)) {return true;}
+      if (j.name.toLowerCase().includes(q)) {
+        return true;
+      }
       return j.pages?.some(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.text?.content?.toLowerCase().includes(q),
+        (p) => p.name.toLowerCase().includes(q) || p.text?.content?.toLowerCase().includes(q),
       );
     });
   }
@@ -514,7 +531,9 @@ export class FoundryClient {
   // ==========================================================================
 
   getWorldSummary(): Record<string, number> {
-    if (!this.worldData) {return {};}
+    if (!this.worldData) {
+      return {};
+    }
     return {
       actors: this.worldData.actors.length,
       items: this.worldData.items.length,
@@ -556,7 +575,9 @@ export class FoundryClient {
               .join(' + ') || formula,
           timestamp: new Date().toISOString(),
         };
-        if (reason) {result.reason = reason;}
+        if (reason) {
+          result.reason = reason;
+        }
         return result;
       } catch {
         // Fall through to local roll
@@ -567,16 +588,16 @@ export class FoundryClient {
   }
 
   private fallbackDiceRoll(formula: string, reason?: string): DiceRoll {
-    const diceRegex = /(\d+)d(\d+)([+\-]\d+)?/g;
+    const diceRegex = /(\d+)d(\d+)([+-]\d+)?/g;
     let total = 0;
     const breakdown: string[] = [];
 
-    let match;
-    while ((match = diceRegex.exec(formula)) !== null) {
+    let match: RegExpExecArray | null = diceRegex.exec(formula);
+    while (match !== null) {
       const [, numDice, numSides, modifier] = match;
-      const diceCount = parseInt(numDice || '1');
-      const sides = parseInt(numSides || '6');
-      const mod = modifier ? parseInt(modifier) : 0;
+      const diceCount = parseInt(numDice || '1', 10);
+      const sides = parseInt(numSides || '6', 10);
+      const mod = modifier ? parseInt(modifier, 10) : 0;
 
       const rolls: number[] = [];
       for (let i = 0; i < diceCount; i++) {
@@ -586,6 +607,7 @@ export class FoundryClient {
       const rollSum = rolls.reduce((sum, roll) => sum + roll, 0) + mod;
       total += rollSum;
       breakdown.push(`${rolls.join(', ')}${mod !== 0 ? ` ${modifier}` : ''} = ${rollSum}`);
+      match = diceRegex.exec(formula);
     }
 
     const result: DiceRoll = {
@@ -594,7 +616,9 @@ export class FoundryClient {
       breakdown: breakdown.join(' | '),
       timestamp: new Date().toISOString(),
     };
-    if (reason) {result.reason = reason;}
+    if (reason) {
+      result.reason = reason;
+    }
     return result;
   }
 
@@ -640,9 +664,11 @@ export class FoundryClient {
           }
         }
 
-        if (attempt === maxAttempts) {throw lastError;}
+        if (attempt === maxAttempts) {
+          throw lastError;
+        }
 
-        const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+        const exponentialDelay = baseDelay * 2 ** (attempt - 1);
         const jitter = Math.random() * 0.1 * exponentialDelay;
         await new Promise((resolve) => setTimeout(resolve, exponentialDelay + jitter));
       }
@@ -655,11 +681,19 @@ export class FoundryClient {
     return this.executeWithRetry(() => this.http.get(url, config));
   }
 
-  async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  async post<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<T>> {
     return this.executeWithRetry(() => this.http.post(url, data, config));
   }
 
-  async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  async put<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<T>> {
     return this.executeWithRetry(() => this.http.put(url, data, config));
   }
 
@@ -690,7 +724,9 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
           value: typeof val.value === 'number' ? val.value : 10,
           mod: typeof val.mod === 'number' ? val.mod : 0,
         };
-        if (typeof val.save === 'number') {entry.save = val.save;}
+        if (typeof val.save === 'number') {
+          entry.save = val.save;
+        }
         mappedAbilities[key] = entry;
       }
     }
@@ -702,24 +738,36 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
     type: a.type,
   };
 
-  if (a.img) {actor.img = a.img;}
+  if (a.img) {
+    actor.img = a.img;
+  }
 
   if (hp) {
     const hpValue = typeof hp.value === 'number' ? hp.value : 0;
     const hpMax = typeof hp.max === 'number' ? hp.max : 0;
     const hpObj: { value: number; max: number; temp?: number } = { value: hpValue, max: hpMax };
-    if (typeof hp.temp === 'number') {hpObj.temp = hp.temp;}
+    if (typeof hp.temp === 'number') {
+      hpObj.temp = hp.temp;
+    }
     actor.hp = hpObj;
   }
 
-  if (ac && typeof ac.value === 'number') {actor.ac = { value: ac.value };}
+  if (ac && typeof ac.value === 'number') {
+    actor.ac = { value: ac.value };
+  }
 
-  if (typeof details.level === 'number') {actor.level = details.level;}
+  if (typeof details.level === 'number') {
+    actor.level = details.level;
+  }
 
-  if (mappedAbilities) {actor.abilities = mappedAbilities;}
+  if (mappedAbilities) {
+    actor.abilities = mappedAbilities;
+  }
 
   const bio = extractString(details, 'biography', 'value') || extractString(details, 'biography');
-  if (bio) {actor.biography = bio;}
+  if (bio) {
+    actor.biography = bio;
+  }
 
   return actor;
 }
@@ -738,9 +786,13 @@ function worldSceneToFoundry(s: WorldScene): FoundryScene {
     globalLight: s.globalLight,
     darkness: s.darkness,
   };
-  if (s.img) {scene.img = s.img;}
+  if (s.img) {
+    scene.img = s.img;
+  }
   const desc = (s.flags as Record<string, unknown>)?.description;
-  if (typeof desc === 'string') {scene.description = desc;}
+  if (typeof desc === 'string') {
+    scene.description = desc;
+  }
   return scene;
 }
 
@@ -751,10 +803,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function extractNested(
-  obj: Record<string, unknown>,
-  ...keys: string[]
-): unknown {
+function extractNested(obj: Record<string, unknown>, ...keys: string[]): unknown {
   let current: unknown = obj;
   for (const key of keys) {
     if (isRecord(current) && key in current) {
@@ -769,10 +818,7 @@ function extractNested(
 /**
  * Extracts a string from nested Record, following a chain of keys.
  */
-function extractString(
-  obj: Record<string, unknown>,
-  ...keys: string[]
-): string | null {
+function extractString(obj: Record<string, unknown>, ...keys: string[]): string | null {
   const val = extractNested(obj, ...keys);
   return typeof val === 'string' ? val : null;
 }

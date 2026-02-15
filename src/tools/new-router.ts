@@ -1,31 +1,30 @@
 /**
  * @fileoverview New tool routing implementation using registry pattern
- * 
+ *
  * This module provides a cleaner routing system that uses the tool registry
  * and eliminates the need for manual switch statements and validation.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../foundry/client.js';
-import { DiagnosticsClient } from '../diagnostics/client.js';
-import { DiagnosticSystem } from '../utils/diagnostics.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { DiagnosticsClient } from '../diagnostics/client.js';
+import type { FoundryClient } from '../foundry/client.js';
+import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
-import { toolRegistry } from './registry.js';
-import { ToolContext } from './base.js';
-
+import type { ToolContext } from './base.js';
 // Import legacy handlers for tools not yet converted
-import { handleSearchActors, handleGetActorDetails } from './handlers/actors.js';
-import { handleSearchItems } from './handlers/items.js';
-import { handleGetSceneInfo } from './handlers/scenes.js';
-import { handleGenerateNPC, handleGenerateLoot, handleLookupRule } from './handlers/generation.js';
-import { 
-  handleGetRecentLogs, 
-  handleSearchLogs, 
-  handleGetSystemHealth,
+import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
+import {
   handleDiagnoseErrors,
-  handleGetHealthStatus 
+  handleGetHealthStatus,
+  handleGetRecentLogs,
+  handleGetSystemHealth,
+  handleSearchLogs,
 } from './handlers/diagnostics.js';
+import { handleGenerateLoot, handleGenerateNPC, handleLookupRule } from './handlers/generation.js';
+import { handleSearchItems } from './handlers/items.js';
 import { handleReadResource } from './handlers/resources.js';
+import { handleGetSceneInfo } from './handlers/scenes.js';
+import { toolRegistry } from './registry.js';
 
 /**
  * Routes tool requests using the new registry system
@@ -35,7 +34,7 @@ export async function routeToolRequest(
   args: Record<string, unknown>,
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
-  diagnosticSystem: DiagnosticSystem
+  diagnosticSystem: DiagnosticSystem,
 ) {
   logger.debug(`Routing tool request: ${name}`, { args });
 
@@ -55,7 +54,7 @@ export async function routeToolRequest(
       }
       throw new McpError(
         ErrorCode.InternalError,
-        `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -73,7 +72,7 @@ async function routeLegacyTool(
   args: Record<string, unknown>,
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
-  diagnosticSystem: DiagnosticSystem
+  diagnosticSystem: DiagnosticSystem,
 ) {
   switch (name) {
     // Actor tools
@@ -95,9 +94,15 @@ async function routeLegacyTool(
 
     // Generation tools
     case 'generate_npc':
-      return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, foundryClient);
+      return handleGenerateNPC(
+        args as { level?: number; race?: string; class?: string },
+        foundryClient,
+      );
     case 'generate_loot':
-      return handleGenerateLoot(args as { challengeRating?: number; treasureType?: string }, foundryClient);
+      return handleGenerateLoot(
+        args as { challengeRating?: number; treasureType?: string },
+        foundryClient,
+      );
     case 'lookup_rule':
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
@@ -111,7 +116,10 @@ async function routeLegacyTool(
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleSearchLogs(args as { query: string; level?: string; limit?: number }, diagnosticsClient);
+      return handleSearchLogs(
+        args as { query: string; level?: string; limit?: number },
+        diagnosticsClient,
+      );
     case 'get_system_health':
       return handleGetSystemHealth(args, diagnosticsClient);
     case 'diagnose_errors':
@@ -130,7 +138,7 @@ async function routeLegacyTool(
 export async function routeResourceRequest(
   uri: string,
   foundryClient: FoundryClient,
-  diagnosticsClient: DiagnosticsClient
+  diagnosticsClient: DiagnosticsClient,
 ) {
   logger.debug(`Routing resource request: ${uri}`);
   return handleReadResource(uri, foundryClient, diagnosticsClient);

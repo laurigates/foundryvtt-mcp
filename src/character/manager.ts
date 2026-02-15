@@ -1,7 +1,7 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
+import type { FoundryClient } from '../foundry/client.js';
+import type { FoundryActor } from '../foundry/types.js';
 import { logger } from '../utils/logger.js';
-import { FoundryClient } from '../foundry/client.js';
-import { FoundryActor } from '../foundry/types.js';
 
 export interface CharacterAdvancement {
   actorId: string;
@@ -63,13 +63,16 @@ export class CharacterManager extends EventEmitter {
   }
 
   // Character Advancement
-  async levelUpCharacter(actorId: string, options: {
-    hitPointMethod?: 'roll' | 'average' | 'max';
-    abilityScoreImprovements?: Array<{ ability: string; increase: number }>;
-    newSpells?: string[];
-    newFeatures?: string[];
-    newSkills?: string[];
-  } = {}): Promise<CharacterAdvancement> {
+  async levelUpCharacter(
+    actorId: string,
+    options: {
+      hitPointMethod?: 'roll' | 'average' | 'max';
+      abilityScoreImprovements?: Array<{ ability: string; increase: number }>;
+      newSpells?: string[];
+      newFeatures?: string[];
+      newSkills?: string[];
+    } = {},
+  ): Promise<CharacterAdvancement> {
     logger.info(`Starting level up process for actor ${actorId}`);
 
     const actor = await this.foundryClient.getActor(actorId);
@@ -100,7 +103,7 @@ export class CharacterManager extends EventEmitter {
       newSpellsLearned: newSpells,
       newFeatures,
       skillProficiencies: newSkills,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.advancementHistory.push(advancement);
@@ -110,7 +113,10 @@ export class CharacterManager extends EventEmitter {
     return advancement;
   }
 
-  async calculateExperienceRequired(currentLevel: number, targetLevel?: number): Promise<{
+  async calculateExperienceRequired(
+    currentLevel: number,
+    targetLevel?: number,
+  ): Promise<{
     current: number;
     required: number;
     remaining: number;
@@ -118,31 +124,36 @@ export class CharacterManager extends EventEmitter {
   }> {
     // D&D 5e experience table
     const xpTable = [
-      0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
-      85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000
+      0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000,
+      165000, 195000, 225000, 265000, 305000, 355000,
     ];
 
     const currentXP = xpTable[Math.min(currentLevel - 1, xpTable.length - 1)] || 0;
     const target = targetLevel || currentLevel + 1;
-    const requiredXP = xpTable[Math.min(target - 1, xpTable.length - 1)] || xpTable[xpTable.length - 1];
-    const nextLevelXP = xpTable[Math.min(currentLevel, xpTable.length - 1)] || xpTable[xpTable.length - 1];
+    const requiredXP =
+      xpTable[Math.min(target - 1, xpTable.length - 1)] || xpTable[xpTable.length - 1];
+    const nextLevelXP =
+      xpTable[Math.min(currentLevel, xpTable.length - 1)] || xpTable[xpTable.length - 1];
 
     return {
       current: currentXP,
       required: requiredXP || 0,
       remaining: (requiredXP || 0) - currentXP,
-      nextMilestone: nextLevelXP || 0
+      nextMilestone: nextLevelXP || 0,
     };
   }
 
   // Equipment Management
-  async addItemToCharacter(actorId: string, itemData: {
-    name: string;
-    type: string;
-    quantity?: number;
-    properties?: Record<string, unknown>;
-    equipped?: boolean;
-  }): Promise<EquipmentTransaction> {
+  async addItemToCharacter(
+    actorId: string,
+    itemData: {
+      name: string;
+      type: string;
+      quantity?: number;
+      properties?: Record<string, unknown>;
+      equipped?: boolean;
+    },
+  ): Promise<EquipmentTransaction> {
     logger.info(`Adding ${itemData.name} to actor ${actorId}`);
 
     const transaction: EquipmentTransaction = {
@@ -151,7 +162,7 @@ export class CharacterManager extends EventEmitter {
       itemId: this.generateItemId(),
       itemName: itemData.name,
       quantity: itemData.quantity || 1,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.equipmentHistory.push(transaction);
@@ -166,7 +177,7 @@ export class CharacterManager extends EventEmitter {
       action: 'equip',
       itemId,
       itemName: 'Unknown Item', // Would be retrieved from actual item data
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.equipmentHistory.push(transaction);
@@ -176,7 +187,12 @@ export class CharacterManager extends EventEmitter {
     return transaction;
   }
 
-  async transferItem(fromActorId: string, toActorId: string, itemId: string, quantity?: number): Promise<EquipmentTransaction> {
+  async transferItem(
+    fromActorId: string,
+    toActorId: string,
+    itemId: string,
+    quantity?: number,
+  ): Promise<EquipmentTransaction> {
     const transaction: EquipmentTransaction = {
       actorId: fromActorId,
       action: 'transfer',
@@ -184,7 +200,7 @@ export class CharacterManager extends EventEmitter {
       itemName: 'Unknown Item',
       quantity: quantity || 1,
       targetActorId: toActorId,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.equipmentHistory.push(transaction);
@@ -195,18 +211,22 @@ export class CharacterManager extends EventEmitter {
   }
 
   // Resource Management
-  async trackResource(actorId: string, resourceName: string, config: {
-    maxValue: number;
-    currentValue?: number;
-    resetType: 'short_rest' | 'long_rest' | 'daily' | 'manual';
-  }): Promise<ResourceManagement> {
+  async trackResource(
+    actorId: string,
+    resourceName: string,
+    config: {
+      maxValue: number;
+      currentValue?: number;
+      resetType: 'short_rest' | 'long_rest' | 'daily' | 'manual';
+    },
+  ): Promise<ResourceManagement> {
     const resource: ResourceManagement = {
       actorId,
       resource: resourceName,
       maxValue: config.maxValue,
       currentValue: config.currentValue ?? config.maxValue,
       resetType: config.resetType,
-      lastReset: new Date()
+      lastReset: new Date(),
     };
 
     if (!this.resourceTracking.has(actorId)) {
@@ -217,7 +237,7 @@ export class CharacterManager extends EventEmitter {
     if (!resources) {
       throw new Error(`Resources not found for actor ${actorId}`);
     }
-    const existingIndex = resources.findIndex(r => r.resource === resourceName);
+    const existingIndex = resources.findIndex((r) => r.resource === resourceName);
 
     if (existingIndex >= 0) {
       resources[existingIndex] = resource;
@@ -229,13 +249,17 @@ export class CharacterManager extends EventEmitter {
     return resource;
   }
 
-  async useResource(actorId: string, resourceName: string, amount: number = 1): Promise<ResourceManagement | null> {
+  async useResource(
+    actorId: string,
+    resourceName: string,
+    amount: number = 1,
+  ): Promise<ResourceManagement | null> {
     const resources = this.resourceTracking.get(actorId);
     if (!resources) {
       return null;
     }
 
-    const resource = resources.find(r => r.resource === resourceName);
+    const resource = resources.find((r) => r.resource === resourceName);
     if (!resource) {
       return null;
     }
@@ -243,33 +267,32 @@ export class CharacterManager extends EventEmitter {
     if (resource.currentValue >= amount) {
       resource.currentValue -= amount;
       this.emit('resource_used', { resource, amountUsed: amount });
-      logger.info(`${actorId} used ${amount} ${resourceName} (${resource.currentValue}/${resource.maxValue} remaining)`);
+      logger.info(
+        `${actorId} used ${amount} ${resourceName} (${resource.currentValue}/${resource.maxValue} remaining)`,
+      );
     } else {
-      logger.warn(`${actorId} attempted to use ${amount} ${resourceName} but only has ${resource.currentValue}`);
+      logger.warn(
+        `${actorId} attempted to use ${amount} ${resourceName} but only has ${resource.currentValue}`,
+      );
     }
 
     return resource;
   }
 
-  async restoreResources(actorId: string, restType: 'short_rest' | 'long_rest'): Promise<ResourceManagement[]> {
+  async restoreResources(
+    actorId: string,
+    restType: 'short_rest' | 'long_rest',
+  ): Promise<ResourceManagement[]> {
     const resources = this.resourceTracking.get(actorId) || [];
     const restoredResources: ResourceManagement[] = [];
 
     // Process resource restoration
     for (const resource of resources) {
-      if ((restType === 'short_rest' && resource.resetType === 'short_rest') ||
-          (restType === 'long_rest' && (resource.resetType === 'long_rest' || resource.resetType === 'short_rest'))) {
-        resource.currentValue = resource.maxValue;
-        resource.lastReset = new Date();
-        restoredResources.push(resource);
-      }
-    }
-
-    return restoredResources;
-
-    for (const resource of resources) {
-      if (resource.resetType === restType ||
-          (restType === 'long_rest' && resource.resetType === 'short_rest')) {
+      if (
+        (restType === 'short_rest' && resource.resetType === 'short_rest') ||
+        (restType === 'long_rest' &&
+          (resource.resetType === 'long_rest' || resource.resetType === 'short_rest'))
+      ) {
         resource.currentValue = resource.maxValue;
         resource.lastReset = new Date();
         restoredResources.push(resource);
@@ -278,12 +301,16 @@ export class CharacterManager extends EventEmitter {
 
     if (restoredResources.length > 0) {
       this.emit('resources_restored', { actorId, restType, resources: restoredResources });
-      logger.info(`Restored ${restoredResources.length} resources for ${actorId} after ${restType} rest`);
+      logger.info(
+        `Restored ${restoredResources.length} resources for ${actorId} after ${restType} rest`,
+      );
     }
+
+    return restoredResources;
   }
 
   // Helper methods for the character advancement system
-  private calculateHitPointGain(actor: FoundryActor, method: 'roll' | 'average' | 'max'): number {
+  private calculateHitPointGain(_actor: FoundryActor, method: 'roll' | 'average' | 'max'): number {
     const hitDie = 8; // Default d8, would be determined by class
     switch (method) {
       case 'roll':
@@ -297,9 +324,14 @@ export class CharacterManager extends EventEmitter {
     }
   }
 
-  private suggestAbilityImprovements(_actor: FoundryActor): Array<{ ability: string; increase: number }> {
+  private suggestAbilityImprovements(
+    _actor: FoundryActor,
+  ): Array<{ ability: string; increase: number }> {
     // Simple suggestion logic - would be more sophisticated in practice
-    return [{ ability: 'strength', increase: 1 }, { ability: 'constitution', increase: 1 }];
+    return [
+      { ability: 'strength', increase: 1 },
+      { ability: 'constitution', increase: 1 },
+    ];
   }
 
   private determineNewSpells(_actor: FoundryActor, _level: number): string[] {

@@ -120,15 +120,15 @@ install-playwright:
 
 ########## Quality ##########
 
-# Run ESLint on source code
+# Run Biome linter on source code
 [group: "quality"]
 lint *args:
     bun run lint {{ args }}
 
-# Run ESLint with auto-fix
+# Run Biome linter with auto-fix
 [group: "quality"]
 lint-fix:
-    bunx eslint src --ext .ts --fix
+    bun run lint:fix
 
 # Run TypeScript type checking
 [group: "quality"]
@@ -145,6 +145,11 @@ qa: lint check-types test
 [group: "docs"]
 docs:
     bun run docs
+
+# Validate documentation without generating output
+[group: "docs"]
+docs-check:
+    bun run docs:check
 
 # Generate and serve documentation locally
 [group: "docs"]

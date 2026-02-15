@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
+import type { FoundryClient } from '../foundry/client.js';
 import { logger } from '../utils/logger.js';
-import { FoundryClient } from '../foundry/client.js';
 
 export interface CombatState {
   id: string;
@@ -40,19 +40,27 @@ export interface CombatantState {
 }
 
 export interface CombatEvent {
-  type: 'combat_start' | 'combat_end' | 'turn_start' | 'turn_end' | 'round_start' | 'round_end' | 'damage_dealt' | 'condition_applied' | 'initiative_changed';
+  type:
+    | 'combat_start'
+    | 'combat_end'
+    | 'turn_start'
+    | 'turn_end'
+    | 'round_start'
+    | 'round_end'
+    | 'damage_dealt'
+    | 'condition_applied'
+    | 'initiative_changed';
   timestamp: Date;
   combat: CombatState;
   data?: unknown;
 }
 
 export class CombatManager extends EventEmitter {
+  private readonly foundryClient: FoundryClient;
   private currentCombat: CombatState | null = null;
-  private foundryClient: FoundryClient;
   private combatHistory: CombatEvent[] = [];
   private turnTimer: NodeJS.Timeout | undefined;
   private readonly TURN_WARNING_TIME = 30000; // 30 seconds
-  private readonly MAX_TURN_TIME = 120000; // 2 minutes
 
   constructor(foundryClient: FoundryClient) {
     super();
@@ -120,7 +128,7 @@ export class CombatManager extends EventEmitter {
 
     const results: { [key: string]: number } = {};
     const combatants = combatantId
-      ? this.currentCombat.combatants.filter(c => c.id === combatantId)
+      ? this.currentCombat.combatants.filter((c) => c.id === combatantId)
       : this.currentCombat.combatants;
 
     for (const combatant of combatants) {
@@ -168,7 +176,7 @@ export class CombatManager extends EventEmitter {
       this.emitCombatEvent('round_end', this.currentCombat);
 
       // Reset turn actions for all combatants
-      this.currentCombat.combatants.forEach(c => {
+      this.currentCombat.combatants.forEach((c) => {
         c.turnTaken = false;
         c.actions = {
           action: false,
@@ -195,12 +203,16 @@ export class CombatManager extends EventEmitter {
     return this.currentCombat.currentCombatant || null;
   }
 
-  async applyDamage(combatantId: string, damage: number, damageType?: string): Promise<CombatantState> {
+  async applyDamage(
+    combatantId: string,
+    damage: number,
+    damageType?: string,
+  ): Promise<CombatantState> {
     if (!this.currentCombat) {
       throw new Error('No active combat');
     }
 
-    const combatant = this.currentCombat.combatants.find(c => c.id === combatantId);
+    const combatant = this.currentCombat.combatants.find((c) => c.id === combatantId);
     if (!combatant) {
       throw new Error(`Combatant ${combatantId} not found`);
     }
@@ -225,10 +237,12 @@ export class CombatManager extends EventEmitter {
       damage,
       damageType,
       newHP: combatant.hp.current,
-      defeated: combatant.defeated
+      defeated: combatant.defeated,
     });
 
-    logger.info(`${combatant.name} took ${damage} ${damageType || 'damage'}, HP: ${combatant.hp.current}/${combatant.hp.max}`);
+    logger.info(
+      `${combatant.name} took ${damage} ${damageType || 'damage'}, HP: ${combatant.hp.current}/${combatant.hp.max}`,
+    );
 
     return combatant;
   }
@@ -238,7 +252,7 @@ export class CombatManager extends EventEmitter {
       throw new Error('No active combat');
     }
 
-    const combatant = this.currentCombat.combatants.find(c => c.id === combatantId);
+    const combatant = this.currentCombat.combatants.find((c) => c.id === combatantId);
     if (!combatant) {
       throw new Error(`Combatant ${combatantId} not found`);
     }
@@ -249,17 +263,23 @@ export class CombatManager extends EventEmitter {
       combatant.defeated = false;
     }
 
-    logger.info(`${combatant.name} healed for ${healing}, HP: ${combatant.hp.current}/${combatant.hp.max}`);
+    logger.info(
+      `${combatant.name} healed for ${healing}, HP: ${combatant.hp.current}/${combatant.hp.max}`,
+    );
 
     return combatant;
   }
 
-  async applyCondition(combatantId: string, condition: string, duration?: number): Promise<CombatantState> {
+  async applyCondition(
+    combatantId: string,
+    condition: string,
+    duration?: number,
+  ): Promise<CombatantState> {
     if (!this.currentCombat) {
       throw new Error('No active combat');
     }
 
-    const combatant = this.currentCombat.combatants.find(c => c.id === combatantId);
+    const combatant = this.currentCombat.combatants.find((c) => c.id === combatantId);
     if (!combatant) {
       throw new Error(`Combatant ${combatantId} not found`);
     }
@@ -270,7 +290,7 @@ export class CombatManager extends EventEmitter {
       this.emitCombatEvent('condition_applied', this.currentCombat, {
         combatantId,
         condition,
-        duration
+        duration,
       });
 
       logger.info(`Applied ${condition} to ${combatant.name}`);
@@ -284,7 +304,7 @@ export class CombatManager extends EventEmitter {
       throw new Error('No active combat');
     }
 
-    const combatant = this.currentCombat.combatants.find(c => c.id === combatantId);
+    const combatant = this.currentCombat.combatants.find((c) => c.id === combatantId);
     if (!combatant) {
       throw new Error(`Combatant ${combatantId} not found`);
     }
@@ -326,7 +346,9 @@ export class CombatManager extends EventEmitter {
   private handleTurnStart(event: CombatEvent): void {
     const combatant = event.combat.currentCombatant;
     if (combatant) {
-      logger.info(`Turn ${event.combat.turn + 1}, Round ${event.combat.round}: ${combatant.name}'s turn`);
+      logger.info(
+        `Turn ${event.combat.turn + 1}, Round ${event.combat.round}: ${combatant.name}'s turn`,
+      );
 
       // Set turn timer
       this.turnTimer = setTimeout(() => {
@@ -348,7 +370,9 @@ export class CombatManager extends EventEmitter {
   }
 
   // Helper Methods
-  private async initializeCombatants(combatantData: Partial<CombatantState>[]): Promise<CombatantState[]> {
+  private async initializeCombatants(
+    combatantData: Partial<CombatantState>[],
+  ): Promise<CombatantState[]> {
     const combatants: CombatantState[] = [];
 
     for (const data of combatantData) {
@@ -369,7 +393,7 @@ export class CombatManager extends EventEmitter {
           bonus: false,
           movement: 0,
           reaction: false,
-        }
+        },
       };
 
       combatants.push(combatant);
@@ -397,7 +421,7 @@ export class CombatManager extends EventEmitter {
       type,
       timestamp: new Date(),
       combat: { ...combat }, // Deep copy to prevent mutations
-      data
+      data,
     };
 
     this.combatHistory.push(event);
@@ -429,22 +453,23 @@ export class CombatManager extends EventEmitter {
 
     const stats = {
       totalRounds: this.currentCombat.round,
-      totalTurns: this.currentCombat.round * this.currentCombat.combatants.length + this.currentCombat.turn,
+      totalTurns:
+        this.currentCombat.round * this.currentCombat.combatants.length + this.currentCombat.turn,
       averageTurnTime: this.calculateAverageTurnTime(),
-      combatants: this.currentCombat.combatants.map(c => ({
+      combatants: this.currentCombat.combatants.map((c) => ({
         name: c.name,
         initiative: c.initiative || 0,
         hp: { current: c.hp.current, max: c.hp.max },
-        status: c.conditions
+        status: c.conditions,
       })),
-      activeEffects: this.currentCombat.combatants.reduce((acc, c) => acc + c.conditions.length, 0)
+      activeEffects: this.currentCombat.combatants.reduce((acc, c) => acc + c.conditions.length, 0),
     };
 
     return stats;
   }
 
   private calculateAverageTurnTime(): number {
-    const turnEvents = this.combatHistory.filter(e => e.type === 'turn_start');
+    const turnEvents = this.combatHistory.filter((e) => e.type === 'turn_start');
     if (turnEvents.length < 2) {
       return 0;
     }
@@ -466,7 +491,7 @@ export class CombatManager extends EventEmitter {
       return ['No active combat'];
     }
 
-    const combatant = this.currentCombat.combatants.find(c => c.id === combatantId);
+    const combatant = this.currentCombat.combatants.find((c) => c.id === combatantId);
     if (!combatant) {
       return ['Combatant not found'];
     }
@@ -502,10 +527,14 @@ export class CombatManager extends EventEmitter {
     }
 
     // Enemy analysis
-    const enemies = this.currentCombat.combatants.filter(c => c.id !== combatantId && !c.defeated);
-    const lowHpEnemies = enemies.filter(e => (e.hp.current / e.hp.max) < 0.3);
+    const enemies = this.currentCombat.combatants.filter(
+      (c) => c.id !== combatantId && !c.defeated,
+    );
+    const lowHpEnemies = enemies.filter((e) => e.hp.current / e.hp.max < 0.3);
     if (lowHpEnemies.length > 0) {
-      suggestions.push(`Focus fire on low HP enemies: ${lowHpEnemies.map(e => e.name).join(', ')}`);
+      suggestions.push(
+        `Focus fire on low HP enemies: ${lowHpEnemies.map((e) => e.name).join(', ')}`,
+      );
     }
 
     if (suggestions.length === 0) {

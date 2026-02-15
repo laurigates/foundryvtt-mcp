@@ -43,11 +43,7 @@ async function getSessionCookie(baseUrl: string): Promise<string> {
  * returns it directly. Otherwise, connects via Socket.IO and emits getJoinData
  * to look up the _id by display name.
  */
-async function resolveUserId(
-  baseUrl: string,
-  user: string,
-  session: string,
-): Promise<string> {
+async function resolveUserId(baseUrl: string, user: string, session: string): Promise<string> {
   // FoundryVTT document IDs are 16-character alphanumeric strings
   if (/^[a-zA-Z0-9]{16}$/.test(user)) {
     logger.debug('User identifier is already a document _id', { userId: user });
@@ -83,14 +79,10 @@ async function resolveUserId(
           return reject(new Error('getJoinData returned no users'));
         }
 
-        const found = data.users.find(
-          (u) => u.name.toLowerCase() === user.toLowerCase(),
-        );
+        const found = data.users.find((u) => u.name.toLowerCase() === user.toLowerCase());
         if (!found) {
           const available = data.users.map((u) => u.name).join(', ');
-          return reject(
-            new Error(`User "${user}" not found. Available users: ${available}`),
-          );
+          return reject(new Error(`User "${user}" not found. Available users: ${available}`));
         }
 
         logger.debug('Resolved user document _id', { displayName: user, _id: found._id });

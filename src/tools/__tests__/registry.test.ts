@@ -2,13 +2,13 @@
  * @fileoverview Tests for the new tool registry system
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { toolRegistry } from '../registry.js';
-import { RollDiceTool } from '../handlers/dice.js';
-import type { ToolContext } from '../base.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
+import type { ToolContext } from '../base.js';
+import { RollDiceTool } from '../handlers/dice.js';
+import { toolRegistry } from '../registry.js';
 
 describe('Tool Registry', () => {
   let mockContext: ToolContext;
@@ -35,8 +35,8 @@ describe('Tool Registry', () => {
 
     it('should return tool definitions', () => {
       const definitions = toolRegistry.getToolDefinitions();
-      const rollDiceDefinition = definitions.find(d => d.name === 'roll_dice');
-      
+      const rollDiceDefinition = definitions.find((d) => d.name === 'roll_dice');
+
       expect(rollDiceDefinition).toBeDefined();
       expect(rollDiceDefinition?.description).toContain('Roll dice');
       expect(rollDiceDefinition?.inputSchema).toBeDefined();
@@ -50,10 +50,14 @@ describe('Tool Registry', () => {
 
   describe('Tool Execution', () => {
     it('should execute roll_dice tool with valid parameters', async () => {
-      const result = await toolRegistry.execute('roll_dice', {
-        formula: '1d20+5',
-        reason: 'attack roll'
-      }, mockContext);
+      const result = await toolRegistry.execute(
+        'roll_dice',
+        {
+          formula: '1d20+5',
+          reason: 'attack roll',
+        },
+        mockContext,
+      );
 
       expect(result).toBeDefined();
       expect(result.content).toBeDefined();
@@ -64,23 +68,27 @@ describe('Tool Registry', () => {
     });
 
     it('should validate parameters and throw error for missing formula', async () => {
-      await expect(
-        toolRegistry.execute('roll_dice', {}, mockContext)
-      ).rejects.toThrow('Invalid parameters');
+      await expect(toolRegistry.execute('roll_dice', {}, mockContext)).rejects.toThrow(
+        'Invalid parameters',
+      );
     });
 
     it('should validate parameters and throw error for wrong type', async () => {
       await expect(
-        toolRegistry.execute('roll_dice', {
-          formula: 123 // should be string
-        }, mockContext)
+        toolRegistry.execute(
+          'roll_dice',
+          {
+            formula: 123, // should be string
+          },
+          mockContext,
+        ),
       ).rejects.toThrow('Invalid parameters');
     });
 
     it('should throw error for unknown tool', async () => {
-      await expect(
-        toolRegistry.execute('unknown_tool', {}, mockContext)
-      ).rejects.toThrow('Unknown tool');
+      await expect(toolRegistry.execute('unknown_tool', {}, mockContext)).rejects.toThrow(
+        'Unknown tool',
+      );
     });
   });
 

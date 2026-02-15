@@ -1,17 +1,17 @@
 /**
  * @fileoverview Tests for DiagnosticsClient
- * 
+ *
  * Unit tests for the DiagnosticsClient class that handles communication
  * with FoundryVTT's diagnostic API endpoints.
- * 
+ *
  * @version 0.1.0
  * @author FoundryVTT MCP Team
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FoundryClient } from '../../foundry/client.js';
 import { DiagnosticsClient } from '../client.js';
-import { FoundryClient } from '../../foundry/client.js';
-import type { LogEntry, SystemHealth, ErrorDiagnosis, LogPatternSearchParams } from '../types.js';
+import type { ErrorDiagnosis, LogEntry, LogPatternSearchParams, SystemHealth } from '../types.js';
 
 // Mock the FoundryClient
 vi.mock('../../foundry/client.js');
@@ -84,7 +84,7 @@ describe('DiagnosticsClient', () => {
       });
 
       expect(mockFoundryClient.get).toHaveBeenCalledWith(
-        '/api/diagnostics/logs?lines=100&level=error&since=2024-01-01T00%3A00%3A00.000Z&source=module&includeStack=true'
+        '/api/diagnostics/logs?lines=100&level=error&since=2024-01-01T00%3A00%3A00.000Z&source=module&includeStack=true',
       );
     });
 
@@ -93,7 +93,7 @@ describe('DiagnosticsClient', () => {
       mockFoundryClient.get.mockRejectedValue(error);
 
       await expect(diagnosticsClient.getRecentLogs()).rejects.toThrow(
-        'Failed to retrieve recent logs: API Error'
+        'Failed to retrieve recent logs: API Error',
       );
     });
   });
@@ -121,7 +121,7 @@ describe('DiagnosticsClient', () => {
       const result = await diagnosticsClient.searchLogs({ pattern: 'TypeError' });
 
       expect(mockFoundryClient.get).toHaveBeenCalledWith(
-        '/api/diagnostics/search?pattern=TypeError'
+        '/api/diagnostics/search?pattern=TypeError',
       );
       expect(result.matches).toBe(1);
       expect(result.logs[0].message).toContain('TypeError');
@@ -147,14 +147,14 @@ describe('DiagnosticsClient', () => {
       });
 
       expect(mockFoundryClient.get).toHaveBeenCalledWith(
-        '/api/diagnostics/search?pattern=Error&timeframe=3600&level=error&caseSensitive=true'
+        '/api/diagnostics/search?pattern=Error&timeframe=3600&level=error&caseSensitive=true',
       );
     });
 
     it('should throw error when pattern is missing', async () => {
-      await expect(
-        diagnosticsClient.searchLogs({} as LogPatternSearchParams)
-      ).rejects.toThrow('Failed to search logs');
+      await expect(diagnosticsClient.searchLogs({} as LogPatternSearchParams)).rejects.toThrow(
+        'Failed to search logs',
+      );
     });
   });
 
@@ -210,7 +210,7 @@ describe('DiagnosticsClient', () => {
       mockFoundryClient.get.mockRejectedValue(new Error('Server Error'));
 
       await expect(diagnosticsClient.getSystemHealth()).rejects.toThrow(
-        'Failed to retrieve system health: Server Error'
+        'Failed to retrieve system health: Server Error',
       );
     });
   });
@@ -250,9 +250,7 @@ describe('DiagnosticsClient', () => {
 
       const result = await diagnosticsClient.diagnoseErrors(3600);
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith(
-        '/api/diagnostics/errors?timeframe=3600'
-      );
+      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
       expect(result.healthScore).toBe(75);
       expect(result.summary.totalErrors).toBe(5);
       expect(result.suggestions).toHaveLength(1);
@@ -272,9 +270,7 @@ describe('DiagnosticsClient', () => {
 
       await diagnosticsClient.diagnoseErrors();
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith(
-        '/api/diagnostics/errors?timeframe=3600'
-      );
+      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
     });
   });
 
