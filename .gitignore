@@ -111,3 +111,5 @@ data/
 # Test files
 test-results/
 playwright-report/
+.env.integration
+tests/integration/logs/
