@@ -1,0 +1,71 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create .env.integration
+        run: |
+          cat > .env.integration <<EOF
+          FOUNDRY_LICENSE_KEY=${{ secrets.FOUNDRY_LICENSE_KEY }}
+          FOUNDRY_USERNAME=${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD=${{ secrets.FOUNDRY_PASSWORD }}
+          FOUNDRY_URL=http://localhost:30001
+          EOF
+
+      - name: Start FoundryVTT container
+        run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for container health
+        run: |
+          echo "Waiting for FoundryVTT to be healthy..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.test.yml ps | grep -q "healthy"; do sleep 5; done'
+          echo "FoundryVTT is healthy"
+
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs
+          path: |
+            docker-compose.test.yml
+          retention-days: 7
+
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          mkdir -p tests/integration/logs
+          docker compose -f docker-compose.test.yml logs --no-color > tests/integration/logs/container.log 2>&1
+
+      - name: Upload collected logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: tests/integration/logs/
+          retention-days: 7
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v

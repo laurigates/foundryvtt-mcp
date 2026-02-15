@@ -1,0 +1,21 @@
+services:
+  fvtt-test:
+    image: felddy/foundryvtt:13
+    ports:
+      - "30001:30000"
+    environment:
+      - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
+      - FOUNDRY_ADMIN_KEY=integration-test-admin
+      - FOUNDRY_USERNAME=${FOUNDRY_USERNAME:-test-user}
+      - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD:-test-password}
+      - CONTAINER_PRESERVE_CONFIG=false
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    env_file:
+      - .env.integration
