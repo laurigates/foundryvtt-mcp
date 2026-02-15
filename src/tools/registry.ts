@@ -1,13 +1,13 @@
 /**
  * @fileoverview Tool registry for the new tool system
- * 
+ *
  * This module manages tool registration and provides a clean interface
  * for tool execution with automatic validation.
  */
 
-import { Tool, ToolContext, ToolResult } from './base.js';
-import { RollDiceTool } from './handlers/dice.js';
 import { logger } from '../utils/logger.js';
+import type { Tool, ToolContext, ToolResult } from './base.js';
+import { RollDiceTool } from './handlers/dice.js';
 
 /**
  * Tool registry manages all available tools
@@ -26,7 +26,7 @@ export class ToolRegistry {
     if (this.tools.has(tool.name)) {
       logger.warn(`Tool '${tool.name}' is already registered, replacing...`);
     }
-    
+
     this.tools.set(tool.name, tool);
     logger.debug(`Registered tool: ${tool.name}`);
   }
@@ -35,12 +35,12 @@ export class ToolRegistry {
    * Execute a tool by name with given arguments
    */
   async execute(
-    name: string, 
-    args: Record<string, unknown>, 
-    context: ToolContext
+    name: string,
+    args: Record<string, unknown>,
+    context: ToolContext,
   ): Promise<ToolResult> {
     const tool = this.tools.get(name);
-    
+
     if (!tool) {
       throw new Error(`Unknown tool: ${name}`);
     }
@@ -63,7 +63,7 @@ export class ToolRegistry {
     description: string;
     inputSchema: object;
   }> {
-    return Array.from(this.tools.values()).map(tool => ({
+    return Array.from(this.tools.values()).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,

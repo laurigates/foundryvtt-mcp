@@ -48,16 +48,22 @@ export interface FoundryActor {
     value: number;
   };
   attributes?: Record<string, unknown>;
-  abilities?: Record<string, {
-    value: number;
-    mod: number;
-    save?: number;
-  }>;
-  skills?: Record<string, {
-    value: number;
-    mod: number;
-    proficient?: boolean;
-  }>;
+  abilities?: Record<
+    string,
+    {
+      value: number;
+      mod: number;
+      save?: number;
+    }
+  >;
+  skills?: Record<
+    string,
+    {
+      value: number;
+      mod: number;
+      proficient?: boolean;
+    }
+  >;
   level?: number;
   experience?: {
     value: number;

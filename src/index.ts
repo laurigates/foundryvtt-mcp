@@ -25,12 +25,17 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
-import { FoundryClient, FoundryClientConfig } from './foundry/client.js';
+import { config } from './config/index.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
+import { FoundryClient, type FoundryClientConfig } from './foundry/client.js';
+import {
+  getAllResources,
+  getAllTools,
+  routeResourceRequest,
+  routeToolRequest,
+} from './tools/index.js';
 import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
-import { config } from './config/index.js';
-import { getAllTools, getAllResources, routeToolRequest, routeResourceRequest } from './tools/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -60,7 +65,7 @@ class FoundryMCPServer {
           resources: {},
           tools: {},
         },
-      }
+      },
     );
 
     // Initialize FoundryVTT client with configuration
@@ -71,10 +76,18 @@ class FoundryMCPServer {
       retryAttempts: config.foundry.retryAttempts,
       retryDelay: config.foundry.retryDelay,
     };
-    if (config.foundry.apiKey) {clientConfig.apiKey = config.foundry.apiKey;}
-    if (config.foundry.username) {clientConfig.username = config.foundry.username;}
-    if (config.foundry.password) {clientConfig.password = config.foundry.password;}
-    if (config.foundry.userId) {clientConfig.userId = config.foundry.userId;}
+    if (config.foundry.apiKey) {
+      clientConfig.apiKey = config.foundry.apiKey;
+    }
+    if (config.foundry.username) {
+      clientConfig.username = config.foundry.username;
+    }
+    if (config.foundry.password) {
+      clientConfig.password = config.foundry.password;
+    }
+    if (config.foundry.userId) {
+      clientConfig.userId = config.foundry.userId;
+    }
     this.foundryClient = new FoundryClient(clientConfig);
 
     // Initialize DiagnosticsClient
@@ -118,18 +131,18 @@ class FoundryMCPServer {
           args || {},
           this.foundryClient,
           this.diagnosticsClient,
-          this.diagnosticSystem
+          this.diagnosticSystem,
         );
       } catch (error) {
         logger.error('Tool execution failed:', error);
-        
+
         if (error instanceof McpError) {
           throw error;
         }
-        
+
         throw new McpError(
           ErrorCode.InternalError,
-          `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     });
@@ -143,14 +156,14 @@ class FoundryMCPServer {
         return await routeResourceRequest(uri, this.foundryClient, this.diagnosticsClient);
       } catch (error) {
         logger.error('Resource read failed:', error);
-        
+
         if (error instanceof McpError) {
           throw error;
         }
-        
+
         throw new McpError(
           ErrorCode.InternalError,
-          `Resource read failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Resource read failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     });

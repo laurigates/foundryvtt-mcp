@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 vi.mock('axios');
 vi.mock('socket.io-client');
 vi.mock('../auth.js', () => ({
-  authenticateFoundry: vi.fn().mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+  authenticateFoundry: vi
+    .fn()
+    .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
 }));
 vi.mock('../../utils/logger.js', () => ({
   logger: {
@@ -91,7 +93,9 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get.mockResolvedValue({ data: mockData });
 
       const result = await client.searchActors({ query: 'Hero' });
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', { params: { query: 'Hero' } });
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
+        params: { query: 'Hero' },
+      });
       expect(result.actors).toEqual(mockData.actors);
     });
 

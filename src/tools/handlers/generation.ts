@@ -1,21 +1,24 @@
 /**
  * @fileoverview Content generation tool handlers
- * 
+ *
  * Handles NPC generation, loot generation, and rule lookups.
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 /**
  * Handles NPC generation requests
  */
-export async function handleGenerateNPC(args: {
-  level?: number;
-  race?: string;
-  class?: string;
-}, _foundryClient: FoundryClient) {
+export async function handleGenerateNPC(
+  args: {
+    level?: number;
+    race?: string;
+    class?: string;
+  },
+  _foundryClient: FoundryClient,
+) {
   const { level = 1, race, class: characterClass } = args;
 
   try {
@@ -51,7 +54,7 @@ export async function handleGenerateNPC(args: {
     logger.error('Failed to generate NPC:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to generate NPC: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to generate NPC: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -59,10 +62,13 @@ export async function handleGenerateNPC(args: {
 /**
  * Handles loot generation requests
  */
-export async function handleGenerateLoot(args: {
-  challengeRating?: number;
-  treasureType?: string;
-}, _foundryClient: FoundryClient) {
+export async function handleGenerateLoot(
+  args: {
+    challengeRating?: number;
+    treasureType?: string;
+  },
+  _foundryClient: FoundryClient,
+) {
   const { challengeRating = 1, treasureType = 'individual' } = args;
 
   try {
@@ -79,10 +85,10 @@ export async function handleGenerateLoot(args: {
 **Treasure Type:** ${treasureType}
 
 **Currency:**
-${loot.currency.map(c => `- ${c.amount} ${c.type}`).join('\n')}
+${loot.currency.map((c) => `- ${c.amount} ${c.type}`).join('\n')}
 
 **Items:**
-${loot.items.map(item => `- ${item.name} (${item.rarity})`).join('\n')}
+${loot.items.map((item) => `- ${item.name} (${item.rarity})`).join('\n')}
 
 **Total Estimated Value:** ${loot.totalValue} gp`,
         },
@@ -92,7 +98,7 @@ ${loot.items.map(item => `- ${item.name} (${item.rarity})`).join('\n')}
     logger.error('Failed to generate loot:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to generate loot: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to generate loot: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -100,10 +106,13 @@ ${loot.items.map(item => `- ${item.name} (${item.rarity})`).join('\n')}
 /**
  * Handles rule lookup requests
  */
-export async function handleLookupRule(args: {
-  query: string;
-  system?: string;
-}, _foundryClient: FoundryClient) {
+export async function handleLookupRule(
+  args: {
+    query: string;
+    system?: string;
+  },
+  _foundryClient: FoundryClient,
+) {
   const { query, system = 'D&D 5e' } = args;
 
   if (!query || typeof query !== 'string') {
@@ -135,7 +144,7 @@ export async function handleLookupRule(args: {
     logger.error('Failed to lookup rule:', error);
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to lookup rule: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to lookup rule: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -143,19 +152,64 @@ export async function handleLookupRule(args: {
 // Helper functions for content generation
 
 function generateRandomName(): string {
-  const firstNames = ['Aerdrie', 'Berris', 'Cithreth', 'Drannor', 'Enna', 'Galinndan', 'Halimath', 'Immeral', 'Jallarzi', 'Keth'];
-  const lastNames = ['Amakir', 'Amakiir', 'Galanodel', 'Holimion', 'Liadon', 'Meliamne', 'Nailo', 'Siannodel', 'Xiloscient', 'Yellowleaf'];
-  
+  const firstNames = [
+    'Aerdrie',
+    'Berris',
+    'Cithreth',
+    'Drannor',
+    'Enna',
+    'Galinndan',
+    'Halimath',
+    'Immeral',
+    'Jallarzi',
+    'Keth',
+  ];
+  const lastNames = [
+    'Amakir',
+    'Amakiir',
+    'Galanodel',
+    'Holimion',
+    'Liadon',
+    'Meliamne',
+    'Nailo',
+    'Siannodel',
+    'Xiloscient',
+    'Yellowleaf',
+  ];
+
   return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
 }
 
 function getRandomRace(): string {
-  const races = ['Human', 'Elf', 'Dwarf', 'Halfling', 'Dragonborn', 'Gnome', 'Half-Elf', 'Half-Orc', 'Tiefling'];
+  const races = [
+    'Human',
+    'Elf',
+    'Dwarf',
+    'Halfling',
+    'Dragonborn',
+    'Gnome',
+    'Half-Elf',
+    'Half-Orc',
+    'Tiefling',
+  ];
   return races[Math.floor(Math.random() * races.length)] || 'Human';
 }
 
 function getRandomClass(): string {
-  const classes = ['Fighter', 'Wizard', 'Cleric', 'Rogue', 'Ranger', 'Paladin', 'Barbarian', 'Bard', 'Druid', 'Monk', 'Sorcerer', 'Warlock'];
+  const classes = [
+    'Fighter',
+    'Wizard',
+    'Cleric',
+    'Rogue',
+    'Ranger',
+    'Paladin',
+    'Barbarian',
+    'Bard',
+    'Druid',
+    'Monk',
+    'Sorcerer',
+    'Warlock',
+  ];
   return classes[Math.floor(Math.random() * classes.length)] || 'Fighter';
 }
 
@@ -184,13 +238,16 @@ function generateBackground(race: string, characterClass: string): string {
     `A scholar turned adventurer after discovering an ancient mystery.`,
     `A protector of the innocent, dedicated to fighting against evil.`,
   ];
-  
-  return backgrounds[Math.floor(Math.random() * backgrounds.length)] || 'A mysterious wanderer with an unknown past.';
+
+  return (
+    backgrounds[Math.floor(Math.random() * backgrounds.length)] ||
+    'A mysterious wanderer with an unknown past.'
+  );
 }
 
 function generateLootForCR(cr: number, _type: string) {
   const baseValue = Math.floor(cr * 100 * (0.5 + Math.random()));
-  
+
   return {
     currency: [
       { amount: Math.floor(baseValue * 0.1), type: 'gp' as const },

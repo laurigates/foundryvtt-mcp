@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock process.env before importing the config
 const mockEnv = {
@@ -28,7 +28,7 @@ describe('Config', () => {
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
-    
+
     // Reset any cached config
     try {
       const { resetConfig } = await import('../index.js');
@@ -94,7 +94,7 @@ describe('Config', () => {
 
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
-      
+
       expect(() => config.foundry.url).toThrow();
     });
 
@@ -103,20 +103,20 @@ describe('Config', () => {
 
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
-      
+
       expect(() => config.foundry.url).toThrow('process.exit called');
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('should throw error when FOUNDRY_URL is invalid in test environment', async () => {
-      process.env = { 
+      process.env = {
         FOUNDRY_URL: 'invalid-url',
-        NODE_ENV: 'test'
+        NODE_ENV: 'test',
       };
 
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
-      
+
       expect(() => config.foundry.url).toThrow();
     });
 
@@ -124,24 +124,24 @@ describe('Config', () => {
       process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
         LOG_LEVEL: 'invalid-level',
-        NODE_ENV: 'test'
+        NODE_ENV: 'test',
       };
 
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
-      
+
       expect(() => config.logLevel).toThrow();
     });
 
     it('should throw error when NODE_ENV is invalid in test environment', async () => {
       process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
-        NODE_ENV: 'invalid-env'
+        NODE_ENV: 'invalid-env',
       };
 
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
-      
+
       expect(() => config.nodeEnv).toThrow();
     });
   });

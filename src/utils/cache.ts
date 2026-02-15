@@ -1,6 +1,6 @@
 /**
  * @fileoverview Caching utility with TTL (Time To Live) support
- * 
+ *
  * This module provides a simple in-memory cache with automatic expiration
  * and configurable size limits to improve performance for quasi-static data.
  */
@@ -59,7 +59,10 @@ export class CacheService {
       });
 
       // Clean up expired entries periodically
-      this.cleanupInterval = setInterval(() => this.cleanup(), Math.max(config.ttlSeconds * 1000 / 4, 30000));
+      this.cleanupInterval = setInterval(
+        () => this.cleanup(),
+        Math.max((config.ttlSeconds * 1000) / 4, 30000),
+      );
     }
   }
 
@@ -72,7 +75,7 @@ export class CacheService {
     }
 
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       logger.debug('Cache miss', { key });
@@ -91,7 +94,7 @@ export class CacheService {
     // Update access metadata
     entry.accessCount++;
     entry.lastAccessed = now;
-    
+
     this.stats.hits++;
     logger.debug('Cache hit', { key, accessCount: entry.accessCount });
     return entry.value;
@@ -151,11 +154,7 @@ export class CacheService {
   /**
    * Get or set a value using a factory function
    */
-  async getOrSet<T>(
-    key: string, 
-    factory: () => Promise<T>, 
-    customTtlSeconds?: number
-  ): Promise<T> {
+  async getOrSet<T>(key: string, factory: () => Promise<T>, customTtlSeconds?: number): Promise<T> {
     if (!this.config.enabled) {
       return await factory();
     }
@@ -228,9 +227,9 @@ export class CacheService {
     }
 
     if (cleaned > 0) {
-      logger.debug('Cache cleanup completed', { 
-        cleaned, 
-        remaining: this.cache.size 
+      logger.debug('Cache cleanup completed', {
+        cleaned,
+        remaining: this.cache.size,
       });
     }
   }
@@ -253,9 +252,9 @@ export class CacheService {
     if (lruKey) {
       this.cache.delete(lruKey);
       this.stats.evictions++;
-      logger.debug('Cache evicted LRU entry', { 
-        key: lruKey, 
-        age: Date.now() - lruTime 
+      logger.debug('Cache evicted LRU entry', {
+        key: lruKey,
+        age: Date.now() - lruTime,
       });
     }
   }

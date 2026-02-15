@@ -1,14 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type {
+  DiceRoll,
   FoundryActor,
+  FoundryAPIResponse,
+  FoundryCombat,
   FoundryItem,
   FoundryScene,
-  FoundryCombat,
   FoundryUser,
-  FoundryAPIResponse,
-  DiceRoll,
-  GeneratedNPC,
   GeneratedLocation,
+  GeneratedNPC,
   GeneratedQuest,
 } from '../types';
 

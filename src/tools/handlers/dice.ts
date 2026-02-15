@@ -1,16 +1,16 @@
 /**
  * @fileoverview Dice rolling tool handlers
- * 
+ *
  * Handles dice rolling operations using FoundryVTT's dice system
  * or fallback mechanisms when the API is unavailable.
  */
 
-// import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { BaseTool, ToolContext, ToolResult } from '../base.js';
-import { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { logger } from '../../utils/logger.js';
+// import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { BaseTool, type ToolContext, type ToolResult } from '../base.js';
 
 /**
  * Dice rolling tool implementation
@@ -34,8 +34,8 @@ export class RollDiceTool extends BaseTool {
   };
 
   protected async executeValidated(
-    args: Record<string, unknown>, 
-    context: ToolContext
+    args: Record<string, unknown>,
+    context: ToolContext,
   ): Promise<ToolResult> {
     const { formula, reason } = args as { formula: string; reason?: string };
 
@@ -55,10 +55,13 @@ ${result.reason ? `**Reason:** ${result.reason}` : ''}
  * Legacy function for backward compatibility
  * @deprecated Use RollDiceTool class instead
  */
-export async function handleRollDice(args: {
-  formula: string;
-  reason?: string;
-}, foundryClient: FoundryClient) {
+export async function handleRollDice(
+  args: {
+    formula: string;
+    reason?: string;
+  },
+  foundryClient: FoundryClient,
+) {
   const tool = new RollDiceTool();
   const context: ToolContext = {
     foundryClient,

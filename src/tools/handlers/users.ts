@@ -2,8 +2,8 @@
  * User management tool handler
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 const ROLE_NAMES: Record<number, string> = {
@@ -14,19 +14,18 @@ const ROLE_NAMES: Record<number, string> = {
   4: 'Game Master',
 };
 
-export async function handleGetUsers(
-  _args: Record<string, unknown>,
-  foundryClient: FoundryClient,
-) {
+export async function handleGetUsers(_args: Record<string, unknown>, foundryClient: FoundryClient) {
   try {
     const { users, activeUsers } = foundryClient.getUsers();
     const activeSet = new Set(activeUsers);
 
-    const formatted = users.map((u) => {
-      const online = activeSet.has(u._id) ? 'Online' : 'Offline';
-      const role = ROLE_NAMES[u.role] || `Role ${u.role}`;
-      return `- **${u.name}** (${role}) — ${online}`;
-    }).join('\n');
+    const formatted = users
+      .map((u) => {
+        const online = activeSet.has(u._id) ? 'Online' : 'Offline';
+        const role = ROLE_NAMES[u.role] || `Role ${u.role}`;
+        return `- **${u.name}** (${role}) — ${online}`;
+      })
+      .join('\n');
 
     const onlineCount = users.filter((u) => activeSet.has(u._id)).length;
 

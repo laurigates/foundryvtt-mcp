@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tool definitions for FoundryVTT MCP Server
- * 
+ *
  * This module contains all tool schema definitions organized by category.
  * Tools are separated into logical groups for better maintainability.
  */
@@ -429,16 +429,13 @@ export async function getModernizedTools() {
   try {
     const { toolRegistry } = await import('./registry.js');
     const modernTools = toolRegistry.getToolDefinitions();
-    
+
     // Filter out tools that have been modernized to avoid duplicates
-    const modernToolNames = new Set(modernTools.map(tool => tool.name));
-    const legacyTools = getAllTools().filter(tool => !modernToolNames.has(tool.name));
-    
-    return [
-      ...modernTools,
-      ...legacyTools,
-    ];
-  } catch (error) {
+    const modernToolNames = new Set(modernTools.map((tool) => tool.name));
+    const legacyTools = getAllTools().filter((tool) => !modernToolNames.has(tool.name));
+
+    return [...modernTools, ...legacyTools];
+  } catch (_error) {
     // Fallback to legacy definitions if registry is not available
     return getAllTools();
   }

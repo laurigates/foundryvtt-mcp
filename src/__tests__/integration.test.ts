@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock external dependencies
 vi.mock('axios');
 vi.mock('socket.io-client');
 vi.mock('../foundry/auth.js', () => ({
-  authenticateFoundry: vi.fn().mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+  authenticateFoundry: vi
+    .fn()
+    .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
 }));
 vi.mock('../utils/logger.js', () => ({
   logger: {
@@ -174,7 +176,12 @@ describe('Integration Tests', () => {
             name: 'Flame Tongue',
             type: 'weapon',
             rarity: 'rare',
-            damage: { parts: [['1d8', 'slashing'], ['2d6', 'fire']] },
+            damage: {
+              parts: [
+                ['1d8', 'slashing'],
+                ['2d6', 'fire'],
+              ],
+            },
             price: { value: 5000, denomination: 'gp' },
           },
         ],

@@ -2,7 +2,7 @@
  * @fileoverview Tests for the caching system
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CacheService } from '../cache.js';
 
 describe('CacheService', () => {
@@ -45,9 +45,9 @@ describe('CacheService', () => {
     it('should expire entries after TTL', async () => {
       cache.set('key1', 'value1');
       expect(cache.get('key1')).toBe('value1');
-      
+
       // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
       expect(cache.get('key1')).toBeUndefined();
     });
 
@@ -61,18 +61,18 @@ describe('CacheService', () => {
     it('should evict least recently used entries when max size exceeded', async () => {
       cache.set('key1', 'value1');
       // Small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       cache.set('key2', 'value2');
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       cache.set('key3', 'value3');
-      
+
       // Access key1 and key3 to make them recently used
       cache.get('key1');
       cache.get('key3');
-      
+
       // Adding key4 should evict key2 (least recently used)
       cache.set('key4', 'value4');
-      
+
       expect(cache.get('key1')).toBe('value1'); // Still there
       expect(cache.get('key2')).toBeUndefined(); // Evicted
       expect(cache.get('key3')).toBe('value3'); // Still there
@@ -84,18 +84,18 @@ describe('CacheService', () => {
     it('should return cached value if exists', async () => {
       const factory = vi.fn().mockResolvedValue('factoryValue');
       cache.set('key1', 'cachedValue');
-      
+
       const result = await cache.getOrSet('key1', factory);
-      
+
       expect(result).toBe('cachedValue');
       expect(factory).not.toHaveBeenCalled();
     });
 
     it('should call factory and cache result if not exists', async () => {
       const factory = vi.fn().mockResolvedValue('factoryValue');
-      
+
       const result = await cache.getOrSet('key1', factory);
-      
+
       expect(result).toBe('factoryValue');
       expect(factory).toHaveBeenCalledOnce();
       expect(cache.get('key1')).toBe('factoryValue');
@@ -105,11 +105,11 @@ describe('CacheService', () => {
   describe('Statistics', () => {
     it('should track hits and misses', () => {
       cache.set('key1', 'value1');
-      
+
       cache.get('key1'); // Hit
       cache.get('key2'); // Miss
       cache.get('key1'); // Hit
-      
+
       const stats = cache.getStats();
       expect(stats.hits).toBe(2);
       expect(stats.misses).toBe(1);
@@ -119,7 +119,7 @@ describe('CacheService', () => {
     it('should track cache size', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
-      
+
       const stats = cache.getStats();
       expect(stats.size).toBe(2);
       expect(stats.maxSize).toBe(3);
@@ -142,9 +142,9 @@ describe('CacheService', () => {
 
     it('should always call factory in getOrSet when disabled', async () => {
       const factory = vi.fn().mockResolvedValue('factoryValue');
-      
+
       const result = await cache.getOrSet('key1', factory);
-      
+
       expect(result).toBe('factoryValue');
       expect(factory).toHaveBeenCalledOnce();
     });

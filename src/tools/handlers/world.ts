@@ -2,8 +2,8 @@
  * World-level tool handlers: cross-collection search, summary, refresh
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { FoundryClient } from '../../foundry/client.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 
 export async function handleSearchWorld(
@@ -17,19 +17,31 @@ export async function handleSearchWorld(
     const sections: string[] = [];
 
     if (results.actors.length > 0) {
-      const items = results.actors.slice(0, limit).map((a) => `  - ${a.name} (${a.type})`).join('\n');
+      const items = results.actors
+        .slice(0, limit)
+        .map((a) => `  - ${a.name} (${a.type})`)
+        .join('\n');
       sections.push(`**Actors** (${results.actors.length})\n${items}`);
     }
     if (results.items.length > 0) {
-      const items = results.items.slice(0, limit).map((i) => `  - ${i.name} (${i.type})`).join('\n');
+      const items = results.items
+        .slice(0, limit)
+        .map((i) => `  - ${i.name} (${i.type})`)
+        .join('\n');
       sections.push(`**Items** (${results.items.length})\n${items}`);
     }
     if (results.scenes.length > 0) {
-      const items = results.scenes.slice(0, limit).map((s) => `  - ${s.name}${s.active ? ' [ACTIVE]' : ''}`).join('\n');
+      const items = results.scenes
+        .slice(0, limit)
+        .map((s) => `  - ${s.name}${s.active ? ' [ACTIVE]' : ''}`)
+        .join('\n');
       sections.push(`**Scenes** (${results.scenes.length})\n${items}`);
     }
     if (results.journals.length > 0) {
-      const items = results.journals.slice(0, limit).map((j) => `  - ${j.name}`).join('\n');
+      const items = results.journals
+        .slice(0, limit)
+        .map((j) => `  - ${j.name}`)
+        .join('\n');
       sections.push(`**Journals** (${results.journals.length})\n${items}`);
     }
 
