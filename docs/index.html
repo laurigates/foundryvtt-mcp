@@ -1,27 +1,42 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>FoundryVTT MCP Server Documentation - v0.2.0</title><meta name="description" content="Documentation for FoundryVTT MCP Server Documentation"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">FoundryVTT MCP Server Documentation - v0.2.0</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>FoundryVTT MCP Server Documentation - v0.2.0</h1></div><div class="tsd-panel tsd-typography"><h1 id="foundryvtt-mcp-server" class="tsd-anchor-link">FoundryVTT MCP Server<a href="#foundryvtt-mcp-server" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing AI assistants to interact with your tabletop gaming sessions. Query actors, roll dice, generate content, and manage your game world through natural language.</p>
-<h2 id="features" class="tsd-anchor-link">Features<a href="#features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="core-functionality" class="tsd-anchor-link">Core Functionality<a href="#core-functionality" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
-<li>🎲 <strong>Dice Rolling</strong> - Roll dice with standard RPG notation</li>
-<li>🔍 <strong>Data Querying</strong> - Search actors, items, scenes, and journal entries</li>
-<li>📊 <strong>Game State</strong> - Access current scene, combat status, and world information</li>
-<li>🎭 <strong>Content Generation</strong> - Generate NPCs, loot, and random encounters</li>
-<li>📝 <strong>Rule Lookup</strong> - Query game rules and mechanical information</li>
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>FoundryVTT MCP Server - v0.11.0</title><meta name="description" content="Documentation for FoundryVTT MCP Server"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">FoundryVTT MCP Server - v0.11.0</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>FoundryVTT MCP Server - v0.11.0</h1></div><div class="tsd-panel tsd-typography"><h1 id="foundryvtt-mcp-server" class="tsd-anchor-link">FoundryVTT MCP Server<a href="#foundryvtt-mcp-server" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p>A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing AI assistants to interact with your tabletop gaming sessions. Query actors, roll dice, generate content, and manage your game world through natural language.</p>
+<h2 id="features" class="tsd-anchor-link">Features<a href="#features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="core-functionality" class="tsd-anchor-link">Core Functionality<a href="#core-functionality" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Dice Rolling</strong> - Roll dice with standard RPG notation</li>
+<li><strong>Data Querying</strong> - Search and inspect actors, items, scenes, and journal entries</li>
+<li><strong>Game State</strong> - Access combat status, chat messages, user list, and world information</li>
+<li><strong>Content Generation</strong> - Generate NPCs, loot tables, and rule lookups</li>
+<li><strong>World Search</strong> - Full-text search across all game entities</li>
 </ul>
-<h3 id="real-time-integration" class="tsd-anchor-link">Real-time Integration<a href="#real-time-integration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
-<li>🔄 <strong>Live Updates</strong> - WebSocket connection for real-time game state</li>
-<li>⚔️ <strong>Combat Management</strong> - Track initiative and combat state</li>
-<li>👥 <strong>User Awareness</strong> - See who's online and their status</li>
+<h3 id="real-time-integration" class="tsd-anchor-link">Real-time Integration<a href="#real-time-integration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Live Connection</strong> - <a href="http://Socket.IO">Socket.IO</a> connection loads complete world state on connect</li>
+<li><strong>Combat Tracking</strong> - Access initiative order and combat state</li>
+<li><strong>User Awareness</strong> - See who's online and their current status</li>
+<li><strong>Chat Messages</strong> - Read recent chat history</li>
 </ul>
-<h3 id="ai-powered-features" class="tsd-anchor-link">AI-Powered Features<a href="#ai-powered-features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
-<li>🧠 <strong>Tactical Suggestions</strong> - Get combat advice and strategy tips</li>
-<li>🎪 <strong>Story Assistance</strong> - Generate plot hooks and narrative elements</li>
-<li>🎨 <strong>World Building</strong> - Create locations, NPCs, and quests on demand</li>
-</ul>
-<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="prerequisites" class="tsd-anchor-link">Prerequisites<a href="#prerequisites" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="prerequisites" class="tsd-anchor-link">Prerequisites<a href="#prerequisites" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li>Node.js 18+</li>
-<li>FoundryVTT server running and accessible</li>
+<li>FoundryVTT server running with an active world</li>
 <li>MCP-compatible AI client (Claude Desktop, etc.)</li>
 </ul>
-<h3 id="setup" class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ol>
+<h3 id="quick-setup-recommended" class="tsd-anchor-link">Quick Setup (Recommended)<a href="#quick-setup-recommended" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><strong>Interactive Setup Wizard:</strong></p>
+<pre><code class="bash"><span class="hl-0">git</span><span class="hl-1"> </span><span class="hl-2">clone</span><span class="hl-1"> &lt;</span><span class="hl-2">repository-ur</span><span class="hl-1">l&gt;</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">foundry-mcp-server</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">setup-wizard</span>
+</code><button type="button">Copy</button></pre>
+
+<p>The setup wizard will:</p>
+<ul>
+<li>Automatically detect your FoundryVTT server</li>
+<li>Test connectivity and authentication</li>
+<li>Generate your <code>.env</code> configuration file</li>
+<li>Validate the complete setup</li>
+</ul>
+<h3 id="manual-setup" class="tsd-anchor-link">Manual Setup<a href="#manual-setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ol>
 <li><strong>Clone and install:</strong></li>
 </ol>
 <pre><code class="bash"><span class="hl-0">git</span><span class="hl-1"> </span><span class="hl-2">clone</span><span class="hl-1"> &lt;</span><span class="hl-2">repository-ur</span><span class="hl-1">l&gt;</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">foundry-mcp-server</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span>
@@ -37,127 +52,61 @@
 <li><strong>Required environment variables:</strong></li>
 </ol>
 <pre><code class="env">FOUNDRY_URL=http://localhost:30000
-FOUNDRY_API_KEY=your_api_key_here
-# OR use username/password:
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 </code><button type="button">Copy</button></pre>
 
 <ol start="4">
-<li><strong>Build and start:</strong></li>
+<li><strong>Test and start:</strong></li>
 </ol>
-<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">start</span>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test-connection</span><span class="hl-1">  </span><span class="hl-3"># Verify setup</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">start</span>
 </code><button type="button">Copy</button></pre>
 
-<h3 id="development-mode" class="tsd-anchor-link">Development Mode<a href="#development-mode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span>
+<h3 id="development-mode" class="tsd-anchor-link">Development Mode<a href="#development-mode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span>
 </code><button type="button">Copy</button></pre>
 
-<h2 id="foundryvtt-configuration" class="tsd-anchor-link">FoundryVTT Configuration<a href="#foundryvtt-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>The MCP server supports three authentication methods, listed from most secure to least secure:</p>
-<h3 id="option-1-local-rest-api-module-🔒-recommended" class="tsd-anchor-link">Option 1: Local REST API Module (🔒 Recommended)<a href="#option-1-local-rest-api-module-🔒-recommended" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>Benefits:</strong></p>
-<ul>
-<li>✅ <strong>100% Local</strong> - No external dependencies or third-party services</li>
-<li>✅ <strong>Maximum Privacy</strong> - Your game data never leaves your network</li>
-<li>✅ <strong>Full Control</strong> - You own and manage all authentication</li>
-<li>✅ <strong>Better Performance</strong> - Direct local API access</li>
-<li>✅ <strong>More Reliable</strong> - No external service downtime</li>
-</ul>
-<p><strong>Setup:</strong></p>
+<h2 id="foundryvtt-configuration" class="tsd-anchor-link">FoundryVTT Configuration<a href="#foundryvtt-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>The MCP server connects to FoundryVTT via <a href="http://Socket.IO">Socket.IO</a> using a standard FoundryVTT user account. No custom modules are required for full game data access.</p>
+<h3 id="setup" class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ol>
-<li>Install the <strong>Foundry Local REST API</strong> module:
-<ul>
-<li>In FoundryVTT: <strong>Setup</strong> → <strong>Add-on Modules</strong> → <strong>Install Module</strong></li>
-<li>Paste: <code>https://github.com/lgates/foundryvtt-mcp/releases/latest/download/module.json</code></li>
-</ul>
-</li>
-<li>Enable the module in your world</li>
-<li>Go to <strong>Settings</strong> → <strong>Configure Settings</strong> → <strong>Module Settings</strong></li>
-<li>Find <strong>&quot;Foundry Local REST API&quot;</strong> and check <strong>&quot;Enable REST API&quot;</strong></li>
-<li>Copy the generated <strong>API Key</strong></li>
-<li>Add to your <code>.env</code> file:<pre><code class="env">FOUNDRY_URL=http://localhost:30000
-FOUNDRY_API_KEY=your_local_api_key_here
-USE_REST_MODULE=false  # Use local module instead
-</code><button type="button">Copy</button></pre>
-
-</li>
+<li>Ensure FoundryVTT is running with an active world (not on the setup screen)</li>
+<li>Create or use an existing FoundryVTT user account with appropriate permissions</li>
+<li>Add credentials to your <code>.env</code> file:</li>
 </ol>
-<h3 id="option-2-third-party-rest-api-module" class="tsd-anchor-link">Option 2: Third-Party REST API Module<a href="#option-2-third-party-rest-api-module" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>⚠️ Privacy Notice:</strong> This option sends your game data through external relay servers.</p>
-<ol>
-<li>Install the <strong>Foundry REST API</strong> module from the community</li>
-<li>Get an API key from the third-party service</li>
-<li>Configure the module with the external API key</li>
-<li>Add to your <code>.env</code> file:<pre><code class="env">FOUNDRY_URL=http://localhost:30000
-FOUNDRY_API_KEY=your_external_api_key_here
-USE_REST_MODULE=true
-</code><button type="button">Copy</button></pre>
-
-</li>
-</ol>
-<h3 id="option-3-usernamepassword-fallback" class="tsd-anchor-link">Option 3: Username/Password (Fallback)<a href="#option-3-usernamepassword-fallback" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>Limited functionality</strong> - Some features may not work properly.</p>
-<ol>
-<li>Ensure your FoundryVTT user has appropriate permissions</li>
-<li>Add credentials to <code>.env</code> file:<pre><code class="env">FOUNDRY_URL=http://localhost:30000
+<pre><code class="env">FOUNDRY_URL=http://localhost:30000
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 </code><button type="button">Copy</button></pre>
 
+<p>The server authenticates via a 4-step <a href="http://Socket.IO">Socket.IO</a> flow:</p>
+<ol>
+<li>Fetches the <code>/join</code> page to obtain a session cookie</li>
+<li>Extracts the session cookie from the response</li>
+<li>Resolves the username to a user ID (or uses <code>FOUNDRY_USER_ID</code> if set)</li>
+<li>Emits <code>joinGame</code> with credentials to receive the complete world state</li>
+</ol>
+<h3 id="optional-diagnostics-tools" class="tsd-anchor-link">Optional: Diagnostics Tools<a href="#optional-diagnostics-tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Installing the <strong>Foundry Local REST API</strong> module adds 5 server monitoring tools (<code>get_recent_logs</code>, <code>search_logs</code>, <code>get_system_health</code>, <code>diagnose_errors</code>, <code>get_health_status</code>):</p>
+<ol>
+<li>In FoundryVTT: <strong>Setup</strong> &gt; <strong>Add-on Modules</strong> &gt; <strong>Install Module</strong></li>
+<li>Paste: <code>https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json</code></li>
+<li>Enable the module in your world and copy the generated API key</li>
+<li>Add to <code>.env</code>:<pre><code class="env">FOUNDRY_API_KEY=your_api_key_here
+</code><button type="button">Copy</button></pre>
+
 </li>
 </ol>
-<h3 id="comparison-table" class="tsd-anchor-link">Comparison Table<a href="#comparison-table" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><table>
-<thead>
-<tr>
-<th>Feature</th>
-<th><strong>Local Module</strong></th>
-<th>Third-Party Module</th>
-<th>Username/Password</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Privacy</strong></td>
-<td>✅ 100% Local</td>
-<td>❌ External relay</td>
-<td>✅ Local</td>
-</tr>
-<tr>
-<td><strong>Security</strong></td>
-<td>✅ Your keys only</td>
-<td>❌ External keys</td>
-<td>⚠️ Password auth</td>
-</tr>
-<tr>
-<td><strong>Reliability</strong></td>
-<td>✅ No external deps</td>
-<td>❌ Service dependent</td>
-<td>✅ Direct connection</td>
-</tr>
-<tr>
-<td><strong>Performance</strong></td>
-<td>✅ Direct access</td>
-<td>❌ Network latency</td>
-<td>⚠️ Limited features</td>
-</tr>
-<tr>
-<td><strong>Full Features</strong></td>
-<td>✅ Complete API</td>
-<td>✅ Complete API</td>
-<td>❌ Basic only</td>
-</tr>
-<tr>
-<td><strong>Setup Complexity</strong></td>
-<td>⚠️ Module install</td>
-<td>⚠️ External signup</td>
-<td>✅ Simple</td>
-</tr>
-</tbody>
-</table>
-<h3 id="required-permissions-all-methods" class="tsd-anchor-link">Required Permissions (All Methods)<a href="#required-permissions-all-methods" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Your FoundryVTT user needs these permissions:</p>
+<h3 id="required-permissions" class="tsd-anchor-link">Required Permissions<a href="#required-permissions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Your FoundryVTT user needs these permissions:</p>
 <ul>
 <li>View actors, items, scenes, and journals</li>
-<li>Create and modify journal entries (for content generation)</li>
 <li>Access compendium data</li>
 <li>Use dice rolling API</li>
 </ul>
-<h2 id="usage" class="tsd-anchor-link">Usage<a href="#usage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="basic-queries" class="tsd-anchor-link">Basic Queries<a href="#basic-queries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Ask your AI assistant things like:</p>
+<h2 id="usage" class="tsd-anchor-link">Usage<a href="#usage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="basic-queries" class="tsd-anchor-link">Basic Queries<a href="#basic-queries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Ask your AI assistant things like:</p>
 <p><strong>Dice Rolling:</strong></p>
 <ul>
 <li>&quot;Roll 1d20+5 for an attack roll&quot;</li>
@@ -175,84 +124,110 @@ FOUNDRY_PASSWORD=your_password
 <ul>
 <li>&quot;Generate a random NPC merchant&quot;</li>
 <li>&quot;Create loot for a CR 5 encounter&quot;</li>
-<li>&quot;Generate a tavern with NPCs and plot hooks&quot;</li>
-</ul>
-<h3 id="advanced-features" class="tsd-anchor-link">Advanced Features<a href="#advanced-features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>Rule Lookups:</strong></p>
-<ul>
 <li>&quot;Look up the grappling rules&quot;</li>
-<li>&quot;How does the Fireball spell work?&quot;</li>
-<li>&quot;What are the conditions for being frightened?&quot;</li>
 </ul>
-<p><strong>Tactical Advice:</strong></p>
+<p><strong>World Search:</strong></p>
 <ul>
-<li>&quot;Suggest tactics for fighting a dragon&quot;</li>
-<li>&quot;What should our wizard do this turn?&quot;</li>
-<li>&quot;Analyze this combat encounter&quot;</li>
+<li>&quot;Search the world for anything related to dragons&quot;</li>
+<li>&quot;Give me a summary of the current world state&quot;</li>
+<li>&quot;Who's online right now?&quot;</li>
 </ul>
-<p><strong>World Building:</strong></p>
+<h2 id="available-tools" class="tsd-anchor-link">Available Tools<a href="#available-tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="data-access" class="tsd-anchor-link">Data Access<a href="#data-access" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul>
-<li>&quot;Create a mysterious forest location&quot;</li>
-<li>&quot;Generate a side quest involving missing merchants&quot;</li>
-<li>&quot;Design a magic item appropriate for level 8 characters&quot;</li>
-</ul>
-<h2 id="available-tools" class="tsd-anchor-link">Available Tools<a href="#available-tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="data-access" class="tsd-anchor-link">Data Access<a href="#data-access" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
 <li><code>search_actors</code> - Find characters, NPCs, monsters</li>
-<li><code>search_items</code> - Find equipment, spells, consumables</li>
-<li><code>search_journals</code> - Search notes and handouts</li>
-<li><code>get_scene_info</code> - Current scene details</li>
 <li><code>get_actor_details</code> - Detailed character information</li>
+<li><code>search_items</code> - Find equipment, spells, consumables</li>
+<li><code>get_scene_info</code> - Current scene details</li>
+<li><code>search_journals</code> - Search notes and handouts</li>
+<li><code>get_journal</code> - Retrieve a specific journal entry</li>
+<li><code>get_users</code> - List online users and their status</li>
+<li><code>get_combat_state</code> - Combat state and initiative order</li>
+<li><code>get_chat_messages</code> - Recent chat history</li>
 </ul>
-<h3 id="game-mechanics" class="tsd-anchor-link">Game Mechanics<a href="#game-mechanics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<h3 id="world" class="tsd-anchor-link">World<a href="#world" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><code>search_world</code> - Full-text search across all game entities</li>
+<li><code>get_world_summary</code> - Overview of the current world state</li>
+<li><code>refresh_world_data</code> - Reload world data from FoundryVTT</li>
+</ul>
+<h3 id="game-mechanics" class="tsd-anchor-link">Game Mechanics<a href="#game-mechanics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li><code>roll_dice</code> - Roll dice with any formula</li>
-<li><code>update_actor_hp</code> - Modify character health</li>
-<li><code>get_combat_status</code> - Combat state and initiative</li>
 <li><code>lookup_rule</code> - Game rules and spell descriptions</li>
 </ul>
-<h3 id="content-generation" class="tsd-anchor-link">Content Generation<a href="#content-generation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<h3 id="content-generation" class="tsd-anchor-link">Content Generation<a href="#content-generation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li><code>generate_npc</code> - Create random NPCs</li>
 <li><code>generate_loot</code> - Create treasure appropriate for level</li>
-<li><code>roll_table</code> - Random encounters, events, weather</li>
-<li><code>suggest_tactics</code> - Combat advice and strategy</li>
 </ul>
-<h2 id="available-resources" class="tsd-anchor-link">Available Resources<a href="#available-resources" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>The server exposes these FoundryVTT resources:</p>
+<h3 id="diagnostics-optional-requires-rest-api-module" class="tsd-anchor-link">Diagnostics (Optional — requires REST API module)<a href="#diagnostics-optional-requires-rest-api-module" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul>
-<li><code>foundry://world/info</code> - World and campaign information</li>
-<li><code>foundry://world/actors</code> - All actors in the world</li>
-<li><code>foundry://scene/current</code> - Current active scene</li>
-<li><code>foundry://combat/current</code> - Active combat state</li>
-<li><code>foundry://compendium/spells</code> - Spell database</li>
-<li><code>foundry://compendium/monsters</code> - Monster database</li>
+<li><code>get_recent_logs</code> - Retrieve filtered FoundryVTT logs</li>
+<li><code>search_logs</code> - Search logs with regex patterns</li>
+<li><code>get_system_health</code> - Server performance and health metrics</li>
+<li><code>diagnose_errors</code> - Analyze errors with troubleshooting suggestions</li>
+<li><code>get_health_status</code> - Comprehensive health diagnostics</li>
 </ul>
-<h2 id="configuration" class="tsd-anchor-link">Configuration<a href="#configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="server-settings" class="tsd-anchor-link">Server Settings<a href="#server-settings" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Edit <code>.env</code> to customize:</p>
+<h2 id="available-resources" class="tsd-anchor-link">Available Resources<a href="#available-resources" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>The server exposes these FoundryVTT resources:</p>
+<ul>
+<li><code>foundry://actors</code> - All actors in the world</li>
+<li><code>foundry://items</code> - All items in the world</li>
+<li><code>foundry://scenes</code> - All scenes</li>
+<li><code>foundry://scenes/current</code> - Current active scene</li>
+<li><code>foundry://journals</code> - All journal entries</li>
+<li><code>foundry://users</code> - Online users</li>
+<li><code>foundry://combat</code> - Active combat state</li>
+<li><code>foundry://world/settings</code> - World and campaign settings</li>
+<li><code>foundry://system/diagnostics</code> - System diagnostics (requires REST API module)</li>
+</ul>
+<h2 id="configuration" class="tsd-anchor-link">Configuration<a href="#configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="server-settings" class="tsd-anchor-link">Server Settings<a href="#server-settings" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Edit <code>.env</code> to customize:</p>
 <pre><code class="env"># Logging
 LOG_LEVEL=info  # debug, info, warn, error
 
 # Performance
 FOUNDRY_TIMEOUT=10000      # Request timeout (ms)
 FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
-CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 </code><button type="button">Copy</button></pre>
 
-<h3 id="security" class="tsd-anchor-link">Security<a href="#security" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
-<li>Use API keys instead of passwords when possible</li>
+<h3 id="security" class="tsd-anchor-link">Security<a href="#security" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li>Limit FoundryVTT user permissions to minimum required</li>
 <li>Run server on internal network only</li>
 <li>Monitor logs for suspicious activity</li>
 </ul>
-<h2 id="troubleshooting" class="tsd-anchor-link">Troubleshooting<a href="#troubleshooting" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="connection-issues" class="tsd-anchor-link">Connection Issues<a href="#connection-issues" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-3"># Test FoundryVTT connection</span><br/><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-2">http://localhost:30000/api/status</span><br/><br/><span class="hl-3"># Check server logs</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span><span class="hl-1">  </span><span class="hl-3"># Shows detailed logging</span>
+<h2 id="diagnostics-troubleshooting" class="tsd-anchor-link">Diagnostics &amp; Troubleshooting<a href="#diagnostics-troubleshooting" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="built-in-diagnostics" class="tsd-anchor-link">Built-in Diagnostics<a href="#built-in-diagnostics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The server includes diagnostic tools to help troubleshoot connection and performance issues:</p>
+<p><strong>Connection Testing:</strong></p>
+<pre><code class="bash"><span class="hl-3"># Test complete MCP connection and functionality</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test-connection</span><br/><br/><span class="hl-3"># Clean build and test setup</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">setup</span>
 </code><button type="button">Copy</button></pre>
 
-<h3 id="common-problems" class="tsd-anchor-link">Common Problems<a href="#common-problems" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>&quot;Failed to connect to FoundryVTT&quot;</strong></p>
+<p><strong>Diagnostic Tools (via AI assistant):</strong></p>
+<ul>
+<li><strong>System Health:</strong> &quot;Get the FoundryVTT system health status&quot; (requires REST API module)</li>
+<li><strong>Error Analysis:</strong> &quot;Diagnose recent errors and provide recommendations&quot; (requires REST API module)</li>
+<li><strong>Log Search:</strong> &quot;Search logs for 'connection' patterns in the last hour&quot; (requires REST API module)</li>
+</ul>
+<h3 id="connection-issues" class="tsd-anchor-link">Connection Issues<a href="#connection-issues" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-3"># Test FoundryVTT is accessible</span><br/><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-2">http://localhost:30000</span><br/><br/><span class="hl-3"># Check server logs</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span><span class="hl-1">  </span><span class="hl-3"># Shows detailed logging</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="common-problems" class="tsd-anchor-link">Common Problems<a href="#common-problems" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><strong>&quot;Failed to connect to FoundryVTT&quot;</strong></p>
 <ul>
 <li>Verify FOUNDRY_URL is correct</li>
-<li>Check if FoundryVTT is running</li>
-<li>Ensure API access is enabled</li>
+<li>Check if FoundryVTT is running with an active world</li>
+<li>Ensure the URL is accessible from where the MCP server runs</li>
 </ul>
 <p><strong>&quot;Authentication failed&quot;</strong></p>
 <ul>
-<li>Verify API key or username/password</li>
+<li>Verify username and password match a FoundryVTT user exactly (case-sensitive)</li>
 <li>Check user permissions in FoundryVTT</li>
-<li>Ensure user is not banned/restricted</li>
+<li>Try setting <code>FOUNDRY_USER_ID</code> to the 16-character document <code>_id</code></li>
 </ul>
 <p><strong>&quot;Tool not found&quot; errors</strong></p>
 <ul>
@@ -260,23 +235,30 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 <li>Check tool name spelling</li>
 <li>Review available tools in logs</li>
 </ul>
-<h2 id="development" class="tsd-anchor-link">Development<a href="#development" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="project-structure" class="tsd-anchor-link">Project Structure<a href="#project-structure" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code><span class="hl-4">src</span><span class="hl-1">/</span><br/><span class="hl-1">├── </span><span class="hl-4">config</span><span class="hl-1">/           # </span><span class="hl-4">Configuration</span><span class="hl-1"> </span><span class="hl-4">management</span><br/><span class="hl-1">├── </span><span class="hl-4">foundry</span><span class="hl-1">/          # </span><span class="hl-4">FoundryVTT</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1"> </span><span class="hl-4">and</span><span class="hl-1"> </span><span class="hl-4">types</span><br/><span class="hl-1">├── </span><span class="hl-4">tools</span><span class="hl-1">/            # </span><span class="hl-5">MCP</span><span class="hl-1"> </span><span class="hl-4">tool</span><span class="hl-1"> </span><span class="hl-4">definitions</span><br/><span class="hl-1">├── </span><span class="hl-4">resources</span><span class="hl-1">/        # </span><span class="hl-5">MCP</span><span class="hl-1"> </span><span class="hl-4">resource</span><span class="hl-1"> </span><span class="hl-4">definitions</span><br/><span class="hl-1">├── </span><span class="hl-4">utils</span><span class="hl-1">/            # </span><span class="hl-4">Utilities</span><span class="hl-1"> </span><span class="hl-4">and</span><span class="hl-1"> </span><span class="hl-4">logging</span><br/><span class="hl-1">└── </span><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">          # </span><span class="hl-4">Main</span><span class="hl-1"> </span><span class="hl-4">server</span><span class="hl-1"> </span><span class="hl-4">entry</span><span class="hl-1"> </span><span class="hl-4">point</span>
+<h2 id="development" class="tsd-anchor-link">Development<a href="#development" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="project-structure" class="tsd-anchor-link">Project Structure<a href="#project-structure" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code><span class="hl-4">src</span><span class="hl-1">/</span><br/><span class="hl-1">├── </span><span class="hl-4">config</span><span class="hl-1">/              # </span><span class="hl-4">Zod</span><span class="hl-1">-</span><span class="hl-4">validated</span><span class="hl-1"> </span><span class="hl-4">configuration</span><br/><span class="hl-1">├── </span><span class="hl-4">foundry</span><span class="hl-1">/</span><br/><span class="hl-1">│   ├── </span><span class="hl-4">auth</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">          # </span><span class="hl-4">Socket</span><span class="hl-1">.</span><span class="hl-5">IO</span><span class="hl-1"> </span><span class="hl-6">4</span><span class="hl-1">-</span><span class="hl-4">step</span><span class="hl-1"> </span><span class="hl-4">authentication</span><br/><span class="hl-1">│   ├── </span><span class="hl-4">client</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">        # </span><span class="hl-4">FoundryVTT</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1"> </span><span class="hl-7">with</span><span class="hl-1"> </span><span class="hl-4">worldData</span><span class="hl-1"> </span><span class="hl-4">cache</span><br/><span class="hl-1">│   └── </span><span class="hl-4">types</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">         # </span><span class="hl-4">TypeScript</span><span class="hl-1"> </span><span class="hl-4">interfaces</span><span class="hl-1"> + </span><span class="hl-4">WorldData</span><br/><span class="hl-1">├── </span><span class="hl-4">tools</span><span class="hl-1">/</span><br/><span class="hl-1">│   ├── </span><span class="hl-4">definitions</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">   # </span><span class="hl-4">Tool</span><span class="hl-1"> </span><span class="hl-4">schemas</span><span class="hl-1"> </span><span class="hl-4">by</span><span class="hl-1"> </span><span class="hl-4">category</span><br/><span class="hl-1">│   ├── </span><span class="hl-4">router</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">        # </span><span class="hl-4">Tool</span><span class="hl-1"> </span><span class="hl-4">request</span><span class="hl-1"> </span><span class="hl-4">routing</span><br/><span class="hl-1">│   ├── </span><span class="hl-4">resources</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">     # </span><span class="hl-5">MCP</span><span class="hl-1"> </span><span class="hl-4">resource</span><span class="hl-1"> </span><span class="hl-4">definitions</span><br/><span class="hl-1">│   └── </span><span class="hl-4">handlers</span><span class="hl-1">/        # </span><span class="hl-4">Per</span><span class="hl-1">-</span><span class="hl-4">tool</span><span class="hl-1"> </span><span class="hl-4">handler</span><span class="hl-1"> </span><span class="hl-4">implementations</span><br/><span class="hl-1">├── </span><span class="hl-4">diagnostics</span><span class="hl-1">/         # </span><span class="hl-4">Optional</span><span class="hl-1"> </span><span class="hl-5">REST</span><span class="hl-1"> </span><span class="hl-5">API</span><span class="hl-1"> </span><span class="hl-4">diagnostics</span><br/><span class="hl-1">├── </span><span class="hl-4">utils</span><span class="hl-1">/               # </span><span class="hl-4">Logger</span><span class="hl-1">, </span><span class="hl-4">cache</span><span class="hl-1"> </span><span class="hl-4">utilities</span><br/><span class="hl-1">└── </span><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-4">ts</span><span class="hl-1">             # </span><span class="hl-5">MCP</span><span class="hl-1"> </span><span class="hl-4">server</span><span class="hl-1"> </span><span class="hl-4">entry</span><span class="hl-1"> </span><span class="hl-4">point</span>
 </code><button>Copy</button></pre>
 
-<h3 id="adding-new-tools" class="tsd-anchor-link">Adding New Tools<a href="#adding-new-tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ol>
-<li>Define tool schema in <code>src/tools/index.ts</code></li>
-<li>Add handler method in <code>src/index.ts</code></li>
-<li>Implement FoundryVTT API calls in <code>src/foundry/client.ts</code></li>
-<li>Add TypeScript types in <code>src/foundry/types.ts</code></li>
+<h3 id="adding-new-tools" class="tsd-anchor-link">Adding New Tools<a href="#adding-new-tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ol>
+<li>Define tool schema in <code>src/tools/definitions.ts</code></li>
+<li>Add handler in <code>src/tools/handlers/</code></li>
+<li>Wire the handler in <code>src/tools/router.ts</code></li>
+<li>Add TypeScript types in <code>src/foundry/types.ts</code> if needed</li>
 <li>Test with your AI assistant</li>
 </ol>
-<h3 id="testing" class="tsd-anchor-link">Testing<a href="#testing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-3"># Run tests</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">test</span><br/><br/><span class="hl-3"># Run with coverage</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:coverage</span><br/><br/><span class="hl-3"># Lint code</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">lint</span>
+<h3 id="testing" class="tsd-anchor-link">Testing<a href="#testing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-3"># Run tests</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">test</span><br/><br/><span class="hl-3"># Run with coverage</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:coverage</span><br/><br/><span class="hl-3"># Lint code</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">lint</span>
 </code><button type="button">Copy</button></pre>
 
-<h3 id="building" class="tsd-anchor-link">Building<a href="#building" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-3"># Development build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span><br/><br/><span class="hl-3"># Clean build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">clean</span><span class="hl-1"> &amp;&amp; </span><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
+<h3 id="building" class="tsd-anchor-link">Building<a href="#building" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-3"># Development build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span><br/><br/><span class="hl-3"># Clean build</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">clean</span><span class="hl-1"> &amp;&amp; </span><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
 </code><button type="button">Copy</button></pre>
 
-<h2 id="api-reference" class="tsd-anchor-link">API Reference<a href="#api-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="environment-variables" class="tsd-anchor-link">Environment Variables<a href="#environment-variables" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><table>
+<h2 id="api-reference" class="tsd-anchor-link">API Reference<a href="#api-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="environment-variables" class="tsd-anchor-link">Environment Variables<a href="#environment-variables" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
 <thead>
 <tr>
 <th>Variable</th>
@@ -288,104 +270,148 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 <tbody>
 <tr>
 <td><code>FOUNDRY_URL</code></td>
-<td>✅</td>
+<td>Yes</td>
 <td>FoundryVTT server URL</td>
 <td>-</td>
 </tr>
 <tr>
-<td><code>FOUNDRY_API_KEY</code></td>
-<td>⭐</td>
-<td>API key for authentication</td>
-<td>-</td>
-</tr>
-<tr>
 <td><code>FOUNDRY_USERNAME</code></td>
-<td>⭐</td>
-<td>Username (if no API key)</td>
+<td>Yes</td>
+<td>FoundryVTT username</td>
 <td>-</td>
 </tr>
 <tr>
 <td><code>FOUNDRY_PASSWORD</code></td>
-<td>⭐</td>
-<td>Password (if no API key)</td>
+<td>Yes</td>
+<td>FoundryVTT password</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>FOUNDRY_USER_ID</code></td>
+<td>No</td>
+<td>16-char document <code>_id</code> (bypasses username resolution)</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>FOUNDRY_API_KEY</code></td>
+<td>No</td>
+<td>REST API module key (enables diagnostics)</td>
 <td>-</td>
 </tr>
 <tr>
 <td><code>LOG_LEVEL</code></td>
-<td>❌</td>
+<td>No</td>
 <td>Logging verbosity</td>
 <td><code>info</code></td>
 </tr>
 <tr>
 <td><code>NODE_ENV</code></td>
-<td>❌</td>
+<td>No</td>
 <td>Environment mode</td>
 <td><code>development</code></td>
 </tr>
 <tr>
 <td><code>FOUNDRY_TIMEOUT</code></td>
-<td>❌</td>
+<td>No</td>
 <td>Request timeout (ms)</td>
 <td><code>10000</code></td>
 </tr>
 <tr>
 <td><code>FOUNDRY_RETRY_ATTEMPTS</code></td>
-<td>❌</td>
+<td>No</td>
 <td>Retry failed requests</td>
 <td><code>3</code></td>
 </tr>
 <tr>
+<td><code>FOUNDRY_RETRY_DELAY</code></td>
+<td>No</td>
+<td>Delay between retries (ms)</td>
+<td><code>1000</code></td>
+</tr>
+<tr>
+<td><code>CACHE_ENABLED</code></td>
+<td>No</td>
+<td>Enable response caching</td>
+<td><code>true</code></td>
+</tr>
+<tr>
 <td><code>CACHE_TTL_SECONDS</code></td>
-<td>❌</td>
-<td>Cache duration</td>
+<td>No</td>
+<td>Cache duration (seconds)</td>
 <td><code>300</code></td>
+</tr>
+<tr>
+<td><code>CACHE_MAX_SIZE</code></td>
+<td>No</td>
+<td>Maximum cache entries</td>
+<td>-</td>
 </tr>
 </tbody>
 </table>
-<p>⭐ Either API key OR username/password required</p>
-<h3 id="tool-schemas" class="tsd-anchor-link">Tool Schemas<a href="#tool-schemas" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><h4 id="roll_dice" class="tsd-anchor-link">roll_dice<a href="#roll_dice" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;formula&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;1d20+5&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;reason&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;Attack roll against goblin&quot;</span><br/><span class="hl-1">}</span>
+<h3 id="tool-schemas" class="tsd-anchor-link">Tool Schemas<a href="#tool-schemas" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<h4 id="roll_dice" class="tsd-anchor-link">roll_dice<a href="#roll_dice" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;formula&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;1d20+5&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;reason&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;Attack roll against goblin&quot;</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<h4 id="search_actors" class="tsd-anchor-link">search_actors<a href="#search_actors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;query&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;goblin&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;type&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;npc&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;limit&quot;</span><span class="hl-1">: </span><span class="hl-7">10</span><br/><span class="hl-1">}</span>
+<h4 id="search_world" class="tsd-anchor-link">search_world<a href="#search_world" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;query&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;dragon&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;limit&quot;</span><span class="hl-1">: </span><span class="hl-6">10</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<h4 id="generate_npc" class="tsd-anchor-link">generate_npc<a href="#generate_npc" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;race&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;human&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;level&quot;</span><span class="hl-1">: </span><span class="hl-7">5</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;role&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;merchant&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;alignment&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;neutral good&quot;</span><br/><span class="hl-1">}</span>
+<h4 id="get_combat_state" class="tsd-anchor-link">get_combat_state<a href="#get_combat_state" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
+<pre><code class="json"><span class="hl-1">{}</span>
 </code><button type="button">Copy</button></pre>
 
-<h2 id="integration-examples" class="tsd-anchor-link">Integration Examples<a href="#integration-examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="claude-desktop-configuration" class="tsd-anchor-link">Claude Desktop Configuration<a href="#claude-desktop-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Add to your Claude Desktop MCP settings:</p>
-<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-6">&quot;mcpServers&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-6">&quot;foundry&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">      </span><span class="hl-6">&quot;command&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;node&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-6">&quot;args&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;/path/to/foundry-mcp-server/dist/index.js&quot;</span><span class="hl-1">],</span><br/><span class="hl-1">      </span><span class="hl-6">&quot;env&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">        </span><span class="hl-6">&quot;FOUNDRY_URL&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;http://localhost:30000&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-6">&quot;FOUNDRY_API_KEY&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;your_api_key_here&quot;</span><br/><span class="hl-1">      }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
+<h4 id="search_actors" class="tsd-anchor-link">search_actors<a href="#search_actors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;query&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;goblin&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;type&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;npc&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;limit&quot;</span><span class="hl-1">: </span><span class="hl-6">10</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<h3 id="custom-mcp-client" class="tsd-anchor-link">Custom MCP Client<a href="#custom-mcp-client" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="typescript"><span class="hl-8">import</span><span class="hl-1"> { </span><span class="hl-4">Client</span><span class="hl-1"> } </span><span class="hl-8">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@modelcontextprotocol/sdk/client/index.js&#39;</span><span class="hl-1">;</span><br/><span class="hl-8">import</span><span class="hl-1"> { </span><span class="hl-4">StdioClientTransport</span><span class="hl-1"> } </span><span class="hl-8">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@modelcontextprotocol/sdk/client/stdio.js&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">transport</span><span class="hl-1"> = </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">StdioClientTransport</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">command:</span><span class="hl-1"> </span><span class="hl-2">&#39;node&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">args:</span><span class="hl-1"> [</span><span class="hl-2">&#39;./dist/index.js&#39;</span><span class="hl-1">]</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">client</span><span class="hl-1"> = </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Client</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&quot;foundry-client&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">version:</span><span class="hl-1"> </span><span class="hl-2">&quot;1.0.0&quot;</span><br/><span class="hl-1">}, {</span><br/><span class="hl-1">  </span><span class="hl-4">capabilities:</span><span class="hl-1"> {}</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1">.</span><span class="hl-0">connect</span><span class="hl-1">(</span><span class="hl-4">transport</span><span class="hl-1">);</span><br/><br/><span class="hl-3">// Roll dice</span><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">result</span><span class="hl-1"> = </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1">.</span><span class="hl-0">request</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">method:</span><span class="hl-1"> </span><span class="hl-2">&quot;tools/call&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">params:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&quot;roll_dice&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">arguments:</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-4">formula:</span><span class="hl-1"> </span><span class="hl-2">&quot;1d20+5&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">reason:</span><span class="hl-1"> </span><span class="hl-2">&quot;Initiative roll&quot;</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">});</span>
+<h2 id="integration-examples" class="tsd-anchor-link">Integration Examples<a href="#integration-examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="claude-desktop-configuration" class="tsd-anchor-link">Claude Desktop Configuration<a href="#claude-desktop-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Add to your Claude Desktop MCP settings:</p>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;mcpServers&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;foundry&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">      </span><span class="hl-8">&quot;command&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;node&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-8">&quot;args&quot;</span><span class="hl-1">: [</span><span class="hl-2">&quot;/path/to/foundry-mcp-server/dist/index.js&quot;</span><span class="hl-1">],</span><br/><span class="hl-1">      </span><span class="hl-8">&quot;env&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">        </span><span class="hl-8">&quot;FOUNDRY_URL&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;http://localhost:30000&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-8">&quot;FOUNDRY_USERNAME&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;your_username&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-8">&quot;FOUNDRY_PASSWORD&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;your_password&quot;</span><br/><span class="hl-1">      }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<h2 id="roadmap" class="tsd-anchor-link">Roadmap<a href="#roadmap" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="version-020" class="tsd-anchor-link">Version 0.2.0<a href="#version-020" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
-<li>[ ] Combat management tools (start/end combat, advance initiative)</li>
+<p>To enable optional diagnostics tools, add <code>FOUNDRY_API_KEY</code> to the <code>env</code> block:</p>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;FOUNDRY_API_KEY&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;your_api_key_here&quot;</span><br/><span class="hl-1">}</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="custom-mcp-client" class="tsd-anchor-link">Custom MCP Client<a href="#custom-mcp-client" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="typescript"><span class="hl-7">import</span><span class="hl-1"> { </span><span class="hl-4">Client</span><span class="hl-1"> } </span><span class="hl-7">from</span><span class="hl-1"> </span><span class="hl-2">&quot;@modelcontextprotocol/sdk/client/index.js&quot;</span><span class="hl-1">;</span><br/><span class="hl-7">import</span><span class="hl-1"> { </span><span class="hl-4">StdioClientTransport</span><span class="hl-1"> } </span><span class="hl-7">from</span><span class="hl-1"> </span><span class="hl-2">&quot;@modelcontextprotocol/sdk/client/stdio.js&quot;</span><span class="hl-1">;</span><br/><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">transport</span><span class="hl-1"> = </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">StdioClientTransport</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">command:</span><span class="hl-1"> </span><span class="hl-2">&quot;node&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">args:</span><span class="hl-1"> [</span><span class="hl-2">&quot;./dist/index.js&quot;</span><span class="hl-1">],</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">client</span><span class="hl-1"> = </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Client</span><span class="hl-1">(</span><br/><span class="hl-1">  {</span><br/><span class="hl-1">    </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&quot;foundry-client&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">version:</span><span class="hl-1"> </span><span class="hl-2">&quot;1.0.0&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  {</span><br/><span class="hl-1">    </span><span class="hl-4">capabilities:</span><span class="hl-1"> {},</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">);</span><br/><br/><span class="hl-7">await</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1">.</span><span class="hl-0">connect</span><span class="hl-1">(</span><span class="hl-4">transport</span><span class="hl-1">);</span><br/><br/><span class="hl-3">// Roll dice</span><br/><span class="hl-9">const</span><span class="hl-1"> </span><span class="hl-5">result</span><span class="hl-1"> = </span><span class="hl-7">await</span><span class="hl-1"> </span><span class="hl-4">client</span><span class="hl-1">.</span><span class="hl-0">request</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">method:</span><span class="hl-1"> </span><span class="hl-2">&quot;tools/call&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">params:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&quot;roll_dice&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">arguments:</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-4">formula:</span><span class="hl-1"> </span><span class="hl-2">&quot;1d20+5&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">reason:</span><span class="hl-1"> </span><span class="hl-2">&quot;Initiative roll&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    },</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="roadmap" class="tsd-anchor-link">Roadmap<a href="#roadmap" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="completed" class="tsd-anchor-link">Completed<a href="#completed" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li>[x] <a href="http://Socket.IO">Socket.IO</a> authentication and world data loading</li>
+<li>[x] Combat state tracking</li>
+<li>[x] User awareness (online status)</li>
+<li>[x] Journal access and search</li>
+<li>[x] World-wide search across all entities</li>
+<li>[x] Chat message history</li>
+<li>[x] NPC and loot generation</li>
+<li>[x] Rule lookups</li>
+</ul>
+<h3 id="planned" class="tsd-anchor-link">Planned<a href="#planned" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li>[ ] Combat management (start/end combat, advance initiative)</li>
 <li>[ ] Token manipulation (move, update status effects)</li>
 <li>[ ] Scene navigation and switching</li>
-<li>[ ] Playlist controls and ambient audio</li>
-</ul>
-<h3 id="version-030" class="tsd-anchor-link">Version 0.3.0<a href="#version-030" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
 <li>[ ] Character sheet editing (level up, add equipment)</li>
 <li>[ ] Journal entry creation and editing</li>
 <li>[ ] Macro execution and management</li>
-<li>[ ] Advanced content generation (dungeons, NPCs with full stats)</li>
-</ul>
-<h3 id="version-100" class="tsd-anchor-link">Version 1.0.0<a href="#version-100" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
 <li>[ ] Multi-world support</li>
-<li>[ ] User permission management</li>
-<li>[ ] Webhook support for external triggers</li>
-<li>[ ] Performance optimization and caching</li>
-<li>[ ] Full test coverage</li>
 <li>[ ] Docker deployment</li>
 </ul>
-<h2 id="documentation" class="tsd-anchor-link">Documentation<a href="#documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>Complete API documentation is available in the <code>docs/</code> directory, auto-generated from TypeScript source code and JSDoc comments.</p>
-<h3 id="📖-viewing-documentation" class="tsd-anchor-link">📖 Viewing Documentation<a href="#📖-viewing-documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p><strong>Local development:</strong></p>
+<h2 id="documentation" class="tsd-anchor-link">Documentation<a href="#documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Complete API documentation is available in the <code>docs/</code> directory, auto-generated from TypeScript source code and JSDoc comments.</p>
+<h3 id="viewing-documentation" class="tsd-anchor-link">Viewing Documentation<a href="#viewing-documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><strong>Local development:</strong></p>
 <pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">docs</span><span class="hl-1">        </span><span class="hl-3"># Generate documentation</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">docs:serve</span><span class="hl-1">  </span><span class="hl-3"># Generate and serve locally</span>
 </code><button type="button">Copy</button></pre>
 
 <p><strong>Online:</strong> Browse the <code>docs/</code> folder in this repository or visit the GitHub Pages site (if enabled).</p>
-<h3 id="📚-whats-documented" class="tsd-anchor-link">📚 What's Documented<a href="#📚-whats-documented" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<h3 id="whats-documented" class="tsd-anchor-link">What's Documented<a href="#whats-documented" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li><strong>FoundryClient API</strong> - Complete client documentation with examples</li>
 <li><strong>TypeScript Interfaces</strong> - All data structures and type definitions</li>
 <li><strong>Configuration</strong> - Environment variables and setup options</li>
@@ -393,7 +419,8 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 <li><strong>Usage Examples</strong> - Code samples for common operations</li>
 </ul>
 <p>The documentation is automatically updated via GitHub Actions when source code changes.</p>
-<h2 id="contributing" class="tsd-anchor-link">Contributing<a href="#contributing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ol>
+<h2 id="contributing" class="tsd-anchor-link">Contributing<a href="#contributing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ol>
 <li>Fork the repository</li>
 <li>Create a feature branch: <code>git checkout -b feature/amazing-feature</code></li>
 <li>Make your changes and add tests</li>
@@ -401,24 +428,42 @@ CACHE_TTL_SECONDS=300      # Cache data for 5 minutes
 <li>Push: <code>git push origin feature/amazing-feature</code></li>
 <li>Open a Pull Request</li>
 </ol>
-<h3 id="code-style" class="tsd-anchor-link">Code Style<a href="#code-style" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<h3 id="code-style" class="tsd-anchor-link">Code Style<a href="#code-style" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
 <li>Use TypeScript strict mode</li>
 <li>Follow existing naming conventions</li>
 <li>Add JSDoc comments for public APIs</li>
 <li>Write tests for new functionality</li>
 <li>Use meaningful commit messages</li>
 </ul>
-<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>MIT License - see <a href="LICENSE">LICENSE</a> file for details.</p>
-<h2 id="support" class="tsd-anchor-link">Support<a href="#support" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>MIT License - see <a href="media/LICENSE">LICENSE</a> file for details.</p>
+<h2 id="troubleshooting" class="tsd-anchor-link">Troubleshooting<a href="#troubleshooting" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="quick-diagnostics" class="tsd-anchor-link">Quick Diagnostics<a href="#quick-diagnostics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test-connection</span><span class="hl-1">      </span><span class="hl-3"># Test FoundryVTT connectivity</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">setup-wizard</span><span class="hl-1">        </span><span class="hl-3"># Re-run interactive setup</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="health-check" class="tsd-anchor-link">Health Check<a href="#health-check" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Use the <code>get_health_status</code> MCP tool for comprehensive diagnostics (requires REST API module), or check server logs during startup for detailed status information.</p>
+<h3 id="common-issues" class="tsd-anchor-link">Common Issues<a href="#common-issues" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Connection refused</strong>: Ensure FoundryVTT is running with an active world on the configured port</li>
+<li><strong>Authentication failed</strong>: Verify username/password match a FoundryVTT user exactly</li>
+<li><strong>Empty search results</strong>: Ensure a world is active (not on setup screen) and the user has view permissions</li>
+<li><strong>World data not loading</strong>: Check that <a href="http://Socket.IO">Socket.IO</a> authentication completed successfully</li>
+</ul>
+<p><strong>Detailed troubleshooting guide</strong>: <a href="media/TROUBLESHOOTING.md">TROUBLESHOOTING.md</a></p>
+<h2 id="support" class="tsd-anchor-link">Support<a href="#support" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
 <li><strong>Issues</strong>: GitHub Issues for bugs and feature requests</li>
 <li><strong>Discord</strong>: <a href="https://discord.gg/foundryvtt">FoundryVTT Discord</a> #api-development</li>
 <li><strong>Documentation</strong>: <a href="https://foundryvtt.com/api/">FoundryVTT API Docs</a></li>
+<li><strong>Troubleshooting</strong>: <a href="media/TROUBLESHOOTING.md">TROUBLESHOOTING.md</a></li>
 </ul>
-<h2 id="acknowledgments" class="tsd-anchor-link">Acknowledgments<a href="#acknowledgments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<h2 id="acknowledgments" class="tsd-anchor-link">Acknowledgments<a href="#acknowledgments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
 <li>FoundryVTT team for the excellent VTT platform</li>
 <li>Anthropic for the Model Context Protocol</li>
 <li>The tabletop gaming community for inspiration and feedback</li>
 </ul>
-<hr>
-<p><strong>Happy Gaming! 🎲</strong></p>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#foundryvtt-mcp-server"><span>Foundry<wbr/>VTT <wbr/>MCP <wbr/>Server</span></a><ul><li><a href="#features"><span>Features</span></a></li><li><ul><li><a href="#core-functionality"><span>Core <wbr/>Functionality</span></a></li><li><a href="#real-time-integration"><span>Real-<wbr/>time <wbr/>Integration</span></a></li><li><a href="#ai-powered-features"><span>AI-<wbr/>Powered <wbr/>Features</span></a></li></ul></li><li><a href="#installation"><span>Installation</span></a></li><li><ul><li><a href="#prerequisites"><span>Prerequisites</span></a></li><li><a href="#setup"><span>Setup</span></a></li><li><a href="#development-mode"><span>Development <wbr/>Mode</span></a></li></ul></li><li><a href="#foundryvtt-configuration"><span>Foundry<wbr/>VTT <wbr/>Configuration</span></a></li><li><ul><li><a href="#option-1-local-rest-api-module-🔒-recommended"><span>Option 1: <wbr/>Local <wbr/>REST <wbr/>API <wbr/>Module (🔒 <wbr/>Recommended)</span></a></li><li><a href="#option-2-third-party-rest-api-module"><span>Option 2: <wbr/>Third-<wbr/>Party <wbr/>REST <wbr/>API <wbr/>Module</span></a></li><li><a href="#option-3-usernamepassword-fallback"><span>Option 3: <wbr/>Username/<wbr/>Password (<wbr/>Fallback)</span></a></li><li><a href="#comparison-table"><span>Comparison <wbr/>Table</span></a></li><li><a href="#required-permissions-all-methods"><span>Required <wbr/>Permissions (<wbr/>All <wbr/>Methods)</span></a></li></ul></li><li><a href="#usage"><span>Usage</span></a></li><li><ul><li><a href="#basic-queries"><span>Basic <wbr/>Queries</span></a></li><li><a href="#advanced-features"><span>Advanced <wbr/>Features</span></a></li></ul></li><li><a href="#available-tools"><span>Available <wbr/>Tools</span></a></li><li><ul><li><a href="#data-access"><span>Data <wbr/>Access</span></a></li><li><a href="#game-mechanics"><span>Game <wbr/>Mechanics</span></a></li><li><a href="#content-generation"><span>Content <wbr/>Generation</span></a></li></ul></li><li><a href="#available-resources"><span>Available <wbr/>Resources</span></a></li><li><a href="#configuration"><span>Configuration</span></a></li><li><ul><li><a href="#server-settings"><span>Server <wbr/>Settings</span></a></li><li><a href="#security"><span>Security</span></a></li></ul></li><li><a href="#troubleshooting"><span>Troubleshooting</span></a></li><li><ul><li><a href="#connection-issues"><span>Connection <wbr/>Issues</span></a></li><li><a href="#common-problems"><span>Common <wbr/>Problems</span></a></li></ul></li><li><a href="#development"><span>Development</span></a></li><li><ul><li><a href="#project-structure"><span>Project <wbr/>Structure</span></a></li><li><a href="#adding-new-tools"><span>Adding <wbr/>New <wbr/>Tools</span></a></li><li><a href="#testing"><span>Testing</span></a></li><li><a href="#building"><span>Building</span></a></li></ul></li><li><a href="#api-reference"><span>API <wbr/>Reference</span></a></li><li><ul><li><a href="#environment-variables"><span>Environment <wbr/>Variables</span></a></li><li><a href="#tool-schemas"><span>Tool <wbr/>Schemas</span></a></li><li><ul><li><a href="#roll_dice"><span>roll_<wbr/>dice</span></a></li><li><a href="#search_actors"><span>search_<wbr/>actors</span></a></li><li><a href="#generate_npc"><span>generate_<wbr/>npc</span></a></li></ul></li></ul></li><li><a href="#integration-examples"><span>Integration <wbr/>Examples</span></a></li><li><ul><li><a href="#claude-desktop-configuration"><span>Claude <wbr/>Desktop <wbr/>Configuration</span></a></li><li><a href="#custom-mcp-client"><span>Custom <wbr/>MCP <wbr/>Client</span></a></li></ul></li><li><a href="#roadmap"><span>Roadmap</span></a></li><li><ul><li><a href="#version-020"><span>Version 0.2.0</span></a></li><li><a href="#version-030"><span>Version 0.3.0</span></a></li><li><a href="#version-100"><span>Version 1.0.0</span></a></li></ul></li><li><a href="#documentation"><span>Documentation</span></a></li><li><ul><li><a href="#📖-viewing-documentation"><span>📖 <wbr/>Viewing <wbr/>Documentation</span></a></li><li><a href="#📚-whats-documented"><span>📚 <wbr/>What&#39;s <wbr/>Documented</span></a></li></ul></li><li><a href="#contributing"><span>Contributing</span></a></li><li><ul><li><a href="#code-style"><span>Code <wbr/>Style</span></a></li></ul></li><li><a href="#license"><span>License</span></a></li><li><a href="#support"><span>Support</span></a></li><li><a href="#acknowledgments"><span>Acknowledgments</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">FoundryVTT MCP Server Documentation - v0.2.0</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#foundryvtt-mcp-server"><span>Foundry<wbr/>VTT <wbr/>MCP <wbr/>Server</span></a><ul><li><a href="#features"><span>Features</span></a></li><li><ul><li><a href="#core-functionality"><span>Core <wbr/>Functionality</span></a></li><li><a href="#real-time-integration"><span>Real-<wbr/>time <wbr/>Integration</span></a></li></ul></li><li><a href="#installation"><span>Installation</span></a></li><li><ul><li><a href="#prerequisites"><span>Prerequisites</span></a></li><li><a href="#quick-setup-recommended"><span>Quick <wbr/>Setup (<wbr/>Recommended)</span></a></li><li><a href="#manual-setup"><span>Manual <wbr/>Setup</span></a></li><li><a href="#development-mode"><span>Development <wbr/>Mode</span></a></li></ul></li><li><a href="#foundryvtt-configuration"><span>Foundry<wbr/>VTT <wbr/>Configuration</span></a></li><li><ul><li><a href="#setup"><span>Setup</span></a></li><li><a href="#optional-diagnostics-tools"><span>Optional: <wbr/>Diagnostics <wbr/>Tools</span></a></li><li><a href="#required-permissions"><span>Required <wbr/>Permissions</span></a></li></ul></li><li><a href="#usage"><span>Usage</span></a></li><li><ul><li><a href="#basic-queries"><span>Basic <wbr/>Queries</span></a></li></ul></li><li><a href="#available-tools"><span>Available <wbr/>Tools</span></a></li><li><ul><li><a href="#data-access"><span>Data <wbr/>Access</span></a></li><li><a href="#world"><span>World</span></a></li><li><a href="#game-mechanics"><span>Game <wbr/>Mechanics</span></a></li><li><a href="#content-generation"><span>Content <wbr/>Generation</span></a></li><li><a href="#diagnostics-optional-requires-rest-api-module"><span>Diagnostics (<wbr/>Optional — requires <wbr/>REST <wbr/>API module)</span></a></li></ul></li><li><a href="#available-resources"><span>Available <wbr/>Resources</span></a></li><li><a href="#configuration"><span>Configuration</span></a></li><li><ul><li><a href="#server-settings"><span>Server <wbr/>Settings</span></a></li><li><a href="#security"><span>Security</span></a></li></ul></li><li><a href="#diagnostics-troubleshooting"><span>Diagnostics &amp; <wbr/>Troubleshooting</span></a></li><li><ul><li><a href="#built-in-diagnostics"><span>Built-<wbr/>in <wbr/>Diagnostics</span></a></li><li><a href="#connection-issues"><span>Connection <wbr/>Issues</span></a></li><li><a href="#common-problems"><span>Common <wbr/>Problems</span></a></li></ul></li><li><a href="#development"><span>Development</span></a></li><li><ul><li><a href="#project-structure"><span>Project <wbr/>Structure</span></a></li><li><a href="#adding-new-tools"><span>Adding <wbr/>New <wbr/>Tools</span></a></li><li><a href="#testing"><span>Testing</span></a></li><li><a href="#building"><span>Building</span></a></li></ul></li><li><a href="#api-reference"><span>API <wbr/>Reference</span></a></li><li><ul><li><a href="#environment-variables"><span>Environment <wbr/>Variables</span></a></li><li><a href="#tool-schemas"><span>Tool <wbr/>Schemas</span></a></li><li><ul><li><a href="#roll_dice"><span>roll_<wbr/>dice</span></a></li><li><a href="#search_world"><span>search_<wbr/>world</span></a></li><li><a href="#get_combat_state"><span>get_<wbr/>combat_<wbr/>state</span></a></li><li><a href="#search_actors"><span>search_<wbr/>actors</span></a></li></ul></li></ul></li><li><a href="#integration-examples"><span>Integration <wbr/>Examples</span></a></li><li><ul><li><a href="#claude-desktop-configuration"><span>Claude <wbr/>Desktop <wbr/>Configuration</span></a></li><li><a href="#custom-mcp-client"><span>Custom <wbr/>MCP <wbr/>Client</span></a></li></ul></li><li><a href="#roadmap"><span>Roadmap</span></a></li><li><ul><li><a href="#completed"><span>Completed</span></a></li><li><a href="#planned"><span>Planned</span></a></li></ul></li><li><a href="#documentation"><span>Documentation</span></a></li><li><ul><li><a href="#viewing-documentation"><span>Viewing <wbr/>Documentation</span></a></li><li><a href="#whats-documented"><span>What&#39;s <wbr/>Documented</span></a></li></ul></li><li><a href="#contributing"><span>Contributing</span></a></li><li><ul><li><a href="#code-style"><span>Code <wbr/>Style</span></a></li></ul></li><li><a href="#license"><span>License</span></a></li><li><a href="#troubleshooting"><span>Troubleshooting</span></a></li><li><ul><li><a href="#quick-diagnostics"><span>Quick <wbr/>Diagnostics</span></a></li><li><a href="#health-check"><span>Health <wbr/>Check</span></a></li><li><a href="#common-issues"><span>Common <wbr/>Issues</span></a></li></ul></li><li><a href="#support"><span>Support</span></a></li><li><a href="#acknowledgments"><span>Acknowledgments</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">FoundryVTT MCP Server - v0.11.0</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
