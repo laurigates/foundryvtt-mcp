@@ -135,7 +135,7 @@ function loadConfig(): Config {
         if (err.path.includes('url')) {
           console.error('  💡 URL Examples:');
           console.error('     • Local: http://localhost:30000');
-          console.error('     • Reverse Proxy: https://dnd.lakuz.com');
+          console.error('     • Reverse Proxy: https://foundry.example.com');
           console.error('     • Network IP: http://192.168.1.100:30000');
           console.error('     • Custom Port: https://foundry.example.com:8443');
         }

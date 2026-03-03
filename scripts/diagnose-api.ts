@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL || 'https://dnd.lakuz.com';
+const FOUNDRY_URL = process.env.FOUNDRY_URL || 'http://localhost:30000';
 const API_KEY = process.env.FOUNDRY_API_KEY;
 
 interface TestResult {

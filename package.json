@@ -30,7 +30,8 @@
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
     "docs:serve": "npm run docs && npx http-server docs",
-    "setup": "npm run clean && npm run build && npm run test-connection"
+    "setup": "npm run clean && npm run build && npm run test-connection",
+    "prepare": "husky"
   },
   "keywords": [
     "foundry",
@@ -54,6 +55,8 @@
     "@biomejs/biome": "^2.3.15",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20.19.33",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "rimraf": "^5.0.10",
     "tsx": "^4.21.0",
     "typedoc": "^0.28.16",
@@ -62,5 +65,13 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,js,jsx}": [
+      "biome check --write"
+    ],
+    "src/**/*.{json,css,md}": [
+      "biome format --write"
+    ]
   }
 }
