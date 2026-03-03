@@ -4,15 +4,6 @@
       "type": "http",
       "url": "https://mcp.sentry.dev/mcp"
     },
-    "github": {
-      "command": "github-mcp-server",
-      "args": [
-        "stdio"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
-      }
-    },
     "context7": {
       "command": "bunx",
       "args": [
@@ -41,6 +32,17 @@
         "chrome-devtools-mcp@latest"
       ],
       "env": {}
+    },
+    "github": {
+      "command": "go",
+      "args": [
+        "run",
+        "github.com/github/github-mcp-server/cmd/github-mcp-server@latest",
+        "stdio"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      }
     }
   }
 }
