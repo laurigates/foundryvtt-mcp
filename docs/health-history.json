@@ -1,0 +1,18 @@
+{
+  "snapshots": [
+    {
+      "date": "2026-03-03",
+      "overall_score": 87,
+      "grade": "B",
+      "category_scores": {
+        "docs": 20,
+        "tests": 17,
+        "security": 12,
+        "quality": 18,
+        "ci": 20
+      },
+      "fixed_count": 3,
+      "remaining_count": 12
+    }
+  ]
+}
