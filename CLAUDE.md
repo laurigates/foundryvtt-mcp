@@ -5,20 +5,22 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 ## Tech Stack
 
 - **Language**: TypeScript (ES modules, `.js` imports for MCP SDK compatibility)
-- **Runtime**: Node.js
+- **Runtime**: Node.js (Bun as package manager)
 - **Test**: Vitest (unit), Playwright (E2E)
-- **Lint**: ESLint (functional programming patterns)
+- **Lint/Format**: Biome (linting + formatting)
 - **Validation**: Zod schemas
 
 ## Essential Commands
 
 ```bash
-npm run build          # Compile TypeScript
-npm run dev            # Development mode with hot reload
-npm test               # Unit tests (Vitest)
-npm run test:e2e       # E2E tests (Playwright, headless)
-npm run lint           # Lint code
-npm run test-connection # Test MCP→FoundryVTT connection
+bun run build          # Compile TypeScript
+bun run dev            # Development mode with hot reload
+bun test               # Unit tests (Vitest)
+bun run test:e2e       # E2E tests (Playwright, headless)
+bun run lint           # Lint code (Biome)
+bun run lint:fix       # Auto-fix lint issues
+bun run format         # Format code (Biome)
+bun run test-connection # Test MCP→FoundryVTT connection
 ```
 
 ## Architecture
