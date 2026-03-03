@@ -61,7 +61,7 @@
     "tsx": "^4.21.0",
     "typedoc": "^0.28.16",
     "typescript": "^5.9.3",
-    "vitest": "^1.6.1"
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18.0.0"
