@@ -43,7 +43,7 @@ Before configuring, determine your FoundryVTT deployment:
 
 #### Reverse Proxy / Remote Setup
 - FoundryVTT behind a reverse proxy (nginx, Apache, Caddy, etc.)
-- Custom domains with SSL/TLS (e.g., `https://dnd.lakuz.com`)
+- Custom domains with SSL/TLS (e.g., `https://foundry.example.com`)
 - Cloud hosting or remote server deployments
 - May use custom ports or paths
 
@@ -65,7 +65,7 @@ FOUNDRY_PASSWORD=your_password
 
 **Reverse Proxy / Remote:**
 ```env
-FOUNDRY_URL=https://dnd.lakuz.com
+FOUNDRY_URL=https://foundry.example.com
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 ```
@@ -162,7 +162,7 @@ Once the server is running, test these commands with your AI assistant:
 
 - **Check**: FoundryVTT is running at the configured URL with an active world
 - **Check**: No firewall blocking the connection
-- **Try**: Test URL in browser (local: `http://localhost:30000`, remote: `https://dnd.lakuz.com`)
+- **Try**: Test URL in browser (local: `http://localhost:30000`, remote: `https://foundry.example.com`)
 - **For reverse proxy**: Ensure WebSocket upgrades are properly configured
 
 #### "Authentication failed"
@@ -195,7 +195,7 @@ Once the server is running, test these commands with your AI assistant:
 **SSL Certificate Problems:**
 - **Check**: SSL certificate is valid and not expired
 - **Check**: Certificate includes your domain name
-- **Try**: Test with curl: `curl -I https://dnd.lakuz.com`
+- **Try**: Test with curl: `curl -I https://foundry.example.com`
 
 **Proxy Configuration:**
 - **Nginx**: Ensure `proxy_set_header Upgrade $http_upgrade;` and `proxy_set_header Connection "upgrade";`

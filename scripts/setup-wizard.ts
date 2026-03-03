@@ -146,7 +146,7 @@ class SetupWizard {
     console.log('🌐 Remote FoundryVTT Configuration\n');
     console.log('For remote setups, you\'ll need the full URL including protocol.');
     console.log('Examples:');
-    console.log('  • https://dnd.lakuz.com (reverse proxy with HTTPS)');
+    console.log('  • https://foundry.example.com (reverse proxy with HTTPS)');
     console.log('  • http://foundry.example.com (reverse proxy with HTTP)');
     console.log('  • https://my-server.com:8443 (custom port with HTTPS)');
     console.log('  • http://192.168.1.100:30000 (local network IP)\n');
@@ -174,7 +174,7 @@ class SetupWizard {
     console.log('⚙️ Custom URL Configuration\n');
     console.log('Examples:');
     console.log('  • http://localhost:30000 (local development)');
-    console.log('  • https://dnd.lakuz.com (reverse proxy)');
+    console.log('  • https://foundry.example.com (reverse proxy)');
     console.log('  • http://192.168.1.100:30000 (network IP)');
     console.log('  • https://my-foundry.com:8443 (custom port)\n');
 
