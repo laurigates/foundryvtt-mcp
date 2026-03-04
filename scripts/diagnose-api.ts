@@ -8,7 +8,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const FOUNDRY_URL = process.env.FOUNDRY_URL || 'http://localhost:30000';
 const API_KEY = process.env.FOUNDRY_API_KEY;
