@@ -8,7 +8,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 /**
  * Handles recent log retrieval requests
@@ -23,8 +23,7 @@ export async function handleGetRecentLogs(
 ) {
   const { limit = 20, level, since } = args;
 
-  try {
-    logger.info('Getting recent logs', { limit, level, since });
+  return withToolError('get recent logs', async () => {
     const logs = await diagnosticsClient.getRecentLogs();
 
     const logEntries = Array.isArray(logs)
@@ -49,13 +48,7 @@ ${logEntries || 'No log entries found.'}`,
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get recent logs:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get recent logs: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -69,14 +62,13 @@ export async function handleSearchLogs(
   },
   diagnosticsClient: DiagnosticsClient,
 ) {
-  const { query, level, limit = 50 } = args;
+  const { query, level } = args;
 
   if (!query || typeof query !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'Query is required and must be a string');
   }
 
-  try {
-    logger.info('Searching logs', { query, level, limit });
+  return withToolError('search logs', async () => {
     const logs = await diagnosticsClient.searchLogs({ pattern: query });
 
     const logEntries = Array.isArray(logs)
@@ -103,13 +95,7 @@ ${logEntries || 'No matching log entries found.'}`,
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to search logs:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to search logs: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -119,8 +105,7 @@ export async function handleGetSystemHealth(
   _args: Record<string, unknown>,
   diagnosticsClient: DiagnosticsClient,
 ) {
-  try {
-    logger.info('Getting system health');
+  return withToolError('get system health', async () => {
     const health = await diagnosticsClient.getSystemHealth();
 
     return {
@@ -143,13 +128,7 @@ export async function handleGetSystemHealth(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get system health:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get system health: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -163,8 +142,7 @@ export async function handleDiagnoseErrors(
 ) {
   const { category } = args;
 
-  try {
-    logger.info('Diagnosing errors', { category });
+  return withToolError('diagnose errors', async () => {
     // Mock diagnosis since the method doesn't exist yet
     const diagnosis = {
       errors: [],
@@ -206,13 +184,7 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to diagnose errors:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to diagnose errors: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -223,9 +195,7 @@ export async function handleGetHealthStatus(
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
 ) {
-  try {
-    logger.info('Getting comprehensive health status');
-
+  return withToolError('get health status', async () => {
     const [worldInfo, systemHealth] = await Promise.all([
       foundryClient.getWorldInfo().catch(() => null),
       diagnosticsClient.getSystemHealth().catch(() => null),
@@ -264,11 +234,5 @@ ${
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get health status:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get health status: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

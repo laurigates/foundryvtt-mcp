@@ -4,9 +4,8 @@
  * Handles searching for items and retrieving detailed item information.
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 /**
  * Handles item search requests
@@ -22,8 +21,7 @@ export async function handleSearchItems(
 ) {
   const { query, type, rarity, limit = 10 } = args;
 
-  try {
-    logger.info('Searching items', { query, type, rarity, limit });
+  return withToolError('search items', async () => {
     const searchParams: { query: string; type?: string; rarity?: string; limit: number } = {
       query: query || '',
       limit,
@@ -61,11 +59,5 @@ ${itemList || 'No items found matching the criteria.'}
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to search items:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to search items: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

@@ -6,7 +6,7 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 /**
  * Handles actor search requests
@@ -21,8 +21,7 @@ export async function handleSearchActors(
 ) {
   const { query, type, limit = 10 } = args;
 
-  try {
-    logger.info('Searching actors', { query, type, limit });
+  return withToolError('search actors', async () => {
     const searchParams: { query: string; type?: string; limit: number } = {
       query: query || '',
       limit,
@@ -54,13 +53,7 @@ ${actorList || 'No actors found matching the criteria.'}
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to search actors:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to search actors: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -78,8 +71,7 @@ export async function handleGetActorDetails(
     throw new McpError(ErrorCode.InvalidParams, 'Actor ID is required and must be a string');
   }
 
-  try {
-    logger.info('Getting actor details', { actorId });
+  return withToolError('get actor details', async () => {
     const actor = await foundryClient.getActor(actorId);
 
     const abilities = actor.abilities
@@ -108,11 +100,5 @@ ${abilities}
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get actor details:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get actor details: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

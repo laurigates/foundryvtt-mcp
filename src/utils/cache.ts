@@ -60,7 +60,13 @@ export class CacheService {
 
       // Clean up expired entries periodically
       this.cleanupInterval = setInterval(
-        () => this.cleanup(),
+        () => {
+          try {
+            this.cleanup();
+          } catch (err) {
+            logger.warn('Cache cleanup error', { error: err instanceof Error ? err.message : err });
+          }
+        },
         Math.max((config.ttlSeconds * 1000) / 4, 30000),
       );
     }

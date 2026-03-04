@@ -6,15 +6,14 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 export async function handleReadResource(
   uri: string,
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
 ) {
-  logger.info('Reading resource', { uri });
-
-  try {
+  return withToolError('read resource', async () => {
     switch (uri) {
       case 'foundry://actors':
         return await getActorsResource(foundryClient);
@@ -46,16 +45,7 @@ export async function handleReadResource(
       default:
         throw new McpError(ErrorCode.InvalidParams, `Unknown resource URI: ${uri}`);
     }
-  } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
-    logger.error('Failed to read resource:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to read resource: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 async function getActorsResource(foundryClient: FoundryClient) {
@@ -129,7 +119,8 @@ async function getCurrentSceneResource(foundryClient: FoundryClient) {
         },
       ],
     };
-  } catch {
+  } catch (error) {
+    logger.debug('getCurrentSceneResource: no active scene', { error });
     return {
       contents: [
         {
@@ -234,7 +225,8 @@ async function getSystemDiagnosticsResource(diagnosticsClient: DiagnosticsClient
         },
       ],
     };
-  } catch {
+  } catch (error) {
+    logger.debug('getSystemDiagnosticsResource: diagnostics unavailable', { error });
     return {
       contents: [
         {

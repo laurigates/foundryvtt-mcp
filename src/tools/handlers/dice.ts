@@ -5,9 +5,7 @@
  * or fallback mechanisms when the API is unavailable.
  */
 
-import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { logger } from '../../utils/logger.js';
 // import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { BaseTool, type ToolContext, type ToolResult } from '../base.js';
@@ -61,12 +59,10 @@ export async function handleRollDice(
     reason?: string;
   },
   foundryClient: FoundryClient,
-) {
+): Promise<ToolResult> {
   const tool = new RollDiceTool();
   const context: ToolContext = {
     foundryClient,
-    diagnosticsClient: null as unknown as DiagnosticsClient,
-    diagnosticSystem: null as unknown as DiagnosticSystem,
   };
   return tool.execute(args, context);
 }

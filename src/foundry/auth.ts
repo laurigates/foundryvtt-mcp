@@ -17,7 +17,8 @@ import { logger } from '../utils/logger.js';
  */
 async function getSessionCookie(baseUrl: string): Promise<string> {
   const res = await axios.get(`${baseUrl}/join`, {
-    validateStatus: () => true,
+    // Accept 200 (join page) and 302 (redirect after cookie set)
+    validateStatus: (status) => status === 200 || status === 302,
     maxRedirects: 0,
   });
 
@@ -82,7 +83,8 @@ async function resolveUserId(baseUrl: string, user: string, session: string): Pr
         const found = data.users.find((u) => u.name.toLowerCase() === user.toLowerCase());
         if (!found) {
           const available = data.users.map((u) => u.name).join(', ');
-          return reject(new Error(`User "${user}" not found. Available users: ${available}`));
+          logger.debug('User not found in FoundryVTT user list', { available });
+          return reject(new Error(`User "${user}" not found`));
         }
 
         logger.debug('Resolved user document _id', { displayName: user, _id: found._id });
@@ -112,6 +114,26 @@ export async function authenticateFoundry(
   user: string,
   password: string,
 ): Promise<{ session: string; userId: string }> {
+  // Warn when credentials are sent over plaintext HTTP to a non-localhost host
+  try {
+    const parsed = new URL(baseUrl);
+    if (
+      parsed.protocol === 'http:' &&
+      parsed.hostname !== 'localhost' &&
+      parsed.hostname !== '127.0.0.1' &&
+      !parsed.hostname.startsWith('::1')
+    ) {
+      logger.warn(
+        'WARNING: Connecting to a non-localhost host over plain HTTP. ' +
+          'Your password will be transmitted in plaintext. ' +
+          'Use HTTPS for non-local FoundryVTT instances.',
+        { host: parsed.hostname },
+      );
+    }
+  } catch {
+    // URL already validated by config; ignore parse errors here
+  }
+
   // Step 1: Get session cookie
   const session = await getSessionCookie(baseUrl);
 
@@ -131,7 +153,8 @@ export async function authenticateFoundry(
         'Content-Type': 'application/json',
         Cookie: `session=${session}`,
       },
-      validateStatus: () => true,
+      // Accept 200 (success JSON) and 302 (redirect to /game on success)
+      validateStatus: (status) => status === 200 || status === 302,
     },
   );
 

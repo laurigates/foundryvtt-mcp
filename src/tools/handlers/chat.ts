@@ -2,15 +2,14 @@
  * Chat message tool handler
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 export async function handleGetChatMessages(
   args: { limit?: number },
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('get chat messages', async () => {
     const limit = args.limit || 20;
     const messages = foundryClient.getChatMessages(limit);
 
@@ -44,11 +43,5 @@ export async function handleGetChatMessages(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get chat messages:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get chat messages: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

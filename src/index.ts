@@ -18,6 +18,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
+  type CallToolResult,
   ErrorCode,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
@@ -126,13 +127,13 @@ class FoundryMCPServer {
       logger.info('Executing tool', { name, args });
 
       try {
-        return await routeToolRequest(
+        return (await routeToolRequest(
           name,
           args || {},
           this.foundryClient,
           this.diagnosticsClient,
           this.diagnosticSystem,
-        );
+        )) as CallToolResult;
       } catch (error) {
         logger.error('Tool execution failed:', error);
 

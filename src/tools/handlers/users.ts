@@ -2,9 +2,8 @@
  * User management tool handler
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 const ROLE_NAMES: Record<number, string> = {
   0: 'None',
@@ -15,7 +14,7 @@ const ROLE_NAMES: Record<number, string> = {
 };
 
 export async function handleGetUsers(_args: Record<string, unknown>, foundryClient: FoundryClient) {
-  try {
+  return withToolError('get users', async () => {
     const { users, activeUsers } = foundryClient.getUsers();
     const activeSet = new Set(activeUsers);
 
@@ -37,11 +36,5 @@ export async function handleGetUsers(_args: Record<string, unknown>, foundryClie
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get users:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get users: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
