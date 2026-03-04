@@ -17,15 +17,25 @@ import { logger } from '../utils/logger.js';
  */
 export interface ToolContext {
   foundryClient: FoundryClient;
-  diagnosticsClient: DiagnosticsClient;
-  diagnosticSystem: DiagnosticSystem;
+  diagnosticsClient?: DiagnosticsClient;
+  diagnosticSystem?: DiagnosticSystem;
 }
 
 /**
- * Tool execution result with MCP-compatible format
- * This matches the return type of existing handlers
+ * Tool execution result matching the MCP CallToolResult shape.
+ * Uses a structural interface to avoid pulling in zod-inferred literal types
+ * while still enforcing the required content array structure.
  */
-export type ToolResult = any;
+export interface ToolResult {
+  content: Array<{
+    type: string;
+    text?: string;
+    data?: string;
+    mimeType?: string;
+    [key: string]: unknown;
+  }>;
+  isError?: boolean;
+}
 
 /**
  * Base interface for all tools
@@ -56,7 +66,7 @@ export abstract class BaseTool implements Tool {
   private static readonly ajv = new Ajv({
     allErrors: true,
     verbose: true,
-    strict: false, // Allow additional properties for flexibility
+    strict: true,
   });
 
   abstract readonly name: string;

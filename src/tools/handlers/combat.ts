@@ -2,15 +2,14 @@
  * Combat state tool handler
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 export async function handleGetCombatState(
   _args: Record<string, unknown>,
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('get combat state', async () => {
     const combat = foundryClient.getCombatState();
 
     if (!combat) {
@@ -55,11 +54,5 @@ export async function handleGetCombatState(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get combat state:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get combat state: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

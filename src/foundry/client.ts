@@ -7,6 +7,7 @@
 
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import { io, type Socket } from 'socket.io-client';
+import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry } from './auth.js';
 import type {
@@ -25,6 +26,29 @@ import type {
   WorldScene,
   WorldUser,
 } from './types.js';
+
+/** FoundryVTT document IDs are 16-character alphanumeric strings. */
+const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
+
+/**
+ * Minimal Zod schema for the WorldData Socket.IO payload.
+ * Validates the required top-level array fields; extra fields pass through.
+ */
+const WorldDataSchema = z.object({
+  userId: z.string(),
+  actors: z.array(z.unknown()),
+  scenes: z.array(z.unknown()),
+  items: z.array(z.unknown()),
+  journal: z.array(z.unknown()),
+  messages: z.array(z.unknown()),
+  combats: z.array(z.unknown()),
+  users: z.array(z.unknown()),
+  activeUsers: z.array(z.string()),
+  macros: z.array(z.unknown()),
+  playlists: z.array(z.unknown()),
+  tables: z.array(z.unknown()),
+  folders: z.array(z.unknown()),
+});
 
 export interface FoundryClientConfig {
   baseUrl: string;
@@ -171,6 +195,12 @@ export class FoundryClient {
         this.socket?.emit('world', (worldData: WorldData) => {
           clearTimeout(timeout);
           cleanup();
+          const parsed = WorldDataSchema.safeParse(worldData);
+          if (!parsed.success) {
+            logger.warn('WorldData failed schema validation — proceeding with raw data', {
+              issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+            });
+          }
           resolve(worldData);
         });
       };
@@ -223,6 +253,12 @@ export class FoundryClient {
       const timeout = setTimeout(() => reject(new Error('Refresh timeout')), 15000);
       this.socket?.emit('world', (data: WorldData) => {
         clearTimeout(timeout);
+        const parsed = WorldDataSchema.safeParse(data);
+        if (!parsed.success) {
+          logger.warn('WorldData refresh failed schema validation — proceeding with raw data', {
+            issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+          });
+        }
         resolve(data);
       });
     });
@@ -272,6 +308,9 @@ export class FoundryClient {
   }
 
   async getActor(actorId: string): Promise<FoundryActor> {
+    if (!FOUNDRY_ID_PATTERN.test(actorId)) {
+      throw new Error(`Invalid actorId format: ${actorId}`);
+    }
     if (this.config.apiKey) {
       return this.executeWithRetry(async () => {
         const response = await this.http.get(`/api/actors/${actorId}`);
@@ -362,6 +401,9 @@ export class FoundryClient {
   // ==========================================================================
 
   async getCurrentScene(sceneId?: string): Promise<FoundryScene> {
+    if (sceneId !== undefined && !FOUNDRY_ID_PATTERN.test(sceneId)) {
+      throw new Error(`Invalid sceneId format: ${sceneId}`);
+    }
     if (this.config.apiKey) {
       return this.executeWithRetry(async () => {
         const endpoint = sceneId ? `/api/scenes/${sceneId}` : '/api/scenes/current';

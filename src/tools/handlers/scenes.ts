@@ -4,9 +4,8 @@
  * Handles scene information retrieval and management.
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 /**
  * Handles scene information requests
@@ -19,8 +18,7 @@ export async function handleGetSceneInfo(
 ) {
   const { sceneId } = args;
 
-  try {
-    logger.info('Getting scene info', { sceneId });
+  return withToolError('get scene info', async () => {
     const scene = await foundryClient.getCurrentScene(sceneId);
 
     return {
@@ -41,11 +39,5 @@ export async function handleGetSceneInfo(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get scene info:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get scene info: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

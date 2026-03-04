@@ -6,7 +6,7 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 /**
  * Handles NPC generation requests
@@ -21,9 +21,7 @@ export async function handleGenerateNPC(
 ) {
   const { level = 1, race, class: characterClass } = args;
 
-  try {
-    logger.info('Generating NPC', { level, race, characterClass });
-
+  return withToolError('generate NPC', async () => {
     // Generate basic NPC data
     const npcName = generateRandomName();
     const npcRace = race || getRandomRace();
@@ -50,13 +48,7 @@ export async function handleGenerateNPC(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to generate NPC:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to generate NPC: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -71,9 +63,7 @@ export async function handleGenerateLoot(
 ) {
   const { challengeRating = 1, treasureType = 'individual' } = args;
 
-  try {
-    logger.info('Generating loot', { challengeRating, treasureType });
-
+  return withToolError('generate loot', async () => {
     const loot = generateLootForCR(challengeRating, treasureType);
 
     return {
@@ -94,13 +84,7 @@ ${loot.items.map((item) => `- ${item.name} (${item.rarity})`).join('\n')}
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to generate loot:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to generate loot: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 /**
@@ -119,9 +103,7 @@ export async function handleLookupRule(
     throw new McpError(ErrorCode.InvalidParams, 'Query is required and must be a string');
   }
 
-  try {
-    logger.info('Looking up rule', { query, system });
-
+  return withToolError('lookup rule', async () => {
     const ruleInfo = lookupGameRule(query, system);
 
     return {
@@ -140,13 +122,7 @@ export async function handleLookupRule(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to lookup rule:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to lookup rule: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 // Helper functions for content generation

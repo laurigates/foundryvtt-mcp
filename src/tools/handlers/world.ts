@@ -2,15 +2,14 @@
  * World-level tool handlers: cross-collection search, summary, refresh
  */
 
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 export async function handleSearchWorld(
   args: { query: string; limit?: number },
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('search world', async () => {
     const results = foundryClient.searchWorld(args.query);
     const limit = args.limit || 5;
 
@@ -59,20 +58,14 @@ export async function handleSearchWorld(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to search world:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to search world: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 export async function handleGetWorldSummary(
   _args: Record<string, unknown>,
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('get world summary', async () => {
     const worldInfo = await foundryClient.getWorldInfo();
     const counts = foundryClient.getWorldSummary();
 
@@ -93,20 +86,14 @@ ${countLines || 'No data available — not connected.'}`,
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to get world summary:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get world summary: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 export async function handleRefreshWorldData(
   _args: Record<string, unknown>,
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('refresh world data', async () => {
     await foundryClient.refreshWorldData();
     const counts = foundryClient.getWorldSummary();
 
@@ -122,11 +109,5 @@ export async function handleRefreshWorldData(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to refresh world data:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to refresh world data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

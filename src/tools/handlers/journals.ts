@@ -4,13 +4,13 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import { logger } from '../../utils/logger.js';
+import { withToolError } from './utils.js';
 
 export async function handleSearchJournals(
   args: { query: string; limit?: number },
   foundryClient: FoundryClient,
 ) {
-  try {
+  return withToolError('search journals', async () => {
     const results = foundryClient.searchJournals(args.query);
     const limit = args.limit || 10;
     const limited = results.slice(0, limit);
@@ -41,17 +41,11 @@ export async function handleSearchJournals(
         },
       ],
     };
-  } catch (error) {
-    logger.error('Failed to search journals:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to search journals: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }
 
 export async function handleGetJournal(args: { journalId: string }, foundryClient: FoundryClient) {
-  try {
+  return withToolError('get journal', async () => {
     const journal = foundryClient.getJournal(args.journalId);
 
     if (!journal) {
@@ -78,14 +72,5 @@ export async function handleGetJournal(args: { journalId: string }, foundryClien
         },
       ],
     };
-  } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
-    logger.error('Failed to get journal:', error);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to get journal: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
-  }
+  });
 }

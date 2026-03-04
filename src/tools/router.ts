@@ -7,7 +7,7 @@ import type { DiagnosticsClient } from '../diagnostics/client.js';
 import type { FoundryClient } from '../foundry/client.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
-import type { ToolContext } from './base.js';
+import type { ToolContext, ToolResult } from './base.js';
 import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
 import { handleGetChatMessages } from './handlers/chat.js';
 import { handleGetCombatState } from './handlers/combat.js';
@@ -42,7 +42,7 @@ export async function routeToolRequest(
   foundryClient: FoundryClient,
   diagnosticsClient: DiagnosticsClient,
   diagnosticSystem: DiagnosticSystem,
-) {
+): Promise<ToolResult> {
   logger.debug(`Routing tool request: ${name}`, { args });
 
   // Try the new registry system first
