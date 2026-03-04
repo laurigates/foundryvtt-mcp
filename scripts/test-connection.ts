@@ -10,7 +10,7 @@ import { FoundryClient } from '../src/foundry/client.js';
 import { config } from '../src/config/index.js';
 import { logger } from '../src/utils/logger.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 async function testConnection() {
   console.log('🧪 FoundryVTT MCP Server - Connection Test\n');

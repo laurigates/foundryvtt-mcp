@@ -39,7 +39,7 @@ import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * Main FoundryVTT MCP Server class that handles all communication
