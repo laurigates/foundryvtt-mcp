@@ -1,0 +1,57 @@
+# Development files
+.claude/
+.env*
+.github/
+.husky/
+.mcp.json
+.release-please-manifest.json
+
+# Source code (compiled JS in dist/ is what we publish)
+src/
+scripts/
+tests/
+
+# Test files
+*.test.ts
+*.spec.ts
+vitest.*.config.ts
+vitest.config.ts
+playwright.config.ts
+test-results/
+.playwright/
+
+# Configuration files
+tsconfig.json
+biome.json
+.gitignore
+.gitattributes
+
+# Documentation source
+docs/
+README.md (if you prefer, but usually included)
+
+# Node modules (always excluded)
+node_modules/
+
+# Build artifacts (exclude everything except dist/)
+tmp/
+coverage/
+dist-old/
+.turbo/
+playwright-report/
+
+# Lock files (use one, exclude others)
+bun.lock
+pnpm-lock.yaml
+yarn.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

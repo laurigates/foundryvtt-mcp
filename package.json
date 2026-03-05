@@ -31,7 +31,8 @@
     "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
     "docs:serve": "npm run docs && npx http-server docs",
     "setup": "npm run clean && npm run build && npm run test-connection",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [
     "foundry",
@@ -41,8 +42,28 @@
     "tabletop",
     "rpg"
   ],
-  "author": "Your Name",
+  "author": "Lauri Gates",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laurigates/foundryvtt-mcp.git"
+  },
+  "homepage": "https://github.com/laurigates/foundryvtt-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/laurigates/foundryvtt-mcp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "!dist/index-old.*",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "ajv": "^8.17.1",
