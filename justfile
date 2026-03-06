@@ -242,11 +242,6 @@ antipatterns:
 
 ########## Publishing ##########
 
-# Create an npm automation token for CI publishing
-[group: "publish"]
-npm-token:
-    npm token create --bypass-2fa --packages-all --packages-and-scopes-permission read-write --token-description "foundryvtt-mcp CI publish"
-
 # Dry-run npm publish to verify tarball contents
 [group: "publish"]
 publish-dry-run: build
