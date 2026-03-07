@@ -350,6 +350,6 @@ export class CharacterManager extends EventEmitter {
   }
 
   private generateItemId(): string {
-    return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 }

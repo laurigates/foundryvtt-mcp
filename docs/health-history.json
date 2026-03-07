@@ -13,6 +13,20 @@
       },
       "fixed_count": 3,
       "remaining_count": 12
+    },
+    {
+      "date": "2026-03-07",
+      "overall_score": 90,
+      "grade": "A",
+      "category_scores": {
+        "docs": 18,
+        "tests": 20,
+        "security": 16,
+        "quality": 16,
+        "ci": 20
+      },
+      "fixed_count": 5,
+      "remaining_count": 12
     }
   ]
 }
