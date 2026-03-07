@@ -10,6 +10,54 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.0.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v0.11.0...foundryvtt-mcp-v1.0.0) (2026-03-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* The foundry-local-rest-api module has been moved to its own repository to improve focus and enable independent versioning.
+
+### Features
+
+* Add Foundry Local REST API module ([7f8383a](https://github.com/laurigates/foundryvtt-mcp/commit/7f8383a9b54b3c374d960aad7f97b0b5ecff7d6d))
+* add FoundryVTT v13 compatibility and API key configuration UI ([#20](https://github.com/laurigates/foundryvtt-mcp/issues/20)) ([c61559f](https://github.com/laurigates/foundryvtt-mcp/commit/c61559f758a14f4e1bb0d756b88758c10f120760))
+* add serena-mcp configuration and Claude plugin setup ([#88](https://github.com/laurigates/foundryvtt-mcp/issues/88)) ([14bbdad](https://github.com/laurigates/foundryvtt-mcp/commit/14bbdade589afc4ff47348482797516960dd890f))
+* Bump module version to 0.7.0 ([#27](https://github.com/laurigates/foundryvtt-mcp/issues/27)) ([cf1a38b](https://github.com/laurigates/foundryvtt-mcp/commit/cf1a38bde8b582833afcedae52dcce37929b2eb1))
+* **ci:** migrate to npm trusted publishing (OIDC) ([#113](https://github.com/laurigates/foundryvtt-mcp/issues/113)) ([cf64b93](https://github.com/laurigates/foundryvtt-mcp/commit/cf64b93a3f407e58b5e57fff95293126051e53a5))
+* **core:** refactor MCP server architecture with proper Socket.IO authentication ([#89](https://github.com/laurigates/foundryvtt-mcp/issues/89)) ([2e7640d](https://github.com/laurigates/foundryvtt-mcp/commit/2e7640d0f5e0b6e826a9804dca3bee0607d419de)), closes [#82](https://github.com/laurigates/foundryvtt-mcp/issues/82)
+* extract foundry-local-rest-api module to standalone repository ([#84](https://github.com/laurigates/foundryvtt-mcp/issues/84)) ([4aae7d9](https://github.com/laurigates/foundryvtt-mcp/commit/4aae7d9e9ec73f3e8b886d020d9e42355c404313))
+* **foundry-local-rest-api:** add local REST API module for FoundryVTT ([ad8b506](https://github.com/laurigates/foundryvtt-mcp/commit/ad8b5060ca231ffefa389cad1e6c8f68f4a4e069))
+* improve UX with setup wizard, diagnostics, and enhanced error handling ([#34](https://github.com/laurigates/foundryvtt-mcp/issues/34)) ([92ba522](https://github.com/laurigates/foundryvtt-mcp/commit/92ba5225abd1b7519d8401596112171e8324b3d2))
+* **justfile:** add npm-token and publish-dry-run recipes ([#111](https://github.com/laurigates/foundryvtt-mcp/issues/111)) ([39a41f7](https://github.com/laurigates/foundryvtt-mcp/commit/39a41f7c481695cf363eb0952ed013bb339c5c5c))
+* modernize tool system with schema validation, caching, and enhanced WebSocket events ([#79](https://github.com/laurigates/foundryvtt-mcp/issues/79)) ([dbbfc9f](https://github.com/laurigates/foundryvtt-mcp/commit/dbbfc9f0670f8dbbfd14c53b9a63f1edb712caac))
+* rename package to foundryvtt-mcp and add bin entry ([#114](https://github.com/laurigates/foundryvtt-mcp/issues/114)) ([fdc5b60](https://github.com/laurigates/foundryvtt-mcp/commit/fdc5b60000f0ca6602995f6eb3497b91065b6437))
+* **test:** add integration test suite with real FoundryVTT container ([#92](https://github.com/laurigates/foundryvtt-mcp/issues/92)) ([b5c168e](https://github.com/laurigates/foundryvtt-mcp/commit/b5c168e7893f32a531a5f3bb8f9a78b02b1871ab))
+* **test:** comprehensive E2E testing framework and development tooling + type safety improvements ([#74](https://github.com/laurigates/foundryvtt-mcp/issues/74)) ([0a4c856](https://github.com/laurigates/foundryvtt-mcp/commit/0a4c856b76c6fcec5e2dad3675c684df0ed7f353))
+
+
+### Bug Fixes
+
+* **author:** update author email ([#12](https://github.com/laurigates/foundryvtt-mcp/issues/12)) ([06e3895](https://github.com/laurigates/foundryvtt-mcp/commit/06e38952cce20a6517725f4a6dc7bbdf9c044661))
+* **config:** replace hardcoded port 30000 with proper URL handling for reverse proxy setups ([#67](https://github.com/laurigates/foundryvtt-mcp/issues/67)) ([f6e219a](https://github.com/laurigates/foundryvtt-mcp/commit/f6e219a0dc0d2effe31f52462e67593f16da140e))
+* improve config layout ([#40](https://github.com/laurigates/foundryvtt-mcp/issues/40)) ([f6496e2](https://github.com/laurigates/foundryvtt-mcp/commit/f6496e295345eed2b1203a630a482797f1f6d16d))
+* resolve integration test timeouts by adding missing apiKey configuration ([#53](https://github.com/laurigates/foundryvtt-mcp/issues/53)) ([0a46713](https://github.com/laurigates/foundryvtt-mcp/commit/0a46713d72311c0542a19336f2b90186d394ee08))
+* resolve integration test timeouts by adding missing apiKey configuration ([#60](https://github.com/laurigates/foundryvtt-mcp/issues/60)) ([d59dba7](https://github.com/laurigates/foundryvtt-mcp/commit/d59dba72a161ee8fcf500797c144469e7061a866))
+* resolve integration test timeouts by adding missing apiKey configuration ([#62](https://github.com/laurigates/foundryvtt-mcp/issues/62)) ([a720211](https://github.com/laurigates/foundryvtt-mcp/commit/a720211a5538e9c295c73fe9568a739141b596e2))
+* resolve issue [#43](https://github.com/laurigates/foundryvtt-mcp/issues/43) - FoundryClient connection lifecycle ([#46](https://github.com/laurigates/foundryvtt-mcp/issues/46)) ([9c315d6](https://github.com/laurigates/foundryvtt-mcp/commit/9c315d6a1ff1b38de7b537a900ef3bdff197d4b9))
+* resolve issue [#43](https://github.com/laurigates/foundryvtt-mcp/issues/43) - FoundryClient connection lifecycle ([#55](https://github.com/laurigates/foundryvtt-mcp/issues/55)) ([b10b5eb](https://github.com/laurigates/foundryvtt-mcp/commit/b10b5eb510316e42efc56f8be9d6837982b584a4))
+* resolve issue [#44](https://github.com/laurigates/foundryvtt-mcp/issues/44) - WebSocket functionality not working properly ([#48](https://github.com/laurigates/foundryvtt-mcp/issues/48)) ([ae93be9](https://github.com/laurigates/foundryvtt-mcp/commit/ae93be918ce0f281f942bad292dda45eac37c8a7))
+* resolve issue [#44](https://github.com/laurigates/foundryvtt-mcp/issues/44) - WebSocket functionality not working properly ([#56](https://github.com/laurigates/foundryvtt-mcp/issues/56)) ([629e1df](https://github.com/laurigates/foundryvtt-mcp/commit/629e1df67a5ebf9e237662383d6a92afdd1903c2))
+* resolve issue [#45](https://github.com/laurigates/foundryvtt-mcp/issues/45) - API retry mechanism not working ([#50](https://github.com/laurigates/foundryvtt-mcp/issues/50)) ([a22e478](https://github.com/laurigates/foundryvtt-mcp/commit/a22e4780df11031e3536f99ea127195b3c0a992e))
+* resolve issue [#45](https://github.com/laurigates/foundryvtt-mcp/issues/45) - API retry mechanism not working ([#58](https://github.com/laurigates/foundryvtt-mcp/issues/58)) ([3050ad0](https://github.com/laurigates/foundryvtt-mcp/commit/3050ad086d599aacb9aa275797da494ee83592a1))
+* resolve test failures and improve error handling ([#63](https://github.com/laurigates/foundryvtt-mcp/issues/63)) ([ca8d01f](https://github.com/laurigates/foundryvtt-mcp/commit/ca8d01f8039ce3493c08b96b27f8df9e7aa53e31))
+* resolve test failures and security vulnerabilities ([#71](https://github.com/laurigates/foundryvtt-mcp/issues/71)) ([6a4f79e](https://github.com/laurigates/foundryvtt-mcp/commit/6a4f79e1be5a33cebb074be71db0d275cd4c49e3))
+* Update module metadata and URLs ([#9](https://github.com/laurigates/foundryvtt-mcp/issues/9)) ([06aeed4](https://github.com/laurigates/foundryvtt-mcp/commit/06aeed46e584ba4c68762934110ea22a6566c5fb))
+* update README to document comprehensive diagnostics functionality ([#18](https://github.com/laurigates/foundryvtt-mcp/issues/18)) ([66a48ec](https://github.com/laurigates/foundryvtt-mcp/commit/66a48ecfcfce00f8a80698b47fa45c8f36f6b27f))
+* update release-please workflow permissions and configuration ([#4](https://github.com/laurigates/foundryvtt-mcp/issues/4)) ([e7528db](https://github.com/laurigates/foundryvtt-mcp/commit/e7528db011e4de1d02020769abf65fb711f8ac12))
+* update release-please workflow permissions and configuration ([#5](https://github.com/laurigates/foundryvtt-mcp/issues/5)) ([7e2ea4f](https://github.com/laurigates/foundryvtt-mcp/commit/7e2ea4f9d8bf6a6d3a1dce866e3f487110b00a53))
+* update workflow tag patterns for single package ([#32](https://github.com/laurigates/foundryvtt-mcp/issues/32)) ([7158369](https://github.com/laurigates/foundryvtt-mcp/commit/7158369b7a4de1e4cc94380a7773a81b69617f09))
+* workflow trigger tags ([#36](https://github.com/laurigates/foundryvtt-mcp/issues/36)) ([f60c84d](https://github.com/laurigates/foundryvtt-mcp/commit/f60c84d69bf042149124124e08808fb9504f5efb))
+
 ## [0.11.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.10.0...foundry-mcp-server-v0.11.0) (2025-08-03)
 
 
