@@ -1,6 +1,9 @@
 # FoundryVTT MCP Server
 
-A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing AI assistants to interact with your tabletop gaming sessions through natural language.
+[![npm version](https://img.shields.io/npm/v/foundryvtt-mcp)](https://www.npmjs.com/package/foundryvtt-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that integrates with FoundryVTT, allowing AI assistants to interact with your tabletop gaming sessions through natural language.
 
 ## Features
 
@@ -17,22 +20,92 @@ A Model Context Protocol (MCP) server that integrates with FoundryVTT, allowing 
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18+ (or [Bun](https://bun.sh/))
 - FoundryVTT server running with an active world
-- MCP-compatible AI client (Claude Desktop, etc.)
+- MCP-compatible AI client (Claude Desktop, Claude Code, VS Code, etc.)
 
-### Setup
+### Installation
+
+Run directly without installing — no clone needed:
 
 ```bash
-git clone <repository-url>
-cd foundry-mcp-server
-npm install
-npm run setup-wizard
+bunx foundryvtt-mcp
+```
+
+Or with npx:
+
+```bash
+npx -y foundryvtt-mcp
+```
+
+### Client Configuration
+
+#### Claude Desktop / Claude Code
+
+Add to your MCP configuration (`claude_desktop_config.json` or `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "foundryvtt": {
+      "command": "bunx",
+      "args": ["foundryvtt-mcp"],
+      "env": {
+        "FOUNDRY_URL": "http://localhost:30000",
+        "FOUNDRY_USERNAME": "your_username",
+        "FOUNDRY_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
+
+#### VS Code
+
+Add to your VS Code MCP settings:
+
+```json
+{
+  "servers": {
+    "foundryvtt": {
+      "command": "bunx",
+      "args": ["foundryvtt-mcp"],
+      "env": {
+        "FOUNDRY_URL": "http://localhost:30000",
+        "FOUNDRY_USERNAME": "your_username",
+        "FOUNDRY_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
+
+### Development Setup
+
+For local development or contributing:
+
+```bash
+git clone https://github.com/laurigates/foundryvtt-mcp.git
+cd foundryvtt-mcp
+bun install
+bun run setup-wizard
 ```
 
 The setup wizard will detect your FoundryVTT server, test connectivity, and generate your `.env` configuration.
 
 To configure manually, see the [Configuration Guide](docs/guides/configuration.md).
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `FOUNDRY_URL` | Yes | FoundryVTT server URL (e.g., `http://localhost:30000`) |
+| `FOUNDRY_USERNAME` | Yes | FoundryVTT user account |
+| `FOUNDRY_PASSWORD` | Yes | FoundryVTT user password |
+| `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
+| `FOUNDRY_API_KEY` | No | REST API module key (enables diagnostics tools) |
+| `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
+| `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
 
 ## Usage
 
@@ -94,22 +167,24 @@ Ask your AI assistant things like:
 - `foundry://world/settings` — world and campaign settings
 - `foundry://system/diagnostics` — system diagnostics (requires REST API module)
 
-## Configuration
-
-Copy `.env.example`, set `FOUNDRY_URL`, `FOUNDRY_USERNAME`, and `FOUNDRY_PASSWORD`, then run `npm run build && npm start`.
-
-Full environment variable reference: [Configuration Guide](docs/guides/configuration.md)
-
 ## Troubleshooting
 
 ```bash
-npm run test-connection   # Test FoundryVTT connectivity
-npm run setup-wizard      # Re-run interactive setup
+bunx foundryvtt-mcp test-connection   # Test FoundryVTT connectivity
+bunx foundryvtt-mcp setup-wizard      # Re-run interactive setup
 ```
 
 Detailed guide: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## Development
+
+```bash
+bun run build          # Compile TypeScript
+bun run dev            # Development mode with hot reload
+bun test               # Unit tests (Vitest)
+bun run test:e2e       # E2E tests (Playwright)
+bun run lint           # Lint code (Biome)
+```
 
 See [Development Guide](docs/guides/development.md) for project structure, adding tools, testing, and building.
 
@@ -120,10 +195,6 @@ See [Feature Tracker](docs/blueprint/feature-tracker.md) for completed and plann
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Integration
-
-See [Integration Guide](docs/guides/integration.md) for Claude Desktop config and custom MCP client examples.
 
 ## License
 

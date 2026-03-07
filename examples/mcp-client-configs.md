@@ -18,7 +18,7 @@ Add this to your Claude Desktop MCP settings file:
   "mcpServers": {
     "foundry-vtt": {
       "command": "node",
-      "args": ["/path/to/foundry-mcp-server/dist/index.js"],
+      "args": ["/path/to/foundryvtt-mcp/dist/index.js"],
       "env": {
         "FOUNDRY_URL": "http://localhost:30000",
         "USE_REST_MODULE": "true",
@@ -37,8 +37,8 @@ Add this to your Claude Desktop MCP settings file:
   "mcpServers": {
     "foundry-vtt": {
       "command": "node",
-      "args": ["/path/to/foundry-mcp-server/dist/index.js"],
-      "cwd": "/path/to/foundry-mcp-server"
+      "args": ["/path/to/foundryvtt-mcp/dist/index.js"],
+      "cwd": "/path/to/foundryvtt-mcp"
     }
   }
 }
@@ -53,7 +53,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const transport = new StdioClientTransport({
   command: 'node',
   args: ['./dist/index.js'],
-  cwd: '/path/to/foundry-mcp-server'
+  cwd: '/path/to/foundryvtt-mcp'
 });
 
 const client = new Client({
@@ -116,7 +116,7 @@ async def main():
     server_params = StdioServerParameters(
         command="node",
         args=["./dist/index.js"],
-        cwd="/path/to/foundry-mcp-server"
+        cwd="/path/to/foundryvtt-mcp"
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -174,7 +174,7 @@ FOUNDRY_TIMEOUT=15000
 
 1. **Test the MCP server standalone**:
    ```bash
-   cd /path/to/foundry-mcp-server
+   cd /path/to/foundryvtt-mcp
    npm run test-connection
    ```
 

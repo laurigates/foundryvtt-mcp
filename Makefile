@@ -197,14 +197,14 @@ setup-ci: install ## Set up CI/CD environment
 .PHONY: docker-build docker-test docker-clean
 docker-build: ## Build Docker container
 	@if [ -f Dockerfile ]; then \
-		docker build -t foundry-mcp-server .; \
+		docker build -t foundryvtt-mcp .; \
 	else \
 		echo "Dockerfile not found"; \
 	fi
 
 docker-test: docker-build ## Run tests in Docker container
 	@if [ -f Dockerfile ]; then \
-		docker run --rm foundry-mcp-server npm test; \
+		docker run --rm foundryvtt-mcp npm test; \
 	else \
 		echo "Dockerfile not found"; \
 	fi

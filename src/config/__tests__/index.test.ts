@@ -74,7 +74,7 @@ describe('Config', () => {
       const { config, resetConfig } = await import('../index.js');
       resetConfig(); // Reset any cached config
 
-      expect(config.serverName).toBe('foundry-mcp-server');
+      expect(config.serverName).toBe('foundryvtt-mcp');
       expect(config.serverVersion).toBe('0.1.0');
       expect(config.logLevel).toBe('info');
       expect(config.nodeEnv).toBe('development');
