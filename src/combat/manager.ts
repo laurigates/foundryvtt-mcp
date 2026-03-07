@@ -409,11 +409,11 @@ export class CombatManager extends EventEmitter {
   }
 
   private generateCombatId(): string {
-    return `combat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `combat_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private generateCombatantId(): string {
-    return `combatant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `combatant_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private emitCombatEvent(type: CombatEvent['type'], combat: CombatState, data?: unknown): void {
