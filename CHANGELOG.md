@@ -10,6 +10,22 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.0.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.11.0...foundry-mcp-server-v1.0.0) (2026-03-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* The foundry-local-rest-api module has been moved to its own repository to improve focus and enable independent versioning.
+
+### Features
+
+* add serena-mcp configuration and Claude plugin setup ([#88](https://github.com/laurigates/foundryvtt-mcp/issues/88)) ([14bbdad](https://github.com/laurigates/foundryvtt-mcp/commit/14bbdade589afc4ff47348482797516960dd890f))
+* **ci:** migrate to npm trusted publishing (OIDC) ([#113](https://github.com/laurigates/foundryvtt-mcp/issues/113)) ([cf64b93](https://github.com/laurigates/foundryvtt-mcp/commit/cf64b93a3f407e58b5e57fff95293126051e53a5))
+* **core:** refactor MCP server architecture with proper Socket.IO authentication ([#89](https://github.com/laurigates/foundryvtt-mcp/issues/89)) ([2e7640d](https://github.com/laurigates/foundryvtt-mcp/commit/2e7640d0f5e0b6e826a9804dca3bee0607d419de)), closes [#82](https://github.com/laurigates/foundryvtt-mcp/issues/82)
+* extract foundry-local-rest-api module to standalone repository ([#84](https://github.com/laurigates/foundryvtt-mcp/issues/84)) ([4aae7d9](https://github.com/laurigates/foundryvtt-mcp/commit/4aae7d9e9ec73f3e8b886d020d9e42355c404313))
+* **justfile:** add npm-token and publish-dry-run recipes ([#111](https://github.com/laurigates/foundryvtt-mcp/issues/111)) ([39a41f7](https://github.com/laurigates/foundryvtt-mcp/commit/39a41f7c481695cf363eb0952ed013bb339c5c5c))
+* **test:** add integration test suite with real FoundryVTT container ([#92](https://github.com/laurigates/foundryvtt-mcp/issues/92)) ([b5c168e](https://github.com/laurigates/foundryvtt-mcp/commit/b5c168e7893f32a531a5f3bb8f9a78b02b1871ab))
+
 ## [0.11.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundry-mcp-server-v0.10.0...foundry-mcp-server-v0.11.0) (2025-08-03)
 
 
