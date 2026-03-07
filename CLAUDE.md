@@ -1,4 +1,4 @@
-# Project: foundry-mcp-server
+# Project: foundryvtt-mcp
 
 Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT tabletop gaming software.
 

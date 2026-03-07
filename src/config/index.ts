@@ -17,7 +17,7 @@ import { z } from 'zod';
  * including server settings, FoundryVTT connection details, and caching options.
  */
 const ConfigSchema = z.object({
-  serverName: z.string().default('foundry-mcp-server'),
+  serverName: z.string().default('foundryvtt-mcp'),
   serverVersion: z.string().default('0.1.0'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
