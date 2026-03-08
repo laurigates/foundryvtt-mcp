@@ -24,6 +24,22 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 - FoundryVTT server running with an active world
 - MCP-compatible AI client (Claude Desktop, Claude Code, VS Code, etc.)
 
+### Recommended: Create a Dedicated API User
+
+It is recommended to create a separate FoundryVTT user account for the MCP server rather than using your own GM or player account. This provides better security and auditability.
+
+**In FoundryVTT:**
+1. Go to **Configuration** → **User Management**
+2. Click **Create User**
+3. Set a username (e.g., `mcp-api`) and a strong password
+4. Assign the **Assistant GM** role (needed to read world data and roll dice)
+5. Use this account's credentials in your MCP configuration
+
+**Benefits:**
+- Chat messages and actions from the MCP server are clearly attributed to a separate user
+- You can revoke access by disabling the API user without affecting your own account
+- Limits blast radius if credentials are ever exposed
+
 ### Installation
 
 Run directly without installing — no clone needed:
