@@ -1,0 +1,181 @@
+{
+  "source_document": "docs/blueprint/prds/PRD-001-foundry-mcp-server-core.md",
+  "sync_targets": [],
+  "last_synced_at": null,
+  "features": [
+    {
+      "id": "FR-001",
+      "name": "Socket.IO authentication (4-step flow)",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "high"
+    },
+    {
+      "id": "FR-002",
+      "name": "World state cache (actors, items, scenes, journals, combat, users, messages)",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "high"
+    },
+    {
+      "id": "FR-003",
+      "name": "Dice rolling (RPG notation)",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "high"
+    },
+    {
+      "id": "FR-004",
+      "name": "Actor search and detail retrieval",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "high"
+    },
+    {
+      "id": "FR-005",
+      "name": "Item search",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-006",
+      "name": "Scene information",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-007",
+      "name": "Journal search and retrieval",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-008",
+      "name": "Combat state and initiative tracking",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-009",
+      "name": "User presence awareness",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-010",
+      "name": "Chat message history",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-011",
+      "name": "Full-text world search",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-012",
+      "name": "World summary",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-013",
+      "name": "NPC generation",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "low"
+    },
+    {
+      "id": "FR-014",
+      "name": "Loot table generation",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "low"
+    },
+    {
+      "id": "FR-015",
+      "name": "Rule lookup",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "low"
+    },
+    {
+      "id": "FR-016",
+      "name": "MCP resource endpoints (foundry://)",
+      "prd": "PRD-001",
+      "status": "complete",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-017",
+      "name": "Optional REST API diagnostics (logs, health)",
+      "prd": "PRD-002",
+      "status": "complete",
+      "priority": "low"
+    },
+    {
+      "id": "FR-018",
+      "name": "Combat management (start/end, advance initiative)",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "high"
+    },
+    {
+      "id": "FR-019",
+      "name": "Token manipulation (move, status effects)",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-020",
+      "name": "Scene navigation and switching",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-021",
+      "name": "Character sheet editing",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "medium"
+    },
+    {
+      "id": "FR-022",
+      "name": "Journal creation and editing",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "low"
+    },
+    {
+      "id": "FR-023",
+      "name": "Macro execution",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "low"
+    },
+    {
+      "id": "FR-024",
+      "name": "Multi-world support",
+      "prd": "PRD-001",
+      "status": "planned",
+      "priority": "low"
+    }
+  ],
+  "summary": {
+    "total": 24,
+    "complete": 17,
+    "planned": 7,
+    "completion_percentage": 70.8
+  }
+}
