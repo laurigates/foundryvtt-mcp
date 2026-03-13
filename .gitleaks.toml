@@ -1,0 +1,11 @@
+title = "foundryvtt-mcp gitleaks configuration"
+
+[allowlist]
+  description = "Allow test fixtures and example files"
+  paths = [
+    '''src/__tests__/''',
+    '''src/.+/__tests__/''',
+    '''tests/''',
+    '''\.env\.example$''',
+    '''\.env\.integration\.example$''',
+  ]
