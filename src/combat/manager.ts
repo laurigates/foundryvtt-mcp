@@ -56,15 +56,13 @@ export interface CombatEvent {
 }
 
 export class CombatManager extends EventEmitter {
-  private readonly foundryClient: FoundryClient;
   private currentCombat: CombatState | null = null;
   private combatHistory: CombatEvent[] = [];
   private turnTimer: NodeJS.Timeout | undefined;
   private readonly TURN_WARNING_TIME = 30000; // 30 seconds
 
-  constructor(foundryClient: FoundryClient) {
+  constructor(_foundryClient: FoundryClient) {
     super();
-    this.foundryClient = foundryClient;
     this.setupEventHandlers();
   }
 
