@@ -10,7 +10,7 @@ export async function handleGetChatMessages(
   foundryClient: FoundryClient,
 ) {
   return withToolError('get chat messages', async () => {
-    const limit = args.limit || 20;
+    const limit = Math.min(args.limit ?? 20, 100);
     const messages = foundryClient.getChatMessages(limit);
 
     if (messages.length === 0) {
