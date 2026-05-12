@@ -246,4 +246,77 @@ describe('FoundryClient', () => {
       expect(client.hasWorldData()).toBe(false);
     });
   });
+
+  describe('refreshWorldData listener cleanup', () => {
+    /**
+     * Builds a minimal mock socket that records `once`/`off`/`emit` calls and
+     * lets the test trigger the registered 'world' handler manually.
+     */
+    function buildMockSocket() {
+      const listeners = new Map<string, (...args: unknown[]) => void>();
+      const socket = {
+        connected: true,
+        once: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+          listeners.set(event, handler);
+          return socket;
+        }),
+        off: vi.fn((event: string, _handler: (...args: unknown[]) => void) => {
+          listeners.delete(event);
+          return socket;
+        }),
+        emit: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      return { socket, listeners };
+    }
+
+    it('removes the world listener on the success path', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', timeout: 50 });
+      const { socket, listeners } = buildMockSocket();
+      // Inject the mock socket — bypasses the real Socket.IO connect path.
+      (client as unknown as { socket: typeof socket }).socket = socket;
+
+      const refresh = client.refreshWorldData();
+
+      // Trigger the 'world' event handler with a minimal valid WorldData payload.
+      const handler = listeners.get('world');
+      expect(handler).toBeDefined();
+      handler?.({
+        userId: 'test-user',
+        actors: [],
+        scenes: [],
+        items: [],
+        journal: [],
+        messages: [],
+        combats: [],
+        users: [],
+        activeUsers: [],
+        macros: [],
+        playlists: [],
+        tables: [],
+        folders: [],
+      });
+
+      await refresh;
+
+      expect(socket.once).toHaveBeenCalledWith('world', expect.any(Function));
+      const registeredHandler = socket.once.mock.calls[0]?.[1];
+      expect(socket.off).toHaveBeenCalledWith('world', registeredHandler);
+      expect(listeners.has('world')).toBe(false);
+    });
+
+    it('removes the world listener on the timeout path', async () => {
+      // Short timeout so the test runs fast; never trigger the 'world' event.
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', timeout: 25 });
+      const { socket, listeners } = buildMockSocket();
+      (client as unknown as { socket: typeof socket }).socket = socket;
+
+      await expect(client.refreshWorldData()).rejects.toThrow('Refresh timeout');
+
+      expect(socket.once).toHaveBeenCalledWith('world', expect.any(Function));
+      const registeredHandler = socket.once.mock.calls[0]?.[1];
+      expect(socket.off).toHaveBeenCalledWith('world', registeredHandler);
+      expect(listeners.has('world')).toBe(false);
+    });
+  });
 });
