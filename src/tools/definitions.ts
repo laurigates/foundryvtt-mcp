@@ -252,7 +252,8 @@ export const diagnosticsTools = [
   },
   {
     name: 'diagnose_errors',
-    description: 'Diagnose and analyze system errors',
+    description:
+      'Stub: returns raw logs without analysis. Full diagnostic logic is tracked in #133 and not yet implemented.',
     inputSchema: {
       type: 'object',
       properties: {
