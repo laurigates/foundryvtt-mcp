@@ -243,6 +243,10 @@ export class FoundryClient {
 
   /**
    * Re-emits 'world' on the existing socket to refresh the cached snapshot.
+   *
+   * Registers a one-shot 'world' listener and cleans it up on every exit
+   * path (success, error, timeout) via `socket.off()` so that repeated
+   * refreshes over a long-running session do not leak listener handles.
    */
   async refreshWorldData(): Promise<void> {
     if (!this.socket?.connected) {
@@ -250,17 +254,33 @@ export class FoundryClient {
     }
 
     this.worldData = await new Promise<WorldData>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Refresh timeout')), 15000);
-      this.socket?.emit('world', (data: WorldData) => {
-        clearTimeout(timeout);
-        const parsed = WorldDataSchema.safeParse(data);
-        if (!parsed.success) {
-          logger.warn('WorldData refresh failed schema validation — proceeding with raw data', {
-            issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-          });
+      const cleanup = () => {
+        this.socket?.off('world', onWorld);
+      };
+
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error('Refresh timeout'));
+      }, this.config.timeout ?? 15000);
+
+      const onWorld = (data: WorldData) => {
+        cleanup();
+        clearTimeout(timeoutId);
+        try {
+          const parsed = WorldDataSchema.safeParse(data);
+          if (!parsed.success) {
+            logger.warn('WorldData refresh failed schema validation — proceeding with raw data', {
+              issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+            });
+          }
+          resolve(data);
+        } catch (err) {
+          reject(err as Error);
         }
-        resolve(data);
-      });
+      };
+
+      this.socket?.once('world', onWorld);
+      this.socket?.emit('world');
     });
 
     logger.info('World data refreshed', {
