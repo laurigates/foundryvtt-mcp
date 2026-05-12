@@ -10,6 +10,13 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.0.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.0.0...foundryvtt-mcp-v1.0.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* use brace-wrapped env var syntax in MCP config ([#119](https://github.com/laurigates/foundryvtt-mcp/issues/119)) ([6708348](https://github.com/laurigates/foundryvtt-mcp/commit/6708348c017c3cc314ad3bafd0de057aea170042))
+
 ## [1.0.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v0.11.0...foundryvtt-mcp-v1.0.0) (2026-03-07)
 
 
