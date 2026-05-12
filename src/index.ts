@@ -14,6 +14,8 @@
  * @see {@link https://foundryvtt.com/} FoundryVTT Virtual Tabletop
  */
 
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -210,6 +212,13 @@ class FoundryMCPServer {
 async function main(): Promise<void> {
   const server = new FoundryMCPServer();
 
+  // Pre-connect banner — emitted on stderr so the stdio JSON-RPC channel on
+  // stdout stays clean once StdioServerTransport.connect() takes it over.
+  // The smoke test (scripts/smoke-test.js) keys on this string to verify the
+  // binary loads without crashing at construction time, before any network
+  // call to FoundryVTT.
+  process.stderr.write('🎲 FoundryVTT MCP Server starting...\n');
+
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
@@ -241,8 +250,23 @@ async function main(): Promise<void> {
   }
 }
 
-// Start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run the server if this file is executed directly.
+// Use realpath so the comparison works when npm/npx installs the bin as a
+// symlink into node_modules/.bin (the literal `file://${argv[1]}` compare
+// fails for symlinked invocations and on macOS where /tmp -> /private/tmp).
+const isMainModule = (() => {
+  const argv1 = process.argv[1];
+  if (!argv1) {
+    return false;
+  }
+  try {
+    return realpathSync(argv1) === fileURLToPath(import.meta.url);
+  } catch {
+    return import.meta.url === `file://${argv1}`;
+  }
+})();
+
+if (isMainModule) {
   main().catch((error) => {
     logger.error('Server startup failed:', error);
     process.exit(1);

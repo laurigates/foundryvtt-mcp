@@ -46,6 +46,23 @@ npm run lint
 npm run test:e2e
 ```
 
+### Smoke tests
+
+Two smoke tests verify the server boots end-to-end without a live FoundryVTT.
+They run in CI on every PR and catch failure modes that the mocked Vitest
+suite cannot:
+
+```bash
+npm run smoke        # Spawn dist/index.js, verify the startup banner on stderr
+npm run smoke:pack   # npm pack -> install into a fresh consumer -> verify banner
+```
+
+`smoke` covers construction-time and import-time regressions (SDK shape
+changes, ESM resolution). `smoke:pack` additionally validates that the
+`package.json` `files` glob ships every runtime path the entrypoint needs —
+the kind of regression that only surfaces for users running `npx foundryvtt-mcp`
+or `bunx foundryvtt-mcp`, not for anyone running the source tree.
+
 ## Building
 
 ```bash
