@@ -1,5 +1,31 @@
 name: Integration Tests
 
+# ----------------------------------------------------------------------------
+# CI BLOCKER (issue #140): the FoundryVTT secrets needed by this workflow are
+# not currently configured on the repo:
+#
+#   - FOUNDRY_LICENSE_KEY
+#   - FOUNDRY_USERNAME
+#   - FOUNDRY_PASSWORD
+#
+# `gh secret list -R laurigates/foundryvtt-mcp` shows only RELEASE_PLEASE_TOKEN.
+# Without these the felddy/foundryvtt container falls back to the placeholder
+# values in docker-compose.test.yml (test-user/test-password), tries to log in
+# to foundryvtt.com, gets rejected, and never installs Foundry — so the
+# healthcheck never becomes healthy and the inner `timeout 120` aborts the
+# job. Bumping the timeout would not help; the container can't start without
+# valid credentials. Evidence (from the run-25735243106 container.log
+# artifact):
+#
+#   Authenticate | [error] Unable to log in as test-user, verify your credentials...
+#   Entrypoint   | [warn]  Authentication failed with exit code 255.
+#   Entrypoint   | [error] Unable to install Foundry Virtual Tabletop!
+#
+# Resolution requires the repo owner to add the three secrets above (then
+# this workflow will run end-to-end). Until that happens the preflight step
+# below fails fast with a clear message instead of timing out at 2 minutes.
+# ----------------------------------------------------------------------------
+
 on:
   push:
     branches: [main]
@@ -22,6 +48,23 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify FoundryVTT credentials are configured
+        env:
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+        run: |
+          missing=()
+          [ -z "${FOUNDRY_LICENSE_KEY}" ] && missing+=("FOUNDRY_LICENSE_KEY")
+          [ -z "${FOUNDRY_USERNAME}" ] && missing+=("FOUNDRY_USERNAME")
+          [ -z "${FOUNDRY_PASSWORD}" ] && missing+=("FOUNDRY_PASSWORD")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing FoundryVTT secrets::The following repository secrets are not configured: ${missing[*]}"
+            echo "::error::See issue #140 for context. Without these the felddy/foundryvtt container cannot authenticate to foundryvtt.com and never becomes healthy."
+            exit 1
+          fi
+          echo "All required FoundryVTT secrets are present."
+
       - name: Create .env.integration
         run: |
           cat > .env.integration <<EOF
@@ -43,23 +86,14 @@ jobs:
       - name: Run integration tests
         run: bun run test:integration
 
-      - name: Upload container logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: container-logs
-          path: |
-            docker-compose.test.yml
-          retention-days: 7
-
-      - name: Collect container logs on failure
-        if: failure()
+      - name: Collect container logs
+        if: always()
         run: |
           mkdir -p tests/integration/logs
-          docker compose -f docker-compose.test.yml logs --no-color > tests/integration/logs/container.log 2>&1
+          docker compose -f docker-compose.test.yml logs --no-color > tests/integration/logs/container.log 2>&1 || true
 
-      - name: Upload collected logs on failure
-        if: failure()
+      - name: Upload container logs
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: integration-logs
