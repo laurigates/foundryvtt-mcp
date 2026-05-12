@@ -27,7 +27,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Audit dependencies
-        run: npx audit-ci --moderate
+        run: bun audit --audit-level=moderate
 
   codeql:
     name: CodeQL Analysis
