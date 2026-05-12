@@ -10,38 +10,88 @@ import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { withToolError } from './utils.js';
 
+/** Valid log levels recognized by the tool schema */
+const VALID_LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error', 'log', 'notification']);
+
+/** Hard upper bound on entries returned, regardless of caller-supplied limit */
+const MAX_LOG_LIMIT = 1000;
+
 /**
  * Handles recent log retrieval requests
+ *
+ * Filtering is applied after fetching all logs from the underlying source:
+ * - `limit`: clamps result count (default 20, hard cap 1000)
+ * - `level`: case-insensitive match against log entry level; unrecognized values are silently ignored
+ * - `since`: ISO 8601 timestamp; entries older than this are excluded; unparseable values are silently ignored
  */
 export async function handleGetRecentLogs(
   args: {
     limit?: number;
-    level?: string;
+    level?: string | string[];
     since?: string;
   },
   diagnosticsClient: DiagnosticsClient,
 ) {
   const { limit = 20, level, since } = args;
 
-  return withToolError('get recent logs', async () => {
-    const logs = await diagnosticsClient.getRecentLogs();
+  // Clamp limit to [1, MAX_LOG_LIMIT]
+  const effectiveLimit = Math.min(Math.max(1, limit ?? 20), MAX_LOG_LIMIT);
 
-    const logEntries = Array.isArray(logs)
-      ? logs
-          .map((log: unknown) => {
-            const logEntry = log as { timestamp?: string; level?: string; message?: string };
-            return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
-          })
-          .join('\n')
-      : 'No logs available';
+  // Normalize level filter: resolve to a Set of valid lowercase level strings, or null if none recognized
+  let levelFilter: Set<string> | null = null;
+  if (level !== undefined && level !== null) {
+    const requested = (Array.isArray(level) ? level : [level])
+      .map((l) => l.toLowerCase())
+      .filter((l) => VALID_LOG_LEVELS.has(l));
+    if (requested.length > 0) {
+      levelFilter = new Set(requested);
+    }
+    // If no recognized levels, levelFilter stays null → all entries pass through
+  }
+
+  // Parse since timestamp; ignore if unparseable
+  let sinceMs: number | null = null;
+  if (since !== undefined && since !== null && since !== '') {
+    const parsed = Date.parse(since);
+    if (!Number.isNaN(parsed)) {
+      sinceMs = parsed;
+    }
+  }
+
+  return withToolError('get recent logs', async () => {
+    const response = await diagnosticsClient.getRecentLogs();
+    let entries = response.logs;
+
+    // Apply level filter
+    if (levelFilter !== null) {
+      entries = entries.filter((entry) => levelFilter?.has(entry.level.toLowerCase()));
+    }
+
+    // Apply since filter
+    if (sinceMs !== null) {
+      const sinceThreshold = sinceMs;
+      entries = entries.filter((entry) => {
+        const entryMs = Date.parse(entry.timestamp);
+        return !Number.isNaN(entryMs) && entryMs >= sinceThreshold;
+      });
+    }
+
+    // Apply limit
+    entries = entries.slice(0, effectiveLimit);
+
+    const logEntries = entries
+      .map((entry) => `[${entry.timestamp}] **${entry.level.toUpperCase()}** ${entry.message}`)
+      .join('\n');
+
+    const levelLabel = level ? (Array.isArray(level) ? level.join(', ') : level) : 'All levels';
 
     return {
       content: [
         {
           type: 'text',
           text: `📋 **Recent Log Entries**
-**Filter:** ${level || 'All levels'}
-**Limit:** ${limit}
+**Filter:** ${levelLabel}
+**Limit:** ${effectiveLimit}
 **Since:** ${since || 'Beginning'}
 
 ${logEntries || 'No log entries found.'}`,
