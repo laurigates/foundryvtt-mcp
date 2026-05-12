@@ -1,6 +1,6 @@
 {
   "name": "foundryvtt-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Model Context Protocol server for FoundryVTT integration",
   "main": "dist/index.js",
   "bin": {
@@ -8,9 +8,11 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "smoke": "node scripts/smoke-test.js",
+    "smoke:pack": "node scripts/smoke-pack.js",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",

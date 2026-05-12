@@ -185,9 +185,13 @@ Ask your AI assistant things like:
 
 ## Troubleshooting
 
+The connectivity and setup helpers ship in the source tree (not the published `bin`), so run them from a dev checkout:
+
 ```bash
-bunx foundryvtt-mcp test-connection   # Test FoundryVTT connectivity
-bunx foundryvtt-mcp setup-wizard      # Re-run interactive setup
+git clone https://github.com/laurigates/foundryvtt-mcp.git
+cd foundryvtt-mcp && bun install
+bun run test-connection   # Probe FoundryVTT connectivity
+bun run setup-wizard      # Re-run interactive setup
 ```
 
 Detailed guide: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
@@ -195,11 +199,13 @@ Detailed guide: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 ## Development
 
 ```bash
-bun run build          # Compile TypeScript
+bun run build          # Compile TypeScript and make dist/index.js executable
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
 bun run test:e2e       # E2E tests (Playwright)
 bun run lint           # Lint code (Biome)
+bun run smoke          # Startup smoke test against the local build
+bun run smoke:pack     # Pack-and-install smoke test (mirrors what npx consumers get)
 ```
 
 See [Development Guide](docs/guides/development.md) for project structure, adding tools, testing, and building.
