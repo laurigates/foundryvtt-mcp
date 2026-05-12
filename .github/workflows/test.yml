@@ -29,5 +29,11 @@ jobs:
         FOUNDRY_URL: http://localhost:30000
         LOG_LEVEL: error
 
+    - name: Startup smoke test
+      run: bun run smoke
+
+    - name: Pack smoke test
+      run: bun run smoke:pack
+
     - name: Run linter
       run: bun run lint
