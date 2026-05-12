@@ -9,6 +9,7 @@ This directory contains ADRs for the foundryvtt-mcp project using [MADR format](
 | [ADR-007](0007-release-please-for-automated-releases.md) | release-please for Automated Release Management | Accepted | 2025-03-01 |
 | [ADR-008](0008-npm-trusted-publishing-oidc.md) | npm Trusted Publishing via OIDC | Accepted | 2026-03-07 |
 | [ADR-009](0009-package-rename-foundryvtt-mcp.md) | Package Rename to foundryvtt-mcp | Accepted | 2026-03-07 |
+| [ADR-010](0010-mutation-api-conventions.md) | Mutation API Conventions | Proposed | 2026-05-12 |
 
 > **Note**: ADR-001 through ADR-006 are located in `docs/blueprint/adrs/` (earlier placement before blueprint standardization).
 > Future ADRs should be created in this directory (`docs/adrs/`).
