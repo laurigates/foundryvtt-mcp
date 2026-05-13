@@ -152,6 +152,154 @@ describe('FoundryClient', () => {
     });
   });
 
+  /**
+   * CN-6: retry/backoff matrix (Issue #136).
+   *
+   * Verifies the documented exception list:
+   *   - 4xx errors (except 429) fail fast — no retry.
+   *   - 429 is retried alongside 5xx and transport errors.
+   *   - Backoff delays follow baseDelay * 2^(attempt-1) (within jitter).
+   */
+  describe('retry/backoff matrix (CN-6)', () => {
+    /** Construct a 4xx-shaped AxiosError so executeWithRetry recognises it. */
+    function build4xxError(status: number) {
+      const err = new Error(`HTTP ${status}`) as Error & {
+        isAxiosError: boolean;
+        response: { status: number };
+      };
+      err.isAxiosError = true;
+      err.response = { status };
+      return err;
+    }
+
+    beforeEach(() => {
+      // Make the mocked axios.isAxiosError honour our flagged errors so
+      // executeWithRetry's status-based fail-fast branch is exercised.
+      mockAxios.isAxiosError = ((e: unknown): e is { response?: { status?: number } } =>
+        typeof e === 'object' &&
+        e !== null &&
+        (e as { isAxiosError?: boolean }).isAxiosError === true) as typeof axios.isAxiosError;
+    });
+
+    it('does NOT retry on 400 Bad Request', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 3,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get.mockRejectedValue(build4xxError(400));
+
+      await expect(client.searchActors({ query: 'x' })).rejects.toThrow('HTTP 400');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT retry on 404 Not Found', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 3,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get.mockRejectedValue(build4xxError(404));
+
+      await expect(client.searchActors({ query: 'x' })).rejects.toThrow('HTTP 404');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT retry on 401 Unauthorized', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 3,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get.mockRejectedValue(build4xxError(401));
+
+      await expect(client.searchActors({ query: 'x' })).rejects.toThrow('HTTP 401');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('DOES retry on 429 Too Many Requests (documented exception)', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 2,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get
+        .mockRejectedValueOnce(build4xxError(429))
+        .mockRejectedValueOnce(build4xxError(429))
+        .mockResolvedValueOnce({ data: { actors: [] } });
+
+      const result = await client.searchActors({ query: 'x' });
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
+      expect(result.actors).toEqual([]);
+    });
+
+    it('DOES retry on 500 Internal Server Error', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 1,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get
+        .mockRejectedValueOnce(build4xxError(500))
+        .mockResolvedValueOnce({ data: { actors: [] } });
+
+      const result = await client.searchActors({ query: 'x' });
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
+      expect(result.actors).toEqual([]);
+    });
+
+    it('DOES retry on 503 Service Unavailable', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 1,
+        retryDelay: 10,
+      });
+
+      mockAxiosInstance.get
+        .mockRejectedValueOnce(build4xxError(503))
+        .mockResolvedValueOnce({ data: { actors: [] } });
+
+      const result = await client.searchActors({ query: 'x' });
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses exponential backoff (baseDelay * 2^(attempt-1), within jitter)', async () => {
+      const baseDelay = 100;
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        retryAttempts: 3,
+        retryDelay: baseDelay,
+      });
+
+      // Fail twice, succeed third — produces two backoff waits.
+      mockAxiosInstance.get
+        .mockRejectedValueOnce(new Error('transient'))
+        .mockRejectedValueOnce(new Error('transient'))
+        .mockResolvedValueOnce({ data: { actors: [] } });
+
+      const start = Date.now();
+      await client.searchActors({ query: 'x' });
+      const elapsed = Date.now() - start;
+
+      // Expected minimum delay: 100ms (attempt 1) + 200ms (attempt 2) = 300ms.
+      // Allow generous upper bound for jitter + scheduler noise.
+      expect(elapsed).toBeGreaterThanOrEqual(290);
+      expect(elapsed).toBeLessThan(600);
+    });
+  });
+
   describe('worldData mode (no apiKey)', () => {
     it('should return empty results when no worldData', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
