@@ -552,6 +552,87 @@ export interface ItemSearchResult {
   limit: number;
 }
 
+/**
+ * A single compendium search result entry.
+ *
+ * Carries enough metadata to disambiguate near-identical entries across
+ * packs and rule revisions (e.g. Divine Smite PHB-2014 vs PHB-2024 via
+ * `system.source.rules`). `compendiumId` scopes the entry to its pack and
+ * `itemId` identifies the entry within that pack.
+ */
+export interface CompendiumSearchEntry {
+  compendiumId: string;
+  itemId: string;
+  name: string;
+  type: string;
+  img?: string;
+  system?: {
+    level?: number;
+    school?: string;
+    source?: {
+      rules?: string;
+      custom?: string;
+    };
+  };
+}
+
+/**
+ * Result envelope for a compendium search.
+ *
+ * `restAvailable` signals whether the REST API module (FOUNDRY_API_KEY) was
+ * present. When false, `results` is empty and the handler surfaces a note
+ * explaining that compendium search requires REST mode.
+ *
+ * `nextCursor` carries the opaque pagination cursor for the following page
+ * (an offset, base64-encoded); it is `null` when no further results exist.
+ */
+export interface CompendiumSearchResult {
+  results: CompendiumSearchEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  restAvailable: boolean;
+  nextCursor: string | null;
+}
+
+/**
+ * Source for creating an item on an actor.
+ *
+ * Either references a compendium entry to copy (the compendium pack id plus the
+ * item id within that pack — pairs with the compendium search tool) or supplies
+ * an inline item document to create directly.
+ */
+export type ActorItemCreateSource =
+  | {
+      type: 'compendium';
+      compendiumId: string;
+      itemId: string;
+    }
+  | {
+      type: 'inline';
+      item: Partial<FoundryItem>;
+    };
+
+/**
+ * Result structure for an actor attribute update (#143).
+ *
+ * Returned by `FoundryClient.updateActorAttribute`. The `updatedAttributes`
+ * map echoes back the post-update value for every patched dot-path so callers
+ * can confirm what changed.
+ *
+ * @example
+ * ```typescript
+ * const result: ActorAttributeUpdateResult = {
+ *   success: true,
+ *   updatedAttributes: { 'attributes.hp.value': 30, 'currency.gp': 12 },
+ * };
+ * ```
+ */
+export interface ActorAttributeUpdateResult {
+  success: boolean;
+  updatedAttributes: Record<string, unknown>;
+}
+
 // API Response types
 /**
  * Generic API response structure for FoundryVTT REST API

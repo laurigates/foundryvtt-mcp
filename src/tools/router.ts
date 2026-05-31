@@ -4,13 +4,16 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
-import type { FoundryClient } from '../foundry/client.js';
+import type { AttributePatch, FoundryClient } from '../foundry/client.js';
+import type { ActorItemCreateSource } from '../foundry/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 import type { ToolContext, ToolResult } from './base.js';
+import { handleUpdateActorAttribute } from './handlers/actor-mutations.js';
 import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
 import { handleGetChatMessages } from './handlers/chat.js';
 import { handleGetCombatState } from './handlers/combat.js';
+import { handleSearchCompendium } from './handlers/compendium.js';
 import {
   handleDiagnoseErrors,
   handleGetHealthStatus,
@@ -21,6 +24,11 @@ import {
 // Import all tool handlers
 import { handleRollDice } from './handlers/dice.js';
 import { handleGenerateLoot, handleGenerateNPC, handleLookupRule } from './handlers/generation.js';
+import {
+  handleCreateActorItem,
+  handleDeleteActorItem,
+  handleUpdateActorItem,
+} from './handlers/item-mutations.js';
 import { handleSearchItems } from './handlers/items.js';
 import { handleGetJournal, handleSearchJournals } from './handlers/journals.js';
 import { handleReadResource } from './handlers/resources.js';
@@ -83,9 +91,78 @@ export async function routeToolRequest(
       }
       return handleGetActorDetails(args as { actorId: string }, foundryClient);
 
+    // Actor mutation tools (#143, require REST API module)
+    case 'update_actor_attributes':
+      if (!('actorId' in args) || typeof args.actorId !== 'string') {
+        throw new Error('Missing required parameter: actorId');
+      }
+      if (!('patch' in args) || typeof args.patch !== 'object' || args.patch === null) {
+        throw new Error('Missing required parameter: patch');
+      }
+      return handleUpdateActorAttribute(
+        args as { actorId: string; patch: AttributePatch },
+        foundryClient,
+      );
+
     // Item tools
     case 'search_items':
       return handleSearchItems(args, foundryClient);
+
+    // Compendium tools (#144)
+    case 'search_compendium':
+      if (!('query' in args) || typeof args.query !== 'string') {
+        throw new Error('Missing required parameter: query');
+      }
+      return handleSearchCompendium(
+        args as {
+          query: string;
+          filters?: {
+            compendiumId?: string;
+            packType?: string;
+            itemType?: string;
+            spellLevel?: number;
+            source?: string;
+          };
+          limit?: number;
+          cursor?: string;
+        },
+        foundryClient,
+      );
+
+    // Item mutation tools (WRITE — require REST API module)
+    case 'create_actor_item':
+      if (!('actorId' in args) || typeof args.actorId !== 'string') {
+        throw new Error('Missing required parameter: actorId');
+      }
+      if (!('source' in args) || typeof args.source !== 'object' || args.source === null) {
+        throw new Error('Missing required parameter: source');
+      }
+      return handleCreateActorItem(
+        args as { actorId: string; source: ActorItemCreateSource },
+        foundryClient,
+      );
+    case 'update_actor_item':
+      if (!('actorId' in args) || typeof args.actorId !== 'string') {
+        throw new Error('Missing required parameter: actorId');
+      }
+      if (!('itemId' in args) || typeof args.itemId !== 'string') {
+        throw new Error('Missing required parameter: itemId');
+      }
+      if (!('patch' in args) || typeof args.patch !== 'object' || args.patch === null) {
+        throw new Error('Missing required parameter: patch');
+      }
+      return handleUpdateActorItem(
+        args as { actorId: string; itemId: string; patch: Record<string, unknown> },
+        foundryClient,
+      );
+    case 'delete_actor_item':
+      if (!('actorId' in args) || typeof args.actorId !== 'string') {
+        throw new Error('Missing required parameter: actorId');
+      }
+      if (!('itemId' in args) || typeof args.itemId !== 'string') {
+        throw new Error('Missing required parameter: itemId');
+      }
+      return handleDeleteActorItem(args as { actorId: string; itemId: string }, foundryClient);
 
     // Scene tools
     case 'get_scene_info':
