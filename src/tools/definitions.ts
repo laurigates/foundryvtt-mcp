@@ -72,6 +72,43 @@ export const actorTools = [
 ];
 
 /**
+ * Actor attribute mutation tool definitions (#143)
+ *
+ * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active
+ * Socket.IO connection (mutations use the core `modifyDocument` protocol).
+ */
+export const actorMutationTools = [
+  {
+    name: 'update_actor_attributes',
+    description:
+      "Update attributes on an actor's system data. The patch keys are dot-paths into actor.system " +
+      '(e.g. "attributes.hp.value", "attributes.hp.temp", "currency.gp", "resources.primary.value", ' +
+      '"spells.spell1.value", "attributes.exhaustion"). Returns the post-update value for every patched ' +
+      'path. Validates HP <= max + temp, spell slots <= max, and exhaustion within 0-10 (2024) or 0-6 (2014). ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actorId: {
+          type: 'string',
+          description: 'The ID of the actor to update',
+        },
+        patch: {
+          type: 'object',
+          description:
+            'Map of dot-path → value, where each dot-path addresses a field under actor.system ' +
+            '(e.g. {"attributes.hp.value": 30, "currency.gp": 12}). Values must be number, string, or boolean.',
+          additionalProperties: {
+            type: ['number', 'string', 'boolean'],
+          },
+        },
+      },
+      required: ['actorId', 'patch'],
+    },
+  },
+];
+
+/**
  * Item management tool definitions
  */
 export const itemTools = [
@@ -99,6 +136,156 @@ export const itemTools = [
           default: 10,
         },
       },
+    },
+  },
+];
+
+/**
+ * Compendium search tool definitions (#144)
+ */
+export const compendiumTools = [
+  {
+    name: 'search_compendium',
+    description:
+      'Search FoundryVTT compendium packs by name and metadata. Searches all enabled compendiums by default; the compendiumId filter scopes to one pack. Requires the REST API module (FOUNDRY_API_KEY).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query for compendium entry names',
+        },
+        filters: {
+          type: 'object',
+          description: 'Optional metadata filters to narrow the search',
+          properties: {
+            compendiumId: {
+              type: 'string',
+              description: 'Scope the search to a single compendium pack',
+            },
+            packType: {
+              type: 'string',
+              description: 'Pack document type (Item, Actor, JournalEntry, Macro)',
+            },
+            itemType: {
+              type: 'string',
+              description: 'Item type filter (spell, weapon, feat, etc.)',
+            },
+            spellLevel: {
+              type: 'number',
+              description: 'Spell level filter',
+            },
+            source: {
+              type: 'string',
+              description: 'Source/rules filter (e.g. a sourcebook abbreviation)',
+            },
+          },
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results per page',
+          default: 20,
+        },
+        cursor: {
+          type: 'string',
+          description:
+            'Opaque pagination cursor from a prior result\'s "Next page" cursor; omit for the first page',
+        },
+      },
+      required: ['query'],
+    },
+  },
+];
+
+/**
+ * Actor item mutation tool definitions (WRITE — require FOUNDRY_WRITE_ENABLED
+ * and an active Socket.IO connection; mutations use `modifyDocument`)
+ *
+ * The canonical mutation target is the D&D 5e v4+ activity schema. Item
+ * `system` patches honour JSON-merge-patch semantics on nested paths.
+ */
+export const itemMutationTools = [
+  {
+    name: 'create_actor_item',
+    description:
+      'Create an item on an actor from an inline item document (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Compendium-source create is not yet supported over Socket.IO (see issue #159). Canonical target: D&D 5e v4+ activity schema.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actorId: {
+          type: 'string',
+          description: 'The ID of the actor to add the item to',
+        },
+        source: {
+          type: 'object',
+          description:
+            'Item source: { type: "compendium", compendiumId, itemId } to copy a compendium entry, or { type: "inline", item: { type, name, system } } to create directly',
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['compendium', 'inline'],
+              description: 'Source kind',
+            },
+            compendiumId: {
+              type: 'string',
+              description: 'Compendium pack id (compendium source)',
+            },
+            itemId: {
+              type: 'string',
+              description: 'Item id within the compendium pack (compendium source)',
+            },
+            item: {
+              type: 'object',
+              description: 'Inline item document with type, name, and system (inline source)',
+            },
+          },
+          required: ['type'],
+        },
+      },
+      required: ['actorId', 'source'],
+    },
+  },
+  {
+    name: 'update_actor_item',
+    description:
+      "Apply a JSON merge patch to an item's system data on an actor (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Supports nested paths such as activities.{id}.consumption.targets. Canonical target: D&D 5e v4+ activity schema.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actorId: {
+          type: 'string',
+          description: 'The ID of the actor that owns the item',
+        },
+        itemId: {
+          type: 'string',
+          description: 'The ID of the item to update',
+        },
+        patch: {
+          type: 'object',
+          description:
+            'JSON merge patch applied to item.system; nested paths supported (e.g. activities.{id}.consumption.targets)',
+        },
+      },
+      required: ['actorId', 'itemId', 'patch'],
+    },
+  },
+  {
+    name: 'delete_actor_item',
+    description:
+      'Delete an item owned by an actor (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Canonical target: D&D 5e v4+ activity schema.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actorId: {
+          type: 'string',
+          description: 'The ID of the actor that owns the item',
+        },
+        itemId: {
+          type: 'string',
+          description: 'The ID of the item to delete',
+        },
+      },
+      required: ['actorId', 'itemId'],
     },
   },
 ];
@@ -411,7 +598,10 @@ export function getAllTools() {
   return [
     ...diceTools,
     ...actorTools,
+    ...actorMutationTools,
     ...itemTools,
+    ...compendiumTools,
+    ...itemMutationTools,
     ...sceneTools,
     ...combatTools,
     ...chatTools,

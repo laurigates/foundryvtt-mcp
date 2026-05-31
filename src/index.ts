@@ -78,6 +78,7 @@ class FoundryMCPServer {
       timeout: config.foundry.timeout,
       retryAttempts: config.foundry.retryAttempts,
       retryDelay: config.foundry.retryDelay,
+      writeEnabled: config.foundry.writeEnabled,
     };
     if (config.foundry.apiKey) {
       clientConfig.apiKey = config.foundry.apiKey;

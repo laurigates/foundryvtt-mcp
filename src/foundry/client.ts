@@ -11,9 +11,13 @@ import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry } from './auth.js';
 import type {
+  ActorAttributeUpdateResult,
+  ActorItemCreateSource,
   ActorSearchResult,
+  CompendiumSearchResult,
   DiceRoll,
   FoundryActor,
+  FoundryItem,
   FoundryScene,
   FoundryWorld,
   ItemSearchResult,
@@ -60,6 +64,17 @@ export interface FoundryClientConfig {
   retryAttempts?: number;
   retryDelay?: number;
   socketPath?: string;
+  /** Opt-in gate for game-state mutations (FOUNDRY_WRITE_ENABLED). Default false. */
+  writeEnabled?: boolean;
+}
+
+/** Minimal shape of FoundryVTT's `modifyDocument` Socket.IO acknowledgement. */
+interface DocumentSocketResponse {
+  /** Created/updated data objects, or deleted ids, on success. */
+  result?: unknown[];
+  /** Present when the server rejects the operation. */
+  error?: { message?: string } | null;
+  userId?: string;
 }
 
 export interface SearchActorsParams {
@@ -74,6 +89,27 @@ export interface SearchItemsParams {
   rarity?: string;
   limit?: number;
 }
+
+export interface CompendiumSearchParams {
+  query?: string;
+  packType?: string;
+  itemType?: string;
+  spellLevel?: number;
+  source?: string;
+  compendiumId?: string;
+  limit?: number;
+  /** Opaque pagination cursor from a prior result's `nextCursor`. */
+  cursor?: string;
+}
+
+/**
+ * Shallow attribute patch for {@link FoundryClient.updateActorAttribute} (#143).
+ *
+ * Keys are dot-paths into the actor's `system` object (e.g.
+ * `attributes.hp.value`, `currency.gp`, `spells.spell1.value`,
+ * `attributes.exhaustion`). Values are the scalar to set at that path.
+ */
+export type AttributePatch = Record<string, number | string | boolean>;
 
 export class FoundryClient {
   private http: AxiosInstance;
@@ -357,6 +393,67 @@ export class FoundryClient {
     return this.worldData?.actors.find((a) => a._id === actorId);
   }
 
+  /**
+   * Patches attributes on an actor's `system` object (#143). WRITE — REST required.
+   *
+   * `patch` keys are dot-paths into `actor.system` (e.g. `attributes.hp.value`,
+   * `currency.gp`, `spells.spell1.value`, `attributes.exhaustion`). The patch is
+   * expanded into a nested object and sent as `PUT /api/actors/:actorId` with the
+   * body `{ system: <expanded patch> }` — matching FoundryVTT's own document model
+   * (`Actor#update`).
+   *
+   * Client-side validation, using the actor's current data, rejects:
+   *  - HP value exceeding `max + temp`,
+   *  - spell-slot value exceeding its `max`,
+   *  - exhaustion outside `0–10` (2024 rules) or `0–6` (2014 rules).
+   *
+   * @throws if `apiKey` is unset, the id is malformed, the actor/path is missing,
+   *   or a validation rule is violated.
+   */
+  async updateActorAttribute(
+    actorId: string,
+    patch: AttributePatch,
+  ): Promise<ActorAttributeUpdateResult> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(actorId)) {
+      throw new Error(`Invalid actorId format: ${actorId}`);
+    }
+    if (!isRecord(patch) || Object.keys(patch).length === 0) {
+      throw new Error('patch is required and must contain at least one attribute path');
+    }
+
+    // Fetch current actor data to validate paths and bounds. getActor returns
+    // the mapped actor in socket mode (no `system`), so fall back to the cached
+    // raw actor for the system document the validator needs.
+    const actor = await this.getActor(actorId);
+    const rawSystem = systemOf(actor) ?? systemOf(this.getRawActor(actorId));
+    validateAttributePatch(patch, actor, rawSystem);
+
+    // The patch keys are dot-paths into `actor.system`; prefix each with
+    // `system.` for the document update. FoundryVTT accepts dot-notation keys
+    // in update objects and merges recursively.
+    const update: Record<string, unknown> = { _id: actorId };
+    for (const [path, value] of Object.entries(patch)) {
+      update[`system.${path}`] = value;
+    }
+    const result = await this.modifyDocument('Actor', 'update', {
+      updates: [update],
+      diff: true,
+      recursive: true,
+    });
+
+    // Echo the post-update value for each patched path. Prefer the server's
+    // returned document when present; otherwise reflect the requested value.
+    const returned = isRecord(result[0]) ? (result[0] as Record<string, unknown>) : undefined;
+    const updatedAttributes: Record<string, unknown> = {};
+    for (const [path, value] of Object.entries(patch)) {
+      const fromServer = returned ? getDotPath(returned, `system.${path}`) : undefined;
+      updatedAttributes[path] = fromServer !== undefined ? fromServer : value;
+    }
+
+    return { success: true, updatedAttributes };
+  }
+
   // ==========================================================================
   // Item methods
   // ==========================================================================
@@ -414,6 +511,213 @@ export class FoundryClient {
     });
 
     return { items, total, page: 1, limit };
+  }
+
+  // ==========================================================================
+  // Compendium methods
+  // ==========================================================================
+
+  /**
+   * Searches FoundryVTT compendium packs by name and metadata.
+   *
+   * Compendium data is not present in the cached worldData snapshot, so this
+   * read requires the REST API module (FOUNDRY_API_KEY). When the key is
+   * absent it returns a graceful empty result with `restAvailable: false`
+   * rather than throwing, mirroring the no-worldData behaviour of
+   * {@link searchItems}/{@link searchActors}; the handler surfaces a note
+   * explaining why no results were returned.
+   */
+  async searchCompendium(params: CompendiumSearchParams): Promise<CompendiumSearchResult> {
+    const limit = params.limit ?? 20;
+    const offset = decodeCursor(params.cursor);
+
+    if (this.config.apiKey) {
+      return this.executeWithRetry(async () => {
+        // Translate the opaque cursor into a wire offset for the bridge.
+        const { cursor: _cursor, ...rest } = params;
+        const response = await this.http.get('/api/compendium/search', {
+          params: { ...rest, limit, offset },
+        });
+        const data = (
+          isRecord(response.data) ? response.data : {}
+        ) as Partial<CompendiumSearchResult>;
+        const results = data.results ?? [];
+        const total = typeof data.total === 'number' ? data.total : results.length;
+        const nextOffset = offset + results.length;
+        return {
+          results,
+          total,
+          page: Math.floor(offset / limit) + 1,
+          limit,
+          restAvailable: true,
+          nextCursor: nextOffset < total ? encodeCursor(nextOffset) : null,
+        };
+      });
+    }
+    return { results: [], total: 0, page: 1, limit, restAvailable: false, nextCursor: null };
+  }
+
+  // ==========================================================================
+  // Write helpers (Socket.IO `modifyDocument` — primary transport, PRD-003)
+  // ==========================================================================
+
+  /**
+   * Guards a write operation. Writes require the `FOUNDRY_WRITE_ENABLED` opt-in
+   * and an active authenticated Socket.IO session (the primary transport).
+   * Throws a clear, actionable error otherwise.
+   */
+  private assertWriteable(): void {
+    if (!this.config.writeEnabled) {
+      throw new Error(
+        'Write operations are disabled. Set FOUNDRY_WRITE_ENABLED=true to allow game-state mutation.',
+      );
+    }
+    if (!this.socket?.connected) {
+      throw new Error(
+        'Write operations require an active Socket.IO connection to FoundryVTT (username/password mode).',
+      );
+    }
+  }
+
+  /**
+   * Emits a Socket.IO event with an acknowledgement callback, resolving the
+   * server's response and rejecting on timeout. Mirrors the ack pattern used by
+   * the `world` event in {@link connectAndLoadWorld}/{@link refreshWorldData}.
+   */
+  private emitWithAck<T>(event: string, payload: unknown): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const socket = this.socket;
+      if (!socket?.connected) {
+        reject(new Error('Socket.IO is not connected'));
+        return;
+      }
+      const timeoutMs = this.config.timeout || 10000;
+      const timeout = setTimeout(
+        () => reject(new Error(`Timeout waiting for '${event}' response (${timeoutMs}ms)`)),
+        timeoutMs,
+      );
+      socket.emit(event, payload, (response: T) => {
+        clearTimeout(timeout);
+        resolve(response);
+      });
+    });
+  }
+
+  /**
+   * Performs a FoundryVTT document mutation over Socket.IO using the core
+   * `modifyDocument` protocol. The request shape is verified against the
+   * v13.348 client source (`client/data/client-backend.mjs` `#buildRequest`,
+   * `helpers/socket-interface.mjs` `dispatch`, `common/abstract/socket.mjs`).
+   *
+   * @param type - Document name ("Actor", "Item", …)
+   * @param action - "create" | "update" | "delete"
+   * @param operation - action-specific payload: `data` (create) / `updates`
+   *   (update) / `ids` (delete), plus `parentUuid` for embedded documents.
+   * @returns the server's `result` array (created/updated data, or deleted ids)
+   */
+  private async modifyDocument(
+    type: string,
+    action: 'create' | 'update' | 'delete',
+    operation: Record<string, unknown>,
+  ): Promise<unknown[]> {
+    const request = {
+      type,
+      action,
+      operation: { broadcast: true, pack: null, modifiedTime: Date.now(), ...operation },
+    };
+    const response = await this.emitWithAck<DocumentSocketResponse>('modifyDocument', request);
+    if (response?.error) {
+      throw new Error(
+        `FoundryVTT rejected ${action} ${type}: ${response.error.message || 'unknown error'}`,
+      );
+    }
+    return Array.isArray(response?.result) ? response.result : [];
+  }
+
+  // ==========================================================================
+  // Item mutation methods (WRITE — Socket.IO modifyDocument)
+  // ==========================================================================
+
+  /**
+   * Creates a new item on an actor via the `modifyDocument` socket protocol.
+   *
+   * Inline sources are created directly. Compendium sources are NOT yet
+   * supported over Socket.IO — copying a pack entry needs a compendium read
+   * that `modifyDocument` does not provide (tracked in issue #159).
+   *
+   * @param actorId - 16-char alphanumeric actor document id
+   * @param source - inline item document (compendium source throws)
+   * @returns the newly created item document
+   */
+  async createActorItem(actorId: string, source: ActorItemCreateSource): Promise<FoundryItem> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(actorId)) {
+      throw new Error(`Invalid actorId format: ${actorId}`);
+    }
+    if (source.type === 'compendium') {
+      throw new Error(
+        'Creating an item from a compendium source is not yet supported over Socket.IO; ' +
+          'provide an inline item instead. See issue #159.',
+      );
+    }
+    const result = await this.modifyDocument('Item', 'create', {
+      data: [source.item],
+      parentUuid: `Actor.${actorId}`,
+    });
+    return result[0] as FoundryItem;
+  }
+
+  /**
+   * Applies a JSON merge patch to an item owned by an actor.
+   *
+   * The `patch` is merged into the item's `system` data (recursively, so nested
+   * paths like the D&D 5e v4+ `activities.{id}.consumption.targets` are
+   * preserved). Performed via the `modifyDocument` socket protocol.
+   *
+   * @param actorId - 16-char alphanumeric actor document id
+   * @param itemId - 16-char alphanumeric item document id
+   * @param patch - shallow/nested JSON merge patch applied to `item.system`
+   * @returns the updated item document
+   */
+  async updateActorItem(
+    actorId: string,
+    itemId: string,
+    patch: Record<string, unknown>,
+  ): Promise<FoundryItem> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(actorId)) {
+      throw new Error(`Invalid actorId format: ${actorId}`);
+    }
+    if (!FOUNDRY_ID_PATTERN.test(itemId)) {
+      throw new Error(`Invalid itemId format: ${itemId}`);
+    }
+    const result = await this.modifyDocument('Item', 'update', {
+      updates: [{ _id: itemId, system: patch }],
+      parentUuid: `Actor.${actorId}`,
+      diff: true,
+      recursive: true,
+    });
+    return result[0] as FoundryItem;
+  }
+
+  /**
+   * Deletes an item owned by an actor via the `modifyDocument` socket protocol.
+   *
+   * @param actorId - 16-char alphanumeric actor document id
+   * @param itemId - 16-char alphanumeric item document id
+   */
+  async deleteActorItem(actorId: string, itemId: string): Promise<void> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(actorId)) {
+      throw new Error(`Invalid actorId format: ${actorId}`);
+    }
+    if (!FOUNDRY_ID_PATTERN.test(itemId)) {
+      throw new Error(`Invalid itemId format: ${itemId}`);
+    }
+    await this.modifyDocument('Item', 'delete', {
+      ids: [itemId],
+      parentUuid: `Actor.${actorId}`,
+    });
   }
 
   // ==========================================================================
@@ -865,6 +1169,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Returns the `system` object of an actor-like document, accepting either the
+ * raw REST/world document (`{ ..., system }`) or a cached {@link WorldActor}.
+ * Returns undefined when no system object is present (e.g. the mapped
+ * {@link FoundryActor} produced by the socket world-cache path).
+ */
+function systemOf(obj: unknown): Record<string, unknown> | undefined {
+  if (isRecord(obj) && isRecord(obj.system)) {
+    return obj.system;
+  }
+  return undefined;
+}
+
+/**
+ * Compendium pagination cursors are opaque base64-encoded result offsets.
+ * `encodeCursor` turns an offset into a cursor; `decodeCursor` reads it back,
+ * returning 0 when the cursor is absent or malformed.
+ */
+function encodeCursor(offset: number): string {
+  return Buffer.from(String(offset), 'utf8').toString('base64');
+}
+
+function decodeCursor(cursor: string | undefined): number {
+  if (!cursor) {
+    return 0;
+  }
+  const decoded = Number.parseInt(Buffer.from(cursor, 'base64').toString('utf8'), 10);
+  return Number.isFinite(decoded) && decoded >= 0 ? decoded : 0;
+}
+
 function extractNested(obj: Record<string, unknown>, ...keys: string[]): unknown {
   let current: unknown = obj;
   for (const key of keys) {
@@ -883,4 +1217,90 @@ function extractNested(obj: Record<string, unknown>, ...keys: string[]): unknown
 function extractString(obj: Record<string, unknown>, ...keys: string[]): string | null {
   const val = extractNested(obj, ...keys);
   return typeof val === 'string' ? val : null;
+}
+
+// ============================================================================
+// Attribute-patch helpers (#143)
+// ============================================================================
+
+/**
+ * Reads a dot-path out of a nested Record tree, returning undefined if any
+ * segment is missing.
+ */
+function getDotPath(obj: Record<string, unknown>, path: string): unknown {
+  return extractNested(obj, ...path.split('.'));
+}
+
+/**
+ * Reads the actor's game-system id from raw world data, when available.
+ * Used to pick the exhaustion clamp (2024 dnd5e: 0–10; 2014: 0–6).
+ */
+function exhaustionMax(sys: Record<string, unknown> | undefined): number {
+  // dnd5e 2024 rules cap exhaustion at 10; the 2014 rules cap it at 6.
+  // Without an explicit rules-version signal, default to the wider 2024 range
+  // so legitimate 2024 values are not rejected; the 2014 cap is applied when
+  // the actor's system data exposes a `rules: "2014"`-style marker.
+  if (isRecord(sys)) {
+    const source = isRecord(sys._source) ? sys._source : undefined;
+    const rules =
+      extractString(sys, 'rules') ||
+      (source ? extractString(source, 'rules') : null) ||
+      extractString(sys, 'attributes', 'exhaustion', 'rules');
+    if (rules === '2014' || rules === 'legacy') {
+      return 6;
+    }
+  }
+  return 10;
+}
+
+/**
+ * Validates an attribute patch against the actor's current data, throwing a
+ * clear error on the first violation. Only checks rules for which the needed
+ * limit (max HP, slot max, exhaustion bound) is available.
+ */
+function validateAttributePatch(
+  patch: AttributePatch,
+  actor: FoundryActor,
+  rawSystem: Record<string, unknown> | undefined,
+): void {
+  // Prefer the raw `system` document for bounds: in REST mode getActor returns
+  // the raw document (HP at system.attributes.hp.{value,max,temp}); the mapped
+  // FoundryActor.hp is only populated on the socket world-cache path.
+  const rawHp = rawSystem ? extractNested(rawSystem, 'attributes', 'hp') : undefined;
+  const hp = isRecord(rawHp) ? rawHp : undefined;
+
+  for (const [path, value] of Object.entries(patch)) {
+    // HP value cannot exceed max + temp.
+    if (path === 'attributes.hp.value' && typeof value === 'number') {
+      const patchedTemp = patch['attributes.hp.temp'];
+      const currentTemp = typeof hp?.temp === 'number' ? hp.temp : (actor.hp?.temp ?? 0);
+      const temp = typeof patchedTemp === 'number' ? patchedTemp : currentTemp;
+      const max = typeof hp?.max === 'number' ? hp.max : actor.hp?.max;
+      if (typeof max === 'number' && value > max + temp) {
+        throw new Error(
+          `Invalid HP value ${value}: exceeds max + temp (${max} + ${temp} = ${max + temp})`,
+        );
+      }
+    }
+
+    // Spell-slot value cannot exceed its max.
+    const slotMatch = /^spells\.(spell\w+|pact)\.value$/.exec(path);
+    const slotKey = slotMatch?.[1];
+    if (slotKey && typeof value === 'number' && rawSystem) {
+      const slotMax = extractNested(rawSystem, 'spells', slotKey, 'max');
+      if (typeof slotMax === 'number' && value > slotMax) {
+        throw new Error(
+          `Invalid spell slot value ${value} for ${slotKey}: exceeds max (${slotMax})`,
+        );
+      }
+    }
+
+    // Exhaustion clamped 0–10 (2024) or 0–6 (2014).
+    if (path === 'attributes.exhaustion' && typeof value === 'number') {
+      const max = exhaustionMax(rawSystem);
+      if (value < 0 || value > max) {
+        throw new Error(`Invalid exhaustion ${value}: must be between 0 and ${max}`);
+      }
+    }
+  }
 }

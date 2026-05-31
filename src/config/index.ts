@@ -57,6 +57,7 @@ const ConfigSchema = z.object({
     timeout: z.number().default(10000),
     retryAttempts: z.number().default(3),
     retryDelay: z.number().default(1000),
+    writeEnabled: z.boolean().default(false),
   }),
 
   cache: z.object({
@@ -111,6 +112,10 @@ function loadConfig(): Config {
       retryDelay: process.env.FOUNDRY_RETRY_DELAY
         ? parseInt(process.env.FOUNDRY_RETRY_DELAY, 10)
         : undefined,
+      writeEnabled:
+        process.env.FOUNDRY_WRITE_ENABLED !== undefined
+          ? process.env.FOUNDRY_WRITE_ENABLED === 'true'
+          : undefined,
     },
 
     cache: {
