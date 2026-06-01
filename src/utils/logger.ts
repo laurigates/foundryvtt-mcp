@@ -27,7 +27,6 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
  * Provides methods for different log levels and automatically filters
  * messages based on the configured minimum log level.
  *
- * @class Logger
  * @example
  * ```typescript
  * import { logger } from './utils/logger.js';
