@@ -19,7 +19,6 @@
  * and other creatures in the game world. This interface covers the common
  * properties shared across different game systems.
  *
- * @interface FoundryActor
  * @example
  * ```typescript
  * const hero: FoundryActor = {
@@ -80,7 +79,6 @@ export interface FoundryActor {
  * Items represent equipment, spells, features, and other objects that can be
  * owned by actors or exist independently in the game world.
  *
- * @interface FoundryItem
  * @example
  * ```typescript
  * const sword: FoundryItem = {
@@ -151,7 +149,6 @@ export interface FoundryItem {
  * Scenes are the visual environments where gameplay takes place, containing
  * background images, tokens, lighting, walls, and other elements.
  *
- * @interface FoundryScene
  * @example
  * ```typescript
  * const dungeon: FoundryScene = {
@@ -211,7 +208,6 @@ export interface FoundryScene {
  * Tokens are the visual representations of actors placed on scenes.
  * They contain position, appearance, and gameplay-related information.
  *
- * @interface FoundryToken
  * @example
  * ```typescript
  * const heroToken: FoundryToken = {
@@ -258,7 +254,6 @@ export interface FoundryToken {
  * Walls control movement, vision, and sound propagation in scenes.
  * They define the physical boundaries and obstacles in the environment.
  *
- * @interface FoundryWall
  */
 export interface FoundryWall {
   _id: string;
@@ -276,7 +271,6 @@ export interface FoundryWall {
  * Light sources provide illumination and create atmospheric effects
  * in scenes, affecting token vision and creating ambiance.
  *
- * @interface FoundryLight
  */
 export interface FoundryLight {
   _id: string;
@@ -304,7 +298,6 @@ export interface FoundryLight {
  * Sound objects provide audio atmosphere and effects in scenes,
  * with positional audio and volume controls.
  *
- * @interface FoundrySound
  */
 export interface FoundrySound {
   _id: string;
@@ -323,7 +316,6 @@ export interface FoundrySound {
  * Drawings allow GMs and players to add visual annotations,
  * shapes, and text directly onto scenes.
  *
- * @interface FoundryDrawing
  */
 export interface FoundryDrawing {
   _id: string;
@@ -358,7 +350,6 @@ export interface FoundryDrawing {
  * Contains metadata about the current game world including
  * system information, modules, and world settings.
  *
- * @interface FoundryWorld
  * @example
  * ```typescript
  * const world: FoundryWorld = {
@@ -471,7 +462,6 @@ export interface FoundryCombat {
  * Contains all information about a completed dice roll including
  * the formula used, total result, breakdown, and metadata.
  *
- * @interface DiceRoll
  * @example
  * ```typescript
  * const attackRoll: DiceRoll = {
@@ -510,7 +500,6 @@ export interface FoundryUser {
  * Contains paginated search results for actor queries
  * along with metadata about the search.
  *
- * @interface ActorSearchResult
  * @example
  * ```typescript
  * const searchResult: ActorSearchResult = {
@@ -534,7 +523,6 @@ export interface ActorSearchResult {
  * Contains paginated search results for item queries
  * along with metadata about the search.
  *
- * @interface ItemSearchResult
  * @example
  * ```typescript
  * const searchResult: ItemSearchResult = {
@@ -640,8 +628,7 @@ export interface ActorAttributeUpdateResult {
  * Standardized response format for API calls including
  * success status, data payload, and error information.
  *
- * @interface FoundryAPIResponse
- * @template T - Type of the response data
+ * @typeParam T - Type of the response data
  * @example
  * ```typescript
  * const response: FoundryAPIResponse<FoundryActor[]> = {
@@ -665,7 +652,6 @@ export interface FoundryAPIResponse<T = unknown> {
  * Defines the format for real-time communication messages
  * between the MCP server and FoundryVTT.
  *
- * @interface FoundryWebSocketMessage
  * @example
  * ```typescript
  * const message: FoundryWebSocketMessage = {
@@ -690,7 +676,6 @@ export interface FoundryWebSocketMessage {
  * Contains all information needed to create a complete NPC
  * including personality, appearance, and background details.
  *
- * @interface GeneratedNPC
  * @example
  * ```typescript
  * const npc: GeneratedNPC = {
