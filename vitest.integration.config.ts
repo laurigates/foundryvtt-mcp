@@ -8,11 +8,12 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 120000,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    // Vitest 4 removed test.poolOptions; the previous
+    // poolOptions.forks.singleFork is now maxWorkers + isolate (run the
+    // integration suite serially in one process against the single shared
+    // FoundryVTT instance). See https://vitest.dev/guide/migration#pool-rework
+    maxWorkers: 1,
+    isolate: false,
     env: {
       NODE_ENV: 'test',
       FOUNDRY_URL: 'http://localhost:30001',
