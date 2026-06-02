@@ -5,6 +5,10 @@ services:
       - "30001:30000"
     environment:
       - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
+      # Pin the build so integration tests always run against the version the
+      # modifyDocument wire shape is verified against (client.ts), instead of
+      # whatever "latest" felddy resolves to (which also risks 429 rate-limits).
+      - FOUNDRY_VERSION=${FOUNDRY_VERSION:-13.348}
       - FOUNDRY_ADMIN_KEY=integration-test-admin
       - FOUNDRY_USERNAME=${FOUNDRY_USERNAME:-test-user}
       - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD:-test-password}
