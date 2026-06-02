@@ -10,6 +10,23 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.1.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.0.1...foundryvtt-mcp-v1.1.0) (2026-06-02)
+
+
+### Features
+
+* **diagnostics:** implement get_recent_logs filters; mark diagnose_errors as stub ([#151](https://github.com/laurigates/foundryvtt-mcp/issues/151)) ([09e8b05](https://github.com/laurigates/foundryvtt-mcp/commit/09e8b05f9c19d95ff5e8632882d3df9047987b88))
+* **tools:** actor item CRUD, attribute mutation & compendium search ([#142](https://github.com/laurigates/foundryvtt-mcp/issues/142), [#143](https://github.com/laurigates/foundryvtt-mcp/issues/143), [#144](https://github.com/laurigates/foundryvtt-mcp/issues/144)) ([#158](https://github.com/laurigates/foundryvtt-mcp/issues/158)) ([f28d9bd](https://github.com/laurigates/foundryvtt-mcp/commit/f28d9bd6462380cf09a39c3d5b2c14cbcb75b56d))
+
+
+### Bug Fixes
+
+* **auth:** match bracketed IPv6 [::1] loopback in plaintext-HTTP guard ([#167](https://github.com/laurigates/foundryvtt-mcp/issues/167)) ([273447c](https://github.com/laurigates/foundryvtt-mcp/commit/273447c1a655099ed5253cd6bbccb1d4a5c568b2))
+* **chat:** clamp get_chat_messages limit at 100 ([#149](https://github.com/laurigates/foundryvtt-mcp/issues/149)) ([5e125cd](https://github.com/laurigates/foundryvtt-mcp/commit/5e125cde9296ed0792c762dc78633f21daf93f22))
+* **ci:** fail fast on missing FoundryVTT secrets and always upload logs ([#147](https://github.com/laurigates/foundryvtt-mcp/issues/147)) ([8cd0f57](https://github.com/laurigates/foundryvtt-mcp/commit/8cd0f575f38497904be815a3a7bb955bfcfaf191))
+* **ci:** replace audit-ci with bun audit in security workflow ([59e6809](https://github.com/laurigates/foundryvtt-mcp/commit/59e68094c6d68ffda5cf8b86e07c46375a59a285))
+* **client:** clean up world listener on refreshWorldData timeout ([#150](https://github.com/laurigates/foundryvtt-mcp/issues/150)) ([1af305c](https://github.com/laurigates/foundryvtt-mcp/commit/1af305cdcaa6ff49e4bda080d73f18f77b76eccd))
+
 ## [1.0.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.0.0...foundryvtt-mcp-v1.0.1) (2026-03-13)
 
 
