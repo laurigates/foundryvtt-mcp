@@ -247,6 +247,29 @@ antipatterns:
 publish-dry-run: build
     npm publish --dry-run --access public
 
+# Show release-please health: recent runs, open release PR, version drift
+[group: "publish"]
+release-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Recent release-please runs ==="
+    gh run list --workflow=release-please.yml --limit 3 \
+      --json createdAt,status,conclusion,event \
+      --jq '.[] | "\(.createdAt)  \(.status)/\(.conclusion // "running")  \(.event)"'
+    echo ""
+    echo "=== Open release PR ==="
+    prs=$(gh pr list --state open --label "autorelease: pending" \
+      --json number,title --jq '.[] | "#\(.number) \(.title)"')
+    [ -n "$prs" ] && echo "$prs" || echo "(none)"
+    echo ""
+    echo "=== Version drift ==="
+    name=$(node -p "require('./package.json').name")
+    local_v=$(node -p "require('./package.json').version")
+    npm_v=$(npm view "$name" version 2>/dev/null || echo "unpublished")
+    tag_v=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+    printf "  package.json: %s\n  npm latest:   %s\n  latest tag:   %s\n" "$local_v" "$npm_v" "$tag_v"
+    [ "$local_v" = "$npm_v" ] || echo "  ! package.json $local_v not on npm ($npm_v)"
+
 ########## Composite Workflows ##########
 
 # Quick development check (lint + test)
