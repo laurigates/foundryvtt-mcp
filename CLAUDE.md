@@ -6,7 +6,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 
 - **Language**: TypeScript (ES modules, `.js` imports for MCP SDK compatibility)
 - **Runtime**: Node.js (Bun as package manager)
-- **Test**: Vitest (unit), Playwright (E2E)
+- **Test**: Vitest (unit + integration), Playwright (E2E)
 - **Lint/Format**: Biome (linting + formatting)
 - **Validation**: Zod schemas
 
@@ -16,6 +16,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
+bun run test:integration # Integration tests (live FoundryVTT, port 30001)
 bun run test:e2e       # E2E tests (Playwright, headless)
 bun run lint           # Lint code (Biome)
 bun run lint:fix       # Auto-fix lint issues
@@ -56,7 +57,8 @@ bun run test-connection # Test MCP→FoundryVTT connection
 | `FOUNDRY_USERNAME` | Yes | FoundryVTT user |
 | `FOUNDRY_PASSWORD` | Yes | FoundryVTT password |
 | `FOUNDRY_USER_ID` | No | Bypass username→ID resolution |
-| `FOUNDRY_API_KEY` | No | REST API module key |
+| `FOUNDRY_API_KEY` | No | REST API module key (read-only diagnostics path) |
+| `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default `false`) |
 | `LOG_LEVEL` | No | `debug` for verbose output |
 | `FOUNDRY_TIMEOUT` | No | Request timeout (ms, default 10000) |
 
@@ -64,7 +66,8 @@ bun run test-connection # Test MCP→FoundryVTT connection
 
 See `.claude/rules/` for detailed guidelines:
 - `development.md` — TDD workflow, commit conventions, build commands
-- `testing.md` — Unit and E2E test requirements
+- `testing.md` — Test tiers (unit, integration, E2E) and requirements
+- `foundry-write-protocol.md` — transport (Socket.IO vs REST) and the `modifyDocument` write protocol
 - `document-management.md` — Document detection and organization
 
 ## Reference
