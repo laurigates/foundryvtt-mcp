@@ -12,9 +12,9 @@
  */
 
 import axios from 'axios';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Socket } from 'socket.io-client';
 import { io } from 'socket.io-client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('axios');
 vi.mock('socket.io-client');
@@ -116,13 +116,12 @@ describe('authenticateFoundry — plaintext HTTP warning (CN-3)', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('warns for http://[::1] (current source behavior — known limitation)', async () => {
-    // NOTE: new URL('http://[::1]').hostname returns '[::1]' (with brackets),
-    // so the hostname.startsWith('::1') guard in auth.ts does not match the
-    // bracketed IPv6 loopback form. The warning is currently emitted; this
-    // test pins that behavior so a future source fix is a deliberate change.
+  it('does NOT warn for http://[::1] (bracketed IPv6 loopback)', async () => {
+    // new URL('http://[::1]').hostname returns '[::1]' (with brackets). The
+    // guard canonicalizes by stripping the brackets so the IPv6 loopback form
+    // is recognized as localhost and no plaintext-HTTP warning is emitted.
     await authenticateFoundry('http://[::1]:30000', 'aaaaaaaaaaaaaaaa', 'pw');
-    expect(logger.warn).toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('does NOT warn for https:// (non-plaintext)', async () => {
@@ -160,16 +159,10 @@ describe('authenticateFoundry — FOUNDRY_USER_ID shortcut (CN-4)', () => {
   });
 
   it('falls back to Socket.IO lookup when user is NOT a 16-char _id', async () => {
-    const { socket, emit } = buildMockSocket([
-      { _id: 'resolvedDocId123', name: 'Gamemaster' },
-    ]);
+    const { socket, emit } = buildMockSocket([{ _id: 'resolvedDocId123', name: 'Gamemaster' }]);
     mockIo.mockReturnValue(socket);
 
-    const { userId } = await authenticateFoundry(
-      'http://localhost:30000',
-      'Gamemaster',
-      'pw',
-    );
+    const { userId } = await authenticateFoundry('http://localhost:30000', 'Gamemaster', 'pw');
 
     expect(mockIo).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith('getJoinData', expect.any(Function));
@@ -195,11 +188,7 @@ describe('authenticateFoundry — warn-and-continue (CN-7 analogue)', () => {
   });
 
   it('emits warning AND still returns a valid session+userId', async () => {
-    const result = await authenticateFoundry(
-      'http://example.com',
-      'abc123DEF456ghij',
-      'pw',
-    );
+    const result = await authenticateFoundry('http://example.com', 'abc123DEF456ghij', 'pw');
 
     // Warning fired (non-fatal).
     expect(logger.warn).toHaveBeenCalled();
@@ -227,9 +216,7 @@ describe('authenticateFoundry — warn-and-continue (CN-7 analogue)', () => {
     // check) and that auth.ts surfaces the downstream error cleanly.
     mockAxios.get = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED'));
 
-    await expect(
-      authenticateFoundry('not a real url', 'abc123DEF456ghij', 'pw'),
-    ).rejects.toThrow();
+    await expect(authenticateFoundry('not a real url', 'abc123DEF456ghij', 'pw')).rejects.toThrow();
 
     expect(logger.warn).not.toHaveBeenCalled();
   });

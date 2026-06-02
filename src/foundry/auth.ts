@@ -117,12 +117,11 @@ export async function authenticateFoundry(
   // Warn when credentials are sent over plaintext HTTP to a non-localhost host
   try {
     const parsed = new URL(baseUrl);
-    if (
-      parsed.protocol === 'http:' &&
-      parsed.hostname !== 'localhost' &&
-      parsed.hostname !== '127.0.0.1' &&
-      !parsed.hostname.startsWith('::1')
-    ) {
+    // new URL('http://[::1]').hostname returns the bracketed form '[::1]';
+    // strip IPv6 brackets so loopback comparison is uniform.
+    const host = parsed.hostname.replace(/^\[|\]$/g, '');
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (parsed.protocol === 'http:' && !isLocalhost) {
       logger.warn(
         'WARNING: Connecting to a non-localhost host over plain HTTP. ' +
           'Your password will be transmitted in plaintext. ' +
