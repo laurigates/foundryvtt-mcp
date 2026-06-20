@@ -12,11 +12,7 @@ import type {
   WorldJournal,
   WorldScene,
 } from '../../../foundry/types.js';
-import {
-  handleGetWorldSummary,
-  handleRefreshWorldData,
-  handleSearchWorld,
-} from '../world.js';
+import { handleGetWorldSummary, handleRefreshWorldData, handleSearchWorld } from '../world.js';
 
 function getText(result: { content: Array<{ type: string; text: string }> }): string {
   return result.content[0]?.text ?? '';

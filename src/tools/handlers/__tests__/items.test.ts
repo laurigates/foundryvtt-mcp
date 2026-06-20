@@ -21,9 +21,12 @@ interface MockSearchParams {
   limit: number;
 }
 
-function mockFoundryClient(
-  result: { items: MockItem[]; total: number; page: number; limit: number },
-): { client: FoundryClient; calls: { params: MockSearchParams[] } } {
+function mockFoundryClient(result: {
+  items: MockItem[];
+  total: number;
+  page: number;
+  limit: number;
+}): { client: FoundryClient; calls: { params: MockSearchParams[] } } {
   const calls = { params: [] as MockSearchParams[] };
   const client = {
     searchItems: vi.fn(async (params: MockSearchParams) => {
