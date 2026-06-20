@@ -8,7 +8,88 @@
 
 Add write operations to foundryvtt-mcp, starting with combat management (FR-018) as the highest-value first step.
 
-## Phase 1 Implementation Plan (FR-018 + FR-019)
+## Status (current)
+
+| Area | Status |
+|------|--------|
+| Write guard (`FOUNDRY_WRITE_ENABLED`) | ✅ Shipped — `assertWriteable()` in `src/foundry/client.ts`, config `writeEnabled` in `src/config/index.ts` |
+| Socket.IO write transport | ✅ Shipped — `modifyDocument()` (NOT the generic `emitWrite` originally sketched below); see "Design correction" |
+| Actor attribute mutation (FR-021) | ✅ Shipped — `update_actor_attributes` (#143) |
+| Actor item CRUD (FR-021) | ✅ Shipped — `create_actor_item` / `update_actor_item` / `delete_actor_item` (#142, #159) |
+| Combat write — `next_turn`, `end_combat`, `set_initiative` (FR-018) | ✅ Shipped — Phase 1a, this PRP |
+| Combat write — `start_combat` (FR-018) | ⏳ Deferred — [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172) |
+| `next_turn` skipDefeated refinement | ⏳ Deferred — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173) |
+| Token manipulation (FR-019) | ⏳ Deferred — [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174) |
+
+## Design correction: `modifyDocument`, not `emitWrite`
+
+The early sketch below proposed a generic `emitWrite(event, data)` helper. The
+implementation instead uses FoundryVTT's core **`modifyDocument`** Socket.IO
+protocol — the request shape verified against the bundled v13.348 app source
+(`client/data/client-backend.mjs` `#buildRequest`). All writes go through:
+
+```
+assertWriteable()  →  emitWithAck('modifyDocument', { type, action, operation })  →  modifyDocument()
+```
+
+where `operation` carries `data:[…]` (create) / `updates:[{_id,…}]` (update,
+with `diff`/`recursive`) / `ids:[…]` (delete), plus `parentUuid:"<Parent>.<id>"`
+for embedded documents (e.g. `Combatant` → `Combat.<combatId>`). See
+`.claude/rules/foundry-write-protocol.md`.
+
+## Combat Phase 1a (FR-018) — as shipped
+
+Three GM-gated tools operating on the **active** combat, disabled by default:
+
+- `next_turn` — advance turn; wraps to next round past the last combatant
+  (does not yet skip defeated combatants — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173))
+- `end_combat` — delete the active combat encounter
+- `set_initiative` — set a combatant's initiative (`combatId` defaults to active)
+
+Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`
+(`src/foundry/client.ts`). Pure helper `computeNextTurn` and handlers in
+`src/tools/handlers/combat-mutations.ts`.
+
+## Files (combat Phase 1a)
+
+| File | Action |
+|------|--------|
+| `src/foundry/client.ts` | `updateCombat` / `endCombat` / `setCombatantInitiative` |
+| `src/tools/handlers/combat-mutations.ts` | New — `computeNextTurn` + 3 handlers |
+| `src/tools/definitions.ts` | `combatMutationTools` + register in `getAllTools()` |
+| `src/tools/router.ts` | dispatch cases + imports |
+| `src/tools/handlers/__tests__/combat-mutations.test.ts` | New — unit tests (mocked socket) |
+| `tests/integration/combat.integration.test.ts` | New — gated live round-trip (skip/revert idiom) |
+| `README.md` | "Write Operations" subsection + `FOUNDRY_WRITE_ENABLED` env row |
+| `.env.example` | already documents `FOUNDRY_WRITE_ENABLED` |
+
+## Test Checklist
+
+- [x] Unit: all write handlers tested with mocked Socket.IO
+- [x] Unit: write guard returns error when `FOUNDRY_WRITE_ENABLED=false`
+- [x] Unit: emitted `modifyDocument` wire shape asserted (Combat update / delete, Combatant `parentUuid`)
+- [~] Integration: `set_initiative` + `next_turn` live round-trip+restore — gated; skips when no active GM combat or no licensed test instance (CI gap #140)
+
+## Deferred (separate issues)
+
+- `start_combat` (FR-018, highest-risk — creates Combat + Combatant docs): [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)
+- `next_turn` skipDefeated refinement: [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173)
+- Token manipulation tools (FR-019 — move, status effects): [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174)
+
+## Success Criteria
+
+- [x] All write tools disabled by default (`FOUNDRY_WRITE_ENABLED` not set)
+- [x] All write tools documented with clear opt-in instructions
+- [x] Unit test coverage for new handlers (every branch exercised; coverage tooling `@vitest/coverage-v8` not installed locally)
+- [x] No regressions in existing read-only tools
+
+---
+
+## Original Phase 1 sketch (superseded — retained for history)
+
+The steps below were the initial plan. Steps 1–2 shipped via a better
+mechanism (`modifyDocument`, see "Design correction"); the combat tools shipped
+in Phase 1a; token tools (Step 4) are deferred to [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174).
 
 ### Step 1: Add write guard
 
@@ -22,6 +103,9 @@ FOUNDRY_WRITE_ENABLED: z.string().optional().transform(v => v === 'true'),
 All write tool handlers check this at the start and return an error if false.
 
 ### Step 2: Add Socket.IO write helper to FoundryClient
+
+> Superseded: implemented as `modifyDocument()` over `emitWithAck()`, not the
+> generic `emitWrite()` below.
 
 ```typescript
 // src/foundry/client.ts
@@ -41,67 +125,21 @@ async emitWrite<T>(event: string, data: unknown): Promise<T> {
 
 ### Step 3: Implement combat handler tools
 
-```typescript
-// src/tools/handlers/combat-write.ts
-export async function startCombat(client: FoundryClient, tokenIds: string[]): Promise<string>
-export async function endCombat(client: FoundryClient, combatId: string): Promise<void>
-export async function nextTurn(client: FoundryClient, combatId: string): Promise<CombatState>
-export async function setInitiative(client: FoundryClient, combatId: string, combatantId: string, initiative: number): Promise<void>
-```
+Shipped as `next_turn` / `end_combat` / `set_initiative` (`start_combat` deferred to [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)).
 
 ### Step 4: Implement token manipulation tools
 
-```typescript
-// src/tools/handlers/tokens.ts
-export async function moveToken(client: FoundryClient, tokenId: string, x: number, y: number): Promise<void>
-export async function applyStatusEffect(client: FoundryClient, tokenId: string, effect: string, active: boolean): Promise<void>
-```
+Deferred to [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174).
 
 ### Step 5: Register tool schemas
 
-Add to `src/tools/definitions.ts`:
-- `start_combat`, `end_combat`, `next_turn`, `set_initiative`
-- `move_token`, `apply_status_effect`
+Done for combat tools in `src/tools/definitions.ts` (`combatMutationTools`).
 
 ### Step 6: Write unit tests
 
-```typescript
-// src/tools/handlers/__tests__/combat-write.test.ts
-// Mock socket.emit responses
-// Test: write guard blocks when disabled
-// Test: start_combat emits correct Socket.IO event
-// Test: error handling on Socket.IO failure
-```
+Done — `src/tools/handlers/__tests__/combat-mutations.test.ts` (mocked socket;
+guard, wire shape, error handling).
 
 ### Step 7: Update documentation
 
-- README: add "Write Operations" section with `FOUNDRY_WRITE_ENABLED` instructions
-- Add tool descriptions to API reference
-
-## Test Checklist
-
-- [ ] Unit: all write handlers tested with mocked Socket.IO
-- [ ] Unit: write guard returns error when `FOUNDRY_WRITE_ENABLED=false`
-- [ ] E2E: `start_combat` creates combat with correct tokens (requires live Foundry)
-- [ ] E2E: `next_turn` advances initiative correctly
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `src/config/index.ts` | Add `FOUNDRY_WRITE_ENABLED` |
-| `src/foundry/client.ts` | Add `emitWrite()` helper |
-| `src/tools/handlers/combat-write.ts` | New file |
-| `src/tools/handlers/tokens.ts` | New file |
-| `src/tools/definitions.ts` | Add tool schemas |
-| `src/tools/registry.ts` | Register write tools |
-| `tests/unit/combat-write.test.ts` | New tests |
-| `README.md` | Document write ops |
-| `.env.example` | Add `FOUNDRY_WRITE_ENABLED=false` |
-
-## Success Criteria
-
-- All write tools disabled by default (`FOUNDRY_WRITE_ENABLED` not set)
-- All write tools documented with clear opt-in instructions
-- Unit test coverage ≥ 80% for new handlers
-- No regressions in existing read-only tools
+Done — README "Write Operations" subsection + `FOUNDRY_WRITE_ENABLED` env row.

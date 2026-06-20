@@ -126,8 +126,9 @@
       "id": "FR-018",
       "name": "Combat management (start/end, advance initiative)",
       "prd": "PRD-001",
-      "status": "planned",
-      "priority": "high"
+      "status": "partial",
+      "priority": "high",
+      "note": "3/4 tools shipped (next_turn, end_combat, set_initiative); start_combat deferred (#172), skipDefeated refinement (#173)"
     },
     {
       "id": "FR-019",
@@ -147,8 +148,9 @@
       "id": "FR-021",
       "name": "Character sheet editing",
       "prd": "PRD-001",
-      "status": "planned",
-      "priority": "medium"
+      "status": "complete",
+      "priority": "medium",
+      "note": "Delivered by actor attribute + item CRUD mutations (update_actor_attributes, create/update/delete_actor_item)"
     },
     {
       "id": "FR-022",
@@ -174,8 +176,9 @@
   ],
   "summary": {
     "total": 24,
-    "complete": 17,
-    "planned": 7,
-    "completion_percentage": 70.8
+    "complete": 18,
+    "partial": 1,
+    "planned": 5,
+    "completion_percentage": 75.0
   }
 }

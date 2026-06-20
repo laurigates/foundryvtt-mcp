@@ -19,10 +19,10 @@
 | Rule lookup | PRD-001 | complete | low |
 | MCP resource endpoints (foundry://) | PRD-001 | complete | medium |
 | Optional REST API diagnostics (logs, health) | PRD-002 | complete | low |
-| Combat management (start/end, advance initiative) | PRD-001 | planned | high |
+| Combat management (start/end, advance initiative) | PRD-001 | partial | high |
 | Token manipulation (move, status effects) | PRD-001 | planned | medium |
 | Scene navigation and switching | PRD-001 | planned | medium |
-| Character sheet editing | PRD-001 | planned | medium |
+| Character sheet editing | PRD-001 | complete | medium |
 | Journal creation and editing | PRD-001 | planned | low |
 | Macro execution | PRD-001 | planned | low |
 | Multi-world support | PRD-001 | planned | low |

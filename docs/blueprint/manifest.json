@@ -96,11 +96,24 @@
     "feature-tracker-sync": {
       "enabled": true,
       "auto_run": false,
-      "last_completed_at": null,
-      "last_result": null,
+      "last_completed_at": "2026-06-20T17:40:45Z",
+      "last_result": "success",
       "schedule": "daily",
-      "stats": {},
-      "context": {}
+      "stats": {
+        "runs_total": 1,
+        "features_updated": 2
+      },
+      "context": {
+        "updated": [
+          "FR-018 planned->partial",
+          "FR-021 planned->complete"
+        ],
+        "deferred_issues": [
+          172,
+          173,
+          174
+        ]
+      }
     },
     "sync-ids": {
       "enabled": true,
