@@ -721,6 +721,81 @@ export class FoundryClient {
   }
 
   // ==========================================================================
+  // Combat mutation methods (WRITE — Socket.IO modifyDocument, FR-018)
+  // ==========================================================================
+
+  /**
+   * Updates the active combat's turn/round pointers (FR-018).
+   *
+   * `Combat` is a top-level document, so the update carries no `parentUuid`.
+   * The patch fields map directly onto the Combat document (`turn`, `round`).
+   *
+   * @param combatId - 16-char alphanumeric Combat document id
+   * @param patch - turn and/or round to set on the combat
+   * @returns the updated combat document
+   */
+  async updateCombat(combatId: string, patch: { turn?: number; round?: number }): Promise<unknown> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(combatId)) {
+      throw new Error(`Invalid combatId format: ${combatId}`);
+    }
+    const result = await this.modifyDocument('Combat', 'update', {
+      updates: [{ _id: combatId, ...patch }],
+      diff: true,
+      recursive: true,
+    });
+    return result[0];
+  }
+
+  /**
+   * Ends (deletes) the active combat encounter (FR-018).
+   *
+   * @param combatId - 16-char alphanumeric Combat document id
+   */
+  async endCombat(combatId: string): Promise<void> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(combatId)) {
+      throw new Error(`Invalid combatId format: ${combatId}`);
+    }
+    await this.modifyDocument('Combat', 'delete', { ids: [combatId] });
+  }
+
+  /**
+   * Sets a combatant's initiative (FR-018).
+   *
+   * `Combatant` is an embedded document inside `Combat`, so the update is sent
+   * with `parentUuid: "Combat.<combatId>"`.
+   *
+   * @param combatId - 16-char alphanumeric Combat document id (the parent)
+   * @param combatantId - 16-char alphanumeric Combatant document id
+   * @param initiative - finite initiative value to assign
+   * @returns the updated combatant document
+   */
+  async setCombatantInitiative(
+    combatId: string,
+    combatantId: string,
+    initiative: number,
+  ): Promise<unknown> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(combatId)) {
+      throw new Error(`Invalid combatId format: ${combatId}`);
+    }
+    if (!FOUNDRY_ID_PATTERN.test(combatantId)) {
+      throw new Error(`Invalid combatantId format: ${combatantId}`);
+    }
+    if (typeof initiative !== 'number' || !Number.isFinite(initiative)) {
+      throw new Error(`Invalid initiative: ${initiative} (must be a finite number)`);
+    }
+    const result = await this.modifyDocument('Combatant', 'update', {
+      updates: [{ _id: combatantId, initiative }],
+      parentUuid: `Combat.${combatId}`,
+      diff: true,
+      recursive: true,
+    });
+    return result[0];
+  }
+
+  // ==========================================================================
   // Scene methods
   // ==========================================================================
 
