@@ -476,6 +476,61 @@ export const combatTools = [
 ];
 
 /**
+ * Combat control mutation tool definitions (FR-018)
+ *
+ * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active Socket.IO
+ * connection (mutations use the core `modifyDocument` protocol). All operate on
+ * the *active* combat; the connected user needs GM/owner permission.
+ */
+export const combatMutationTools = [
+  {
+    name: 'next_turn',
+    description:
+      'Advance the active combat to the next turn, wrapping to the next round after the last combatant. ' +
+      'Does not yet skip defeated combatants. ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'end_combat',
+    description:
+      'End (delete) the active combat encounter. ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'set_initiative',
+    description:
+      "Set a combatant's initiative in the active combat. " +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        combatantId: {
+          type: 'string',
+          description: 'The ID of the combatant whose initiative to set',
+        },
+        initiative: {
+          type: 'number',
+          description: 'The initiative value to assign',
+        },
+        combatId: {
+          type: 'string',
+          description: 'Optional Combat document ID; defaults to the active combat',
+        },
+      },
+      required: ['combatantId', 'initiative'],
+    },
+  },
+];
+
+/**
  * Chat message tool definitions
  */
 export const chatTools = [
@@ -604,6 +659,7 @@ export function getAllTools() {
     ...itemMutationTools,
     ...sceneTools,
     ...combatTools,
+    ...combatMutationTools,
     ...chatTools,
     ...userTools,
     ...journalTools,

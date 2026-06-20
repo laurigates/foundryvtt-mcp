@@ -120,6 +120,7 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 | `FOUNDRY_PASSWORD` | Yes | FoundryVTT user password |
 | `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
 | `FOUNDRY_API_KEY` | No | REST API module key (enables diagnostics tools) |
+| `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
 
@@ -146,6 +147,20 @@ Ask your AI assistant things like:
 - `get_users` — list online users and their status
 - `get_combat_state` — combat state and initiative order
 - `get_chat_messages` — recent chat history
+
+### Write Operations (require `FOUNDRY_WRITE_ENABLED=true`)
+
+Game-state mutations are **disabled by default**. They use the Socket.IO
+`modifyDocument` protocol over an authenticated session, and the connected user
+needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
+
+- `next_turn` — advance the active combat to the next turn (wraps to the next round)
+- `end_combat` — end (delete) the active combat encounter
+- `set_initiative` — set a combatant's initiative in the active combat
+- `update_actor_attributes` — patch an actor's `system` attributes (HP, currency, spell slots, …)
+- `create_actor_item` — add an inline item to an actor
+- `update_actor_item` — apply a JSON merge patch to an actor's item
+- `delete_actor_item` — remove an item from an actor
 
 ### World
 

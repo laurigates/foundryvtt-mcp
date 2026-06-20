@@ -13,6 +13,11 @@ import { handleUpdateActorAttribute } from './handlers/actor-mutations.js';
 import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
 import { handleGetChatMessages } from './handlers/chat.js';
 import { handleGetCombatState } from './handlers/combat.js';
+import {
+  handleEndCombat,
+  handleNextTurn,
+  handleSetInitiative,
+} from './handlers/combat-mutations.js';
 import { handleSearchCompendium } from './handlers/compendium.js';
 import {
   handleDiagnoseErrors,
@@ -171,6 +176,23 @@ export async function routeToolRequest(
     // Combat tools
     case 'get_combat_state':
       return handleGetCombatState(args, foundryClient);
+
+    // Combat mutation tools (FR-018, WRITE — require FOUNDRY_WRITE_ENABLED)
+    case 'next_turn':
+      return handleNextTurn(args, foundryClient);
+    case 'end_combat':
+      return handleEndCombat(args, foundryClient);
+    case 'set_initiative':
+      if (!('combatantId' in args) || typeof args.combatantId !== 'string') {
+        throw new Error('Missing required parameter: combatantId');
+      }
+      if (!('initiative' in args) || typeof args.initiative !== 'number') {
+        throw new Error('Missing required parameter: initiative');
+      }
+      return handleSetInitiative(
+        args as { combatantId: string; initiative: number; combatId?: string },
+        foundryClient,
+      );
 
     // Chat tools
     case 'get_chat_messages':
