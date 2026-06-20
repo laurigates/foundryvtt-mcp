@@ -10,6 +10,13 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.2.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.1.0...foundryvtt-mcp-v1.2.0) (2026-06-20)
+
+
+### Features
+
+* **tools:** combat control write tools (next_turn, end_combat, set_initiative) ([#175](https://github.com/laurigates/foundryvtt-mcp/issues/175)) ([eb8a531](https://github.com/laurigates/foundryvtt-mcp/commit/eb8a5317a907582a2eb95b2d5b25fcd8314f1718))
+
 ## [1.1.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.0.1...foundryvtt-mcp-v1.1.0) (2026-06-02)
 
 
