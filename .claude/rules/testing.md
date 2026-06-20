@@ -27,6 +27,15 @@ local/CI parity.
 - The bridge/REST path is **read-only**; `search_compendium` integration
   coverage is blocked on the bridge implementing `/api/compendium/search`.
 - CI runs this tier only once the `FOUNDRY_*` secrets are configured (issue #140).
+- **The suite targets its own licensed test instance on :30001**
+  (`bun run test:integration:docker` → `docker-compose.test.yml`, needs
+  `.env.integration` with a `FOUNDRY_LICENSE_KEY`) — **not** the `:30000` dev
+  harness in `../foundryvtt-harness/`, which is a *separate* instance that holds
+  the real world. Without that license the test instance can't start, so live
+  write-tool round-trips can't be verified locally and the gated specs
+  `ctx.skip()`. To smoke a write tool against a real world, point a throwaway
+  client at the running `:30000` harness with its world's GM credentials
+  instead.
 
 ## Coverage areas
 
