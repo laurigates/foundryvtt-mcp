@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.2.1...foundryvtt-mcp-v1.3.0) (2026-06-21)
+
+
+### Features
+
+* **tools:** token manipulation write tools (move_token, apply_status_effect) ([#187](https://github.com/laurigates/foundryvtt-mcp/issues/187)) ([38c7e66](https://github.com/laurigates/foundryvtt-mcp/commit/38c7e66082e713b395a92b4010149dd77a7810c7))
+
 ## [1.2.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.2.0...foundryvtt-mcp-v1.2.1) (2026-06-21)
 
 
