@@ -270,7 +270,7 @@ describe('FoundryClient', () => {
         .mockRejectedValueOnce(build4xxError(503))
         .mockResolvedValueOnce({ data: { actors: [] } });
 
-      const result = await client.searchActors({ query: 'x' });
+      await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
     });
 

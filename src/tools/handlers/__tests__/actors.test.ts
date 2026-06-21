@@ -31,7 +31,13 @@ function buildActor(overrides: Partial<FoundryActor> = {}): FoundryActor {
 describe('handleSearchActors', () => {
   it('returns a formatted list of actors on happy path', async () => {
     const actors: FoundryActor[] = [
-      buildActor({ _id: 'a1', name: 'Aragorn', type: 'character', level: 5, hp: { value: 30, max: 40 } }),
+      buildActor({
+        _id: 'a1',
+        name: 'Aragorn',
+        type: 'character',
+        level: 5,
+        hp: { value: 30, max: 40 },
+      }),
       buildActor({ _id: 'a2', name: 'Goblin', type: 'npc', level: 1, hp: { value: 7, max: 7 } }),
     ];
     const searchResult: ActorSearchResult = { actors, total: 2, page: 1, limit: 10 };
@@ -88,7 +94,9 @@ describe('handleSearchActors', () => {
   });
 
   it('falls back to "Unknown" when level and hp are missing', async () => {
-    const actors: FoundryActor[] = [buildActor({ name: 'Mystery', level: undefined, hp: undefined })];
+    const actors: FoundryActor[] = [
+      buildActor({ name: 'Mystery', level: undefined, hp: undefined }),
+    ];
     const searchResult: ActorSearchResult = { actors, total: 1, page: 1, limit: 10 };
     const client = {
       searchActors: vi.fn().mockResolvedValue(searchResult),

@@ -73,9 +73,9 @@ describe('handleSearchLogs', () => {
 
     it('throws McpError when query is empty string', async () => {
       const client = mockClient([]);
-      await expect(
-        handleSearchLogs({ query: '' } as { query: string }, client),
-      ).rejects.toThrow(/Query is required/);
+      await expect(handleSearchLogs({ query: '' } as { query: string }, client)).rejects.toThrow(
+        /Query is required/,
+      );
     });
 
     it('throws McpError when query is not a string', async () => {

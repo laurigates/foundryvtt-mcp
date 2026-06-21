@@ -7,11 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FoundryClient } from '../../../foundry/client.js';
-import {
-  handleGenerateLoot,
-  handleGenerateNPC,
-  handleLookupRule,
-} from '../generation.js';
+import { handleGenerateLoot, handleGenerateNPC, handleLookupRule } from '../generation.js';
 
 // The handlers do not call any FoundryClient methods, so an empty stub suffices.
 const stubClient = {} as unknown as FoundryClient;
