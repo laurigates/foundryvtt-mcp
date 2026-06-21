@@ -134,8 +134,9 @@
       "id": "FR-019",
       "name": "Token manipulation (move, status effects)",
       "prd": "PRD-001",
-      "status": "planned",
-      "priority": "medium"
+      "status": "partial",
+      "priority": "medium",
+      "note": "move_token and apply_status_effect shipped (#174); update_token (name/visibility/disposition) deferred"
     },
     {
       "id": "FR-020",

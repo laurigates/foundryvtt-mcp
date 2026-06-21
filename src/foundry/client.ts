@@ -24,6 +24,7 @@ import type {
   WorldActor,
   WorldCombat,
   WorldData,
+  WorldEffect,
   WorldItem,
   WorldJournal,
   WorldMessage,
@@ -33,6 +34,14 @@ import type {
 
 /** FoundryVTT document IDs are 16-character alphanumeric strings. */
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
+
+/**
+ * Accepts the two parent-UUID forms a token's actor can take:
+ *  - `Actor.<id>` — a world-linked actor (`actorLink: true`)
+ *  - `Scene.<sid>.Token.<tid>.Actor.<aid>` — an unlinked token's synthetic actor
+ */
+const TOKEN_ACTOR_UUID_PATTERN =
+  /^(Actor\.[a-zA-Z0-9]{16}|Scene\.[a-zA-Z0-9]{16}\.Token\.[a-zA-Z0-9]{16}\.Actor\.[a-zA-Z0-9]{16})$/;
 
 /**
  * Minimal Zod schema for the WorldData Socket.IO payload.
@@ -793,6 +802,139 @@ export class FoundryClient {
       recursive: true,
     });
     return result[0];
+  }
+
+  // ==========================================================================
+  // Token mutation methods (WRITE — Socket.IO modifyDocument, FR-019)
+  // ==========================================================================
+
+  /**
+   * Locates a token (and the scene it lives on) in the cached worldData.
+   *
+   * `Token` is an embedded document of `Scene`; worldData carries each scene's
+   * tokens as raw records. When `sceneId` is omitted the search spans every
+   * scene, so a token can be moved/affected without first resolving its scene.
+   *
+   * @param tokenId - 16-char alphanumeric Token document id
+   * @param sceneId - optional Scene id to scope the search to
+   * @returns the owning scene and the raw token record, or null if not found
+   */
+  findToken(
+    tokenId: string,
+    sceneId?: string,
+  ): { scene: WorldScene; token: Record<string, unknown> } | null {
+    if (!this.worldData) {
+      return null;
+    }
+    const scenes = sceneId
+      ? this.worldData.scenes.filter((s) => s._id === sceneId)
+      : this.worldData.scenes;
+    for (const scene of scenes) {
+      const token = scene.tokens?.find((t) => (t as { _id?: string })._id === tokenId);
+      if (token) {
+        return { scene, token };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Moves a token to new x/y coordinates (FR-019).
+   *
+   * `Token` is an embedded document of `Scene`, so the update is sent with
+   * `parentUuid: "Scene.<sceneId>"` (mirrors the Combatant→Combat embed). The
+   * wire shape is verified against the v13.348 client source per
+   * `.claude/rules/foundry-write-protocol.md`.
+   *
+   * @param sceneId - 16-char alphanumeric Scene document id (the parent)
+   * @param tokenId - 16-char alphanumeric Token document id
+   * @param x - target x pixel coordinate (finite number)
+   * @param y - target y pixel coordinate (finite number)
+   * @returns the updated token document
+   */
+  async moveToken(sceneId: string, tokenId: string, x: number, y: number): Promise<unknown> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(sceneId)) {
+      throw new Error(`Invalid sceneId format: ${sceneId}`);
+    }
+    if (!FOUNDRY_ID_PATTERN.test(tokenId)) {
+      throw new Error(`Invalid tokenId format: ${tokenId}`);
+    }
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`Invalid coordinates: (${x}, ${y}) — x and y must be finite numbers`);
+    }
+    const result = await this.modifyDocument('Token', 'update', {
+      updates: [{ _id: tokenId, x, y }],
+      parentUuid: `Scene.${sceneId}`,
+      diff: true,
+      recursive: true,
+    });
+    return result[0];
+  }
+
+  /**
+   * Creates a status-effect `ActiveEffect` on a token's actor (FR-019).
+   *
+   * `ActiveEffect` is an embedded document of `Actor`, so the create is sent with
+   * the actor's parent UUID:
+   *  - `Actor.<id>` for a world-linked actor (`actorLink: true`)
+   *  - `Scene.<sid>.Token.<tid>.Actor.<aid>` for an unlinked token's synthetic
+   *    actor (the per-token delta).
+   *
+   * The effect carries a `statuses` array, matching how FoundryVTT v11+ models
+   * conditions (`Actor#toggleStatusEffect` toggles by this field).
+   *
+   * @param parentActorUuid - the token actor's parent UUID (see forms above)
+   * @param statusId - condition id (e.g. "prone", "stunned")
+   * @param options - optional display `name` (defaults to `statusId`) and `img`
+   * @returns the newly created ActiveEffect document
+   */
+  async createActorStatusEffect(
+    parentActorUuid: string,
+    statusId: string,
+    options: { name?: string; img?: string } = {},
+  ): Promise<WorldEffect> {
+    this.assertWriteable();
+    if (!TOKEN_ACTOR_UUID_PATTERN.test(parentActorUuid)) {
+      throw new Error(`Invalid actor UUID format: ${parentActorUuid}`);
+    }
+    if (!statusId || typeof statusId !== 'string') {
+      throw new Error('statusId is required and must be a string');
+    }
+    const effectData: Record<string, unknown> = {
+      name: options.name ?? statusId,
+      statuses: [statusId],
+    };
+    if (options.img) {
+      effectData.img = options.img;
+    }
+    const result = await this.modifyDocument('ActiveEffect', 'create', {
+      data: [effectData],
+      parentUuid: parentActorUuid,
+    });
+    return result[0] as WorldEffect;
+  }
+
+  /**
+   * Deletes an `ActiveEffect` from a token's actor (FR-019), e.g. to clear a
+   * status condition. Accepts the same parent-UUID forms as
+   * {@link createActorStatusEffect}.
+   *
+   * @param parentActorUuid - the token actor's parent UUID
+   * @param effectId - 16-char alphanumeric ActiveEffect document id
+   */
+  async deleteActorEffect(parentActorUuid: string, effectId: string): Promise<void> {
+    this.assertWriteable();
+    if (!TOKEN_ACTOR_UUID_PATTERN.test(parentActorUuid)) {
+      throw new Error(`Invalid actor UUID format: ${parentActorUuid}`);
+    }
+    if (!FOUNDRY_ID_PATTERN.test(effectId)) {
+      throw new Error(`Invalid effectId format: ${effectId}`);
+    }
+    await this.modifyDocument('ActiveEffect', 'delete', {
+      ids: [effectId],
+      parentUuid: parentActorUuid,
+    });
   }
 
   // ==========================================================================

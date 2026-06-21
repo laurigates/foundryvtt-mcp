@@ -894,6 +894,12 @@ export interface WorldEffect {
   }>;
   disabled?: boolean;
   duration?: Record<string, unknown>;
+  /**
+   * Status condition ids represented by this effect (e.g. `["prone"]`).
+   * FoundryVTT v11+ models conditions as ActiveEffects carrying a `statuses`
+   * array; `Actor#toggleStatusEffect` matches/toggles by this field.
+   */
+  statuses?: string[];
   flags?: Record<string, unknown>;
 }
 

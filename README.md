@@ -157,6 +157,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `next_turn` — advance the active combat to the next turn (wraps to the next round)
 - `end_combat` — end (delete) the active combat encounter
 - `set_initiative` — set a combatant's initiative in the active combat
+- `move_token` — move a token to new x/y coordinates on its scene
+- `apply_status_effect` — apply or remove a status condition (e.g. prone, stunned) on a token's actor
 - `update_actor_attributes` — patch an actor's `system` attributes (HP, currency, spell slots, …)
 - `create_actor_item` — add an inline item to an actor
 - `update_actor_item` — apply a JSON merge patch to an actor's item

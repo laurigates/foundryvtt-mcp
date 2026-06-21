@@ -19,7 +19,8 @@ Add write operations to foundryvtt-mcp, starting with combat management (FR-018)
 | Combat write — `next_turn`, `end_combat`, `set_initiative` (FR-018) | ✅ Shipped — Phase 1a, this PRP |
 | Combat write — `start_combat` (FR-018) | ⏳ Deferred — [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172) |
 | `next_turn` skipDefeated refinement | ⏳ Deferred — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173) |
-| Token manipulation (FR-019) | ⏳ Deferred — [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174) |
+| Token manipulation — `move_token`, `apply_status_effect` (FR-019) | ✅ Shipped — [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174) |
+| Token manipulation — `update_token` (name/visibility/disposition) (FR-019) | ⏳ Deferred |
 
 ## Design correction: `modifyDocument`, not `emitWrite`
 
@@ -74,7 +75,7 @@ Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`
 
 - `start_combat` (FR-018, highest-risk — creates Combat + Combatant docs): [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)
 - `next_turn` skipDefeated refinement: [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173)
-- Token manipulation tools (FR-019 — move, status effects): [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174)
+- Token manipulation tools (FR-019 — `move_token`, `apply_status_effect`): ✅ shipped via [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174). `update_token` (name/visibility/disposition) still deferred.
 
 ## Success Criteria
 
@@ -129,7 +130,11 @@ Shipped as `next_turn` / `end_combat` / `set_initiative` (`start_combat` deferre
 
 ### Step 4: Implement token manipulation tools
 
-Deferred to [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174).
+Shipped as `move_token` / `apply_status_effect` via [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174).
+Client methods `moveToken` / `createActorStatusEffect` / `deleteActorEffect` plus
+the `findToken` worldData resolver (`src/foundry/client.ts`); handlers in
+`src/tools/handlers/token-mutations.ts`. `update_token` (name/visibility/disposition)
+remains deferred.
 
 ### Step 5: Register tool schemas
 
