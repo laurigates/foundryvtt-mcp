@@ -10,6 +10,13 @@
   - Removed related E2E tests (rest-api-module.spec.ts, issue-7-json-parsing.spec.ts, module-settings.spec.ts)
   - This change improves repository focus and allows independent versioning of the FoundryVTT module
 
+## [1.2.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.2.0...foundryvtt-mcp-v1.2.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* **deps:** resolve bun audit vulnerabilities via transitive overrides ([#179](https://github.com/laurigates/foundryvtt-mcp/issues/179)) ([82dced1](https://github.com/laurigates/foundryvtt-mcp/commit/82dced106c1f00923b326b66e5f2249037647c7a))
+
 ## [1.2.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.1.0...foundryvtt-mcp-v1.2.0) (2026-06-20)
 
 
