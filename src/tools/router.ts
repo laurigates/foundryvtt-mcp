@@ -38,6 +38,7 @@ import { handleSearchItems } from './handlers/items.js';
 import { handleGetJournal, handleSearchJournals } from './handlers/journals.js';
 import { handleReadResource } from './handlers/resources.js';
 import { handleGetSceneInfo } from './handlers/scenes.js';
+import { handleApplyStatusEffect, handleMoveToken } from './handlers/token-mutations.js';
 import { handleGetUsers } from './handlers/users.js';
 import {
   handleGetWorldSummary,
@@ -191,6 +192,33 @@ export async function routeToolRequest(
       }
       return handleSetInitiative(
         args as { combatantId: string; initiative: number; combatId?: string },
+        foundryClient,
+      );
+
+    // Token mutation tools (FR-019, WRITE — require FOUNDRY_WRITE_ENABLED)
+    case 'move_token':
+      if (!('tokenId' in args) || typeof args.tokenId !== 'string') {
+        throw new Error('Missing required parameter: tokenId');
+      }
+      if (!('x' in args) || typeof args.x !== 'number') {
+        throw new Error('Missing required parameter: x');
+      }
+      if (!('y' in args) || typeof args.y !== 'number') {
+        throw new Error('Missing required parameter: y');
+      }
+      return handleMoveToken(
+        args as { tokenId: string; x: number; y: number; sceneId?: string },
+        foundryClient,
+      );
+    case 'apply_status_effect':
+      if (!('tokenId' in args) || typeof args.tokenId !== 'string') {
+        throw new Error('Missing required parameter: tokenId');
+      }
+      if (!('statusId' in args) || typeof args.statusId !== 'string') {
+        throw new Error('Missing required parameter: statusId');
+      }
+      return handleApplyStatusEffect(
+        args as { tokenId: string; statusId: string; active?: boolean; sceneId?: string },
         foundryClient,
       );
 

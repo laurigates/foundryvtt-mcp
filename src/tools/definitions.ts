@@ -531,6 +531,75 @@ export const combatMutationTools = [
 ];
 
 /**
+ * Token manipulation mutation tool definitions (FR-019)
+ *
+ * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active Socket.IO
+ * connection (mutations use the core `modifyDocument` protocol). The connected
+ * user needs GM/owner permission.
+ */
+export const tokenMutationTools = [
+  {
+    name: 'move_token',
+    description:
+      'Move a token to new x/y pixel coordinates on its scene. ' +
+      'The token is located across scenes by id (optionally scoped with sceneId). ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tokenId: {
+          type: 'string',
+          description: 'The ID of the token to move',
+        },
+        x: {
+          type: 'number',
+          description: 'Target x pixel coordinate on the scene',
+        },
+        y: {
+          type: 'number',
+          description: 'Target y pixel coordinate on the scene',
+        },
+        sceneId: {
+          type: 'string',
+          description: 'Optional Scene ID to scope the token lookup',
+        },
+      },
+      required: ['tokenId', 'x', 'y'],
+    },
+  },
+  {
+    name: 'apply_status_effect',
+    description:
+      "Apply or remove a status condition (e.g. 'prone', 'stunned') on a token's actor. " +
+      'Set active=false to remove. Matches by status id, so re-applying or clearing-when-absent is a no-op. ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tokenId: {
+          type: 'string',
+          description: 'The ID of the token whose actor to affect',
+        },
+        statusId: {
+          type: 'string',
+          description: "The status condition id (e.g. 'prone', 'stunned', 'blinded')",
+        },
+        active: {
+          type: 'boolean',
+          description: 'true to apply the effect (default), false to remove it',
+          default: true,
+        },
+        sceneId: {
+          type: 'string',
+          description: 'Optional Scene ID to scope the token lookup',
+        },
+      },
+      required: ['tokenId', 'statusId'],
+    },
+  },
+];
+
+/**
  * Chat message tool definitions
  */
 export const chatTools = [
@@ -660,6 +729,7 @@ export function getAllTools() {
     ...sceneTools,
     ...combatTools,
     ...combatMutationTools,
+    ...tokenMutationTools,
     ...chatTools,
     ...userTools,
     ...journalTools,
