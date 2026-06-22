@@ -16,7 +16,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
-bun run test:integration # Integration tests (live FoundryVTT, port 30001)
+bun run test:integration # Integration tests (needs :30001 container + .env.integration — prefer `just test-integration-docker`)
 bun run test:e2e       # E2E tests (Playwright, headless)
 bun run lint           # Lint code (Biome)
 bun run lint:fix       # Auto-fix lint issues
@@ -44,10 +44,18 @@ bun run test-connection # Test MCP→FoundryVTT connection
 | Router | `src/tools/router.ts` | Request→handler dispatch |
 | Types | `src/foundry/types.ts` | FoundryVTT entity interfaces |
 
-### Authentication
+### Authentication & transport selection
 
-- **Primary**: Socket.IO with `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`
-- **Optional**: `FOUNDRY_API_KEY` for REST API diagnostics (5 extra tools)
+`client.ts` selects transport purely by whether `FOUNDRY_API_KEY` is set:
+
+- **`FOUNDRY_API_KEY` unset → Socket.IO mode** (default): authenticates with
+  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD` and loads full `worldData`.
+- **`FOUNDRY_API_KEY` set → REST API mode**: connects to the REST module's
+  `/api/status` instead. This is a transport **switch**, not an additive layer —
+  it does not run alongside the Socket.IO `worldData` path.
+- `USE_REST_MODULE` (seen in some `.env`/example files and the `test-connection`
+  tips) is **not read** by `src/config/index.ts` — it is a no-op. Transport is
+  decided solely by `apiKey` presence.
 
 ## Environment Variables
 

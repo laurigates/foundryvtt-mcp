@@ -81,10 +81,15 @@ test-coverage:
 test-connection:
     bun run test-connection
 
-# Run integration tests
+# Run integration tests against an ALREADY-RUNNING :30001 container (needs .env.integration)
 [group: "test"]
 test-integration *args:
     bun run test:integration {{ args }}
+
+# Boot the ephemeral :30001 test container, run integration tests, tear it down (needs .env.integration)
+[group: "test"]
+test-integration-docker:
+    bun run test:integration:docker
 
 ########## E2E Testing ##########
 
