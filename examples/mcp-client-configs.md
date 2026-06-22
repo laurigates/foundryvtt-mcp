@@ -21,14 +21,18 @@ Add this to your Claude Desktop MCP settings file:
       "args": ["/path/to/foundryvtt-mcp/dist/index.js"],
       "env": {
         "FOUNDRY_URL": "http://localhost:30000",
-        "USE_REST_MODULE": "true",
-        "FOUNDRY_API_KEY": "your_api_key_here",
+        "FOUNDRY_USERNAME": "your_username",
+        "FOUNDRY_PASSWORD": "your_password",
         "LOG_LEVEL": "info"
       }
     }
   }
 }
 ```
+
+> The server connects to FoundryVTT directly over **Socket.IO** using a world
+> user account — no custom module required. Setting `FOUNDRY_API_KEY` additionally
+> enables the optional, read-only REST diagnostics tools.
 
 ### Alternative: Using .env file
 
@@ -151,18 +155,17 @@ if __name__ == "__main__":
 When configuring your MCP client, you can set these environment variables:
 
 ```bash
-# Required
+# Required — Socket.IO connection (the default and primary transport)
 FOUNDRY_URL=http://localhost:30000
-
-# Connection Method (choose one approach)
-# Option 1: REST API Module (recommended)
-USE_REST_MODULE=true
-FOUNDRY_API_KEY=your_api_key_here
-
-# Option 2: Basic WebSocket (limited functionality)
-USE_REST_MODULE=false
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
+
+# Optional — enables the read-only REST API diagnostics tools.
+# When set, the server uses REST API mode instead of Socket.IO.
+FOUNDRY_API_KEY=your_api_key_here
+
+# Optional — enables game-state mutations (write tools). Default: false.
+FOUNDRY_WRITE_ENABLED=true
 
 # Optional
 LOG_LEVEL=info
@@ -227,9 +230,9 @@ Once connected, try these prompts with your AI assistant:
    - Try `npm run test-connection` to diagnose
 
 3. **"Empty results" or limited functionality**
-   - Install the FoundryVTT REST API module for full features
-   - Set `USE_REST_MODULE=true` and configure API key
-   - Some features work without REST module but with limitations
+   - Ensure a **world is loaded** in FoundryVTT (the server needs an active world, not the setup screen)
+   - Verify the user account has sufficient permissions (Assistant GM or higher)
+   - The optional REST API module / `FOUNDRY_API_KEY` adds diagnostics tools, but is not required for core data access
 
 4. **Permission or authentication errors**
    - Check FoundryVTT user permissions
