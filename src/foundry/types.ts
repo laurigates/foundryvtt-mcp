@@ -859,6 +859,15 @@ export interface WorldCombat {
     defeated: boolean;
     flags?: Record<string, unknown>;
   }>;
+  /**
+   * Combat tracker settings. The core `skipDefeated` toggle lives in the
+   * `core.combatTrackerConfig` world setting and may not be present in every
+   * worldData snapshot, so it is optional here.
+   */
+  settings?: {
+    skipDefeated?: boolean;
+    resource?: string;
+  };
   flags?: Record<string, unknown>;
 }
 
