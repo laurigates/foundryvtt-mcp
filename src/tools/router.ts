@@ -17,6 +17,7 @@ import {
   handleEndCombat,
   handleNextTurn,
   handleSetInitiative,
+  handleStartCombat,
 } from './handlers/combat-mutations.js';
 import { handleSearchCompendium } from './handlers/compendium.js';
 import {
@@ -180,7 +181,7 @@ export async function routeToolRequest(
 
     // Combat mutation tools (FR-018, WRITE — require FOUNDRY_WRITE_ENABLED)
     case 'next_turn':
-      return handleNextTurn(args, foundryClient);
+      return handleNextTurn(args as { skipDefeated?: boolean }, foundryClient);
     case 'end_combat':
       return handleEndCombat(args, foundryClient);
     case 'set_initiative':
@@ -194,6 +195,8 @@ export async function routeToolRequest(
         args as { combatantId: string; initiative: number; combatId?: string },
         foundryClient,
       );
+    case 'start_combat':
+      return handleStartCombat(args as { tokenIds?: string[]; sceneId?: string }, foundryClient);
 
     // Token mutation tools (FR-019, WRITE — require FOUNDRY_WRITE_ENABLED)
     case 'move_token':

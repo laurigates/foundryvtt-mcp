@@ -17,8 +17,8 @@ Add write operations to foundryvtt-mcp, starting with combat management (FR-018)
 | Actor attribute mutation (FR-021) | ✅ Shipped — `update_actor_attributes` (#143) |
 | Actor item CRUD (FR-021) | ✅ Shipped — `create_actor_item` / `update_actor_item` / `delete_actor_item` (#142, #159) |
 | Combat write — `next_turn`, `end_combat`, `set_initiative` (FR-018) | ✅ Shipped — Phase 1a, this PRP |
-| Combat write — `start_combat` (FR-018) | ⏳ Deferred — [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172) |
-| `next_turn` skipDefeated refinement | ⏳ Deferred — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173) |
+| Combat write — `start_combat` (FR-018) | ✅ Shipped — [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172) |
+| `next_turn` skipDefeated refinement | ✅ Shipped — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173) |
 | Token manipulation — `move_token`, `apply_status_effect` (FR-019) | ✅ Shipped — [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174) |
 | Token manipulation — `update_token` (name/visibility/disposition) (FR-019) | ⏳ Deferred |
 
@@ -42,12 +42,15 @@ for embedded documents (e.g. `Combatant` → `Combat.<combatId>`). See
 
 Three GM-gated tools operating on the **active** combat, disabled by default:
 
-- `next_turn` — advance turn; wraps to next round past the last combatant
-  (does not yet skip defeated combatants — [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173))
+- `next_turn` — advance turn; wraps to next round past the last combatant.
+  Skips `defeated` combatants when the `skipDefeated` arg is set (or the combat's
+  `settings.skipDefeated`); see [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173)
 - `end_combat` — delete the active combat encounter
 - `set_initiative` — set a combatant's initiative (`combatId` defaults to active)
+- `start_combat` — create a Combat and seed Combatants from `tokenIds` (or the
+  active scene's tokens); see [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)
 
-Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`
+Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`, `startCombat`
 (`src/foundry/client.ts`). Pure helper `computeNextTurn` and handlers in
 `src/tools/handlers/combat-mutations.ts`.
 
@@ -73,8 +76,8 @@ Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`
 
 ## Deferred (separate issues)
 
-- `start_combat` (FR-018, highest-risk — creates Combat + Combatant docs): [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)
-- `next_turn` skipDefeated refinement: [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173)
+- `start_combat` (FR-018, highest-risk — creates Combat + Combatant docs): ✅ shipped via [#172](https://github.com/laurigates/foundryvtt-mcp/issues/172)
+- `next_turn` skipDefeated refinement: ✅ shipped via [#173](https://github.com/laurigates/foundryvtt-mcp/issues/173)
 - Token manipulation tools (FR-019 — `move_token`, `apply_status_effect`): ✅ shipped via [#174](https://github.com/laurigates/foundryvtt-mcp/issues/174). `update_token` (name/visibility/disposition) still deferred.
 
 ## Success Criteria

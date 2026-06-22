@@ -804,6 +804,57 @@ export class FoundryClient {
     return result[0];
   }
 
+  /**
+   * Starts a new combat encounter and seeds its combatants (FR-018, #172).
+   *
+   * Two-step `modifyDocument` flow:
+   *   1. Create the top-level `Combat` document (no `parentUuid`), activated on
+   *      the given scene, and read its `_id` from the response.
+   *   2. Create the embedded `Combatant` documents with
+   *      `parentUuid: "Combat.<combatId>"` (mirrors the Combatant→Combat embed
+   *      used by {@link setCombatantInitiative}).
+   *
+   * The create wire shape is verified against the v13.348 client source per
+   * `.claude/rules/foundry-write-protocol.md`; smoke-test one live round-trip
+   * when changing it.
+   *
+   * @param sceneId - 16-char alphanumeric Scene document id the combat runs on
+   * @param combatants - combatant seeds ({ tokenId, sceneId, actorId? })
+   * @returns the new combat id and the number of combatants created
+   */
+  async startCombat(
+    sceneId: string,
+    combatants: Array<{ tokenId: string; sceneId: string; actorId?: string | undefined }>,
+  ): Promise<{ combatId: string; combatantCount: number }> {
+    this.assertWriteable();
+    if (!FOUNDRY_ID_PATTERN.test(sceneId)) {
+      throw new Error(`Invalid sceneId format: ${sceneId}`);
+    }
+    for (const c of combatants) {
+      if (!FOUNDRY_ID_PATTERN.test(c.tokenId)) {
+        throw new Error(`Invalid tokenId format: ${c.tokenId}`);
+      }
+    }
+
+    const created = await this.modifyDocument('Combat', 'create', {
+      data: [{ scene: sceneId, active: true }],
+    });
+    const combat = created[0] as { _id?: string } | undefined;
+    const combatId = combat?._id;
+    if (!combatId) {
+      throw new Error('FoundryVTT did not return a Combat id after create');
+    }
+
+    if (combatants.length > 0) {
+      await this.modifyDocument('Combatant', 'create', {
+        data: combatants,
+        parentUuid: `Combat.${combatId}`,
+      });
+    }
+
+    return { combatId, combatantCount: combatants.length };
+  }
+
   // ==========================================================================
   // Token mutation methods (WRITE — Socket.IO modifyDocument, FR-019)
   // ==========================================================================

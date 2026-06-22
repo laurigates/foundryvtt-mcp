@@ -487,11 +487,17 @@ export const combatMutationTools = [
     name: 'next_turn',
     description:
       'Advance the active combat to the next turn, wrapping to the next round after the last combatant. ' +
-      'Does not yet skip defeated combatants. ' +
+      'When skipDefeated is true, defeated combatants are skipped. ' +
       'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        skipDefeated: {
+          type: 'boolean',
+          description:
+            "Skip combatants flagged as defeated when advancing. Defaults to the combat's skipDefeated setting, or false.",
+        },
+      },
     },
   },
   {
@@ -526,6 +532,29 @@ export const combatMutationTools = [
         },
       },
       required: ['combatantId', 'initiative'],
+    },
+  },
+  {
+    name: 'start_combat',
+    description:
+      'Start a new combat encounter, seeding combatants from tokens. ' +
+      'Provide explicit tokenIds, or omit them to seed every token on the scene. ' +
+      'Defaults to the active scene when sceneId is omitted. ' +
+      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection (GM permission).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tokenIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional list of Token document IDs to add as combatants. Defaults to all tokens on the scene.',
+        },
+        sceneId: {
+          type: 'string',
+          description: 'Optional Scene document ID; defaults to the active scene.',
+        },
+      },
     },
   },
 ];
