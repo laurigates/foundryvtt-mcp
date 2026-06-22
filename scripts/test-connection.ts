@@ -35,14 +35,15 @@ async function testConnection() {
       console.log(`   Setup Type: 🖥️  Remote/Network`);
     }
     
-    console.log(`   REST Module: ${config.foundry.useRestModule ? '✅' : '❌'}`);
+    // Transport is selected purely by apiKey presence (client.ts): set → REST
+    // API mode; unset → Socket.IO mode (the default, full worldData path).
+    console.log(`   Transport: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
     console.log(`   API Key: ${config.foundry.apiKey ? '✅ Configured' : '❌ Not set'}`);
     console.log(`   Username: ${config.foundry.username ? '✅ Configured' : '❌ Not set'}\n`);
 
     // Initialize client
     const client = new FoundryClient({
       baseUrl: config.foundry.url,
-      useRestModule: config.foundry.useRestModule,
       apiKey: config.foundry.apiKey,
       username: config.foundry.username,
       password: config.foundry.password,
@@ -97,17 +98,17 @@ async function testConnection() {
       console.log(`⚠️  Scene info limited: ${error instanceof Error ? error.message : error}\n`);
     }
 
-    // Test WebSocket connection
-    console.log('🔌 Testing WebSocket connection...');
+    // Test the live Socket.IO connection (no-op equivalent in REST mode)
+    console.log('🔌 Testing Socket.IO connection...');
     try {
-      await client.connectWebSocket();
-      console.log('✅ WebSocket connection established!\n');
+      await client.connect();
+      console.log('✅ Socket.IO connection established!\n');
 
       // Give it a moment to connect
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       await client.disconnect();
-      console.log('✅ WebSocket disconnected cleanly\n');
+      console.log('✅ Disconnected cleanly\n');
     } catch (error) {
       console.log(`⚠️  WebSocket connection issues: ${error instanceof Error ? error.message : error}\n`);
     }
@@ -116,14 +117,14 @@ async function testConnection() {
     console.log('\n📝 Summary:');
     console.log('   - Basic connection: ✅');
     console.log('   - Dice rolling: ✅');
-    console.log(`   - Data access: ${config.foundry.useRestModule ? '✅ Full' : '⚠️  Limited'}`);
-    console.log(`   - WebSocket: ${config.foundry.useRestModule ? '✅' : '⚠️  Basic'}`);
+    console.log(`   - Data access: ${config.foundry.apiKey ? '⚠️  REST (limited)' : '✅ Full worldData'}`);
+    console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
 
-    if (!config.foundry.useRestModule) {
-      console.log('\n💡 Tips for enhanced functionality:');
+    if (!config.foundry.apiKey) {
+      console.log('\n💡 Optional: the "Foundry REST API" module adds the diagnostics + compendium path.');
       console.log('   1. Install the "Foundry REST API" module in FoundryVTT');
-      console.log('   2. Get the API key from the module configuration page in FoundryVTT');
-      console.log('   3. Set USE_REST_MODULE=true and FOUNDRY_API_KEY in .env');
+      console.log('   2. Copy the API key from the module configuration page');
+      console.log('   3. Set FOUNDRY_API_KEY in .env (this switches the client to REST transport)');
       console.log('   4. Restart the MCP server');
     }
 

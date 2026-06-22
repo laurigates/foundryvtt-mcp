@@ -170,7 +170,6 @@ describe('Config', () => {
     it('should convert string booleans to booleans', async () => {
       process.env = {
         FOUNDRY_URL: 'http://localhost:30000',
-        USE_REST_MODULE: 'true',
         CACHE_ENABLED: 'false',
       };
 

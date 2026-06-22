@@ -98,7 +98,8 @@ export async function routeToolRequest(
       }
       return handleGetActorDetails(args as { actorId: string }, foundryClient);
 
-    // Actor mutation tools (#143, require REST API module)
+    // Actor mutation tools (#143) — WRITE via the Socket.IO modifyDocument
+    // protocol (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
     case 'update_actor_attributes':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');
@@ -136,7 +137,8 @@ export async function routeToolRequest(
         foundryClient,
       );
 
-    // Item mutation tools (WRITE — require REST API module)
+    // Item mutation tools (WRITE) — Socket.IO modifyDocument protocol
+    // (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
     case 'create_actor_item':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');

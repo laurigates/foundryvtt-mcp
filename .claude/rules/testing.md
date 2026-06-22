@@ -17,7 +17,18 @@ local/CI parity.
 
 - Connects through the shared helper `tests/integration/setup.ts`
   (`createConnectedClient`) in Socket.IO mode (`FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`).
-- `tests/integration/global-setup.ts` waits for the container to be ready.
+- `tests/integration/global-setup.ts` only **waits** for the container at
+  `:30001` — it does **not** start it.
+- **Running it:** needs (a) `.env.integration` (copy from
+  `.env.integration.example`, add a real `FOUNDRY_LICENSE_KEY` — the file is
+  gitignored and ships only as the `.example`) and (b) the ephemeral test
+  container up on `:30001`. Use **`just test-integration-docker`** (wraps `bun
+  run test:integration:docker`: `docker-compose.test.yml up --wait` → run suite
+  → `down -v`). Plain `just test-integration` assumes the `:30001` container is
+  already running and otherwise blocks ~120s before failing in global-setup.
+- The test container uses tmpfs `/data` + `CONTAINER_PRESERVE_CONFIG=false`, so
+  it starts world-less; Socket.IO auth specs need a bootstrapped world (still
+  manual — the CI wiring for this tier is gated on `FOUNDRY_*` secrets, issue #140).
 - **Write-tool tests** (`mutations.integration.test.ts`) exercise the
   `modifyDocument` write protocol: they require `writeEnabled: true` and a world
   **GM** user, target an actor with a mutable attribute, and **revert every
