@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.3.0...foundryvtt-mcp-v1.4.0) (2026-07-01)
+
+
+### Features
+
+* **combat:** add start_combat and skip defeated combatants in next_turn ([#191](https://github.com/laurigates/foundryvtt-mcp/issues/191)) ([9c43807](https://github.com/laurigates/foundryvtt-mcp/commit/9c43807ce5fb182bbc6a38cd97631b496bbee633))
+
+
+### Bug Fixes
+
+* **mcp:** correct transport drift and repair test-connection script ([#193](https://github.com/laurigates/foundryvtt-mcp/issues/193)) ([df0b89e](https://github.com/laurigates/foundryvtt-mcp/commit/df0b89ec1f0d2e4a2bac71cc290c0db173a1ff56))
+
 ## [1.3.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.2.1...foundryvtt-mcp-v1.3.0) (2026-06-21)
 
 
