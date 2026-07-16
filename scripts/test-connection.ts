@@ -5,12 +5,29 @@
  * Run with: npm run test-connection
  */
 
+import axios from 'axios';
 import dotenv from 'dotenv';
 import { FoundryClient } from '../src/foundry/client.js';
 import { config } from '../src/config/index.js';
 import { logger } from '../src/utils/logger.js';
 
 dotenv.config({ quiet: true });
+
+/**
+ * True when a REST-mode request failed because the target's REST module does
+ * not serve the route at all (the bridge's catch-all 404), as opposed to a
+ * transport or server error. See issue #194.
+ */
+function isRestRouteMissing(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404;
+}
+
+function printRestRouteMissing(what: string, route: string): void {
+  console.log(`ℹ️  ${what} not exposed by this REST module (404 on ${route}).`);
+  console.log('   The target instance\'s REST module does not serve this endpoint —');
+  console.log('   expected with older/other REST module builds; not a client defect.');
+  console.log('   Actor/scene reads are canonical over Socket.IO: unset FOUNDRY_API_KEY.\n');
+}
 
 async function testConnection() {
   console.log('🧪 FoundryVTT MCP Server - Connection Test\n');
@@ -84,7 +101,11 @@ async function testConnection() {
         console.log('ℹ️  No actors found (may require REST API module)\n');
       }
     } catch (error) {
-      console.log(`⚠️  Actor search limited: ${error instanceof Error ? error.message : error}\n`);
+      if (config.foundry.apiKey && isRestRouteMissing(error)) {
+        printRestRouteMissing('Actor search', 'GET /api/actors');
+      } else {
+        console.log(`⚠️  Actor search limited: ${error instanceof Error ? error.message : error}\n`);
+      }
     }
 
     // Test scene info
@@ -95,7 +116,11 @@ async function testConnection() {
       console.log(`   Dimensions: ${scene.width}x${scene.height}`);
       console.log('✅ Scene information works!\n');
     } catch (error) {
-      console.log(`⚠️  Scene info limited: ${error instanceof Error ? error.message : error}\n`);
+      if (config.foundry.apiKey && isRestRouteMissing(error)) {
+        printRestRouteMissing('Scene info', 'GET /api/scenes/current');
+      } else {
+        console.log(`⚠️  Scene info limited: ${error instanceof Error ? error.message : error}\n`);
+      }
     }
 
     // Test the live Socket.IO connection (no-op equivalent in REST mode)
@@ -117,7 +142,7 @@ async function testConnection() {
     console.log('\n📝 Summary:');
     console.log('   - Basic connection: ✅');
     console.log('   - Dice rolling: ✅');
-    console.log(`   - Data access: ${config.foundry.apiKey ? '⚠️  REST (limited)' : '✅ Full worldData'}`);
+    console.log(`   - Data access: ${config.foundry.apiKey ? '🌐 REST (coverage depends on the target module; Socket.IO is the full-data path)' : '✅ Full worldData'}`);
     console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
 
     if (!config.foundry.apiKey) {
