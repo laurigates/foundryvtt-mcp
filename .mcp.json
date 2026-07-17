@@ -6,31 +6,20 @@
     },
     "context7": {
       "command": "bunx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ]
+      "args": ["-y", "@upstash/context7-mcp"]
     },
     "playwright": {
       "command": "bunx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ]
+      "args": ["-y", "@playwright/mcp@latest"]
     },
     "sequential-thinking": {
       "command": "bunx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "bunx",
-      "args": [
-        "chrome-devtools-mcp@latest"
-      ],
+      "args": ["chrome-devtools-mcp@latest"],
       "env": {}
     },
     "github": {
@@ -43,6 +32,17 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
+    },
+    "pal-mcp-server": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/laurigates/pal-mcp-server.git",
+        "pal-mcp-server"
+      ],
+      "env": {}
     }
   }
 }
+
