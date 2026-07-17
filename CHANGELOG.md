@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.4.0...foundryvtt-mcp-v1.4.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **scripts:** report REST 404s as missing endpoints, not degraded state ([#196](https://github.com/laurigates/foundryvtt-mcp/issues/196)) ([db2735e](https://github.com/laurigates/foundryvtt-mcp/commit/db2735e522a75006fc7f4ccd86019d91f75bcef6))
+
 ## [1.4.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.3.0...foundryvtt-mcp-v1.4.0) (2026-07-01)
 
 
