@@ -1,0 +1,9 @@
+standards_version: "2025.1"
+project_type: typescript
+last_configured: "2026-05-12"
+components:
+  docs: "2025.1"
+  docs_level: standard
+  docs_languages:
+    - typescript
+  docs_generator: typedoc
