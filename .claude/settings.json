@@ -1,6 +1,12 @@
 {
   "permissions": {
     "allow": [
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "PushNotification",
+      "RemoteTrigger",
+      "ScheduleWakeup",
       "Bash(git:*)",
       "Bash(gh:*)",
       "Bash(pre-commit:*)",
