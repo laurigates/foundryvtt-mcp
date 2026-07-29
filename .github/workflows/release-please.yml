@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    # Pure GitHub-API job (no build) — 1-CPU slim runner is 3x cheaper.
+    runs-on: ubuntu-slim
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
