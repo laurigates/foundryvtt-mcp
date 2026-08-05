@@ -602,6 +602,19 @@ export type ActorItemCreateSource =
     };
 
 /**
+ * A single page to create on a new journal entry.
+ *
+ * `content` is plain text/HTML for a text-type page; {@link FoundryClient.createJournalEntry}
+ * maps it into Foundry's native `JournalEntryPage` shape
+ * (`type: "text"`, `text: { content, format: 1 }` — format 1 is
+ * `CONST.JOURNAL_ENTRY_PAGE_FORMATS.HTML`).
+ */
+export interface JournalPageCreateSource {
+  name: string;
+  content: string;
+}
+
+/**
  * Result structure for an actor attribute update (#143).
  *
  * Returned by `FoundryClient.updateActorAttribute`. The `updatedAttributes`

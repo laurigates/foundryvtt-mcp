@@ -704,6 +704,50 @@ export const journalTools = [
 ];
 
 /**
+ * Journal mutation tool definitions (WRITE)
+ */
+export const journalMutationTools = [
+  {
+    name: 'create_journal_entry',
+    description:
+      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Title of the journal entry',
+        },
+        pages: {
+          type: 'array',
+          description: 'One or more pages to create on the entry',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Page title',
+              },
+              content: {
+                type: 'string',
+                description: 'Page body as HTML or plain text',
+              },
+            },
+            required: ['name', 'content'],
+          },
+          minItems: 1,
+        },
+        folder: {
+          type: 'string',
+          description: 'Optional Folder document id to file the entry under',
+        },
+      },
+      required: ['name', 'pages'],
+    },
+  },
+];
+
+/**
  * World-level tool definitions
  */
 export const worldTools = [
@@ -762,6 +806,7 @@ export function getAllTools() {
     ...chatTools,
     ...userTools,
     ...journalTools,
+    ...journalMutationTools,
     ...worldTools,
     ...generationTools,
     ...diagnosticsTools,

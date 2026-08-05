@@ -5,7 +5,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
 import type { AttributePatch, FoundryClient } from '../foundry/client.js';
-import type { ActorItemCreateSource } from '../foundry/types.js';
+import type { ActorItemCreateSource, JournalPageCreateSource } from '../foundry/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 import type { ToolContext, ToolResult } from './base.js';
@@ -36,6 +36,7 @@ import {
   handleUpdateActorItem,
 } from './handlers/item-mutations.js';
 import { handleSearchItems } from './handlers/items.js';
+import { handleCreateJournalEntry } from './handlers/journal-mutations.js';
 import { handleGetJournal, handleSearchJournals } from './handlers/journals.js';
 import { handleReadResource } from './handlers/resources.js';
 import { handleGetSceneInfo } from './handlers/scenes.js';
@@ -246,6 +247,20 @@ export async function routeToolRequest(
         throw new Error('Missing required parameter: journalId');
       }
       return handleGetJournal(args as { journalId: string }, foundryClient);
+
+    // Journal mutation tools (WRITE) — Socket.IO modifyDocument protocol
+    // (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
+    case 'create_journal_entry':
+      if (!('name' in args) || typeof args.name !== 'string') {
+        throw new Error('Missing required parameter: name');
+      }
+      if (!('pages' in args) || !Array.isArray(args.pages)) {
+        throw new Error('Missing required parameter: pages');
+      }
+      return handleCreateJournalEntry(
+        args as { name: string; pages: JournalPageCreateSource[]; folder?: string },
+        foundryClient,
+      );
 
     // World tools
     case 'search_world':
