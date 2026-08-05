@@ -21,6 +21,7 @@ import type {
   FoundryScene,
   FoundryWorld,
   ItemSearchResult,
+  JournalPageCreateSource,
   WorldActor,
   WorldCombat,
   WorldData,
@@ -1134,6 +1135,57 @@ export class FoundryClient {
 
   getJournal(journalId: string): WorldJournal | undefined {
     return this.worldData?.journal.find((j) => j._id === journalId);
+  }
+
+  // ==========================================================================
+  // Journal mutation methods (WRITE — Socket.IO modifyDocument)
+  // ==========================================================================
+
+  /**
+   * Creates a new JournalEntry with one or more text pages.
+   *
+   * `JournalEntry` is a top-level document (unlike Item/ActiveEffect, which
+   * are embedded in an Actor), so the create carries no `parentUuid` —
+   * mirrors {@link startCombat}'s top-level Combat create. Each entry in
+   * `pages` is mapped to Foundry's native `JournalEntryPage` text-page shape.
+   *
+   * @param name - journal entry title
+   * @param pages - one or more pages (name + content); at least one required
+   * @param folder - optional 16-char Folder document id to file the entry under
+   * @returns the newly created journal entry document
+   */
+  async createJournalEntry(
+    name: string,
+    pages: JournalPageCreateSource[],
+    folder?: string,
+  ): Promise<WorldJournal> {
+    this.assertWriteable();
+    if (!name || typeof name !== 'string') {
+      throw new Error('name is required and must be a string');
+    }
+    if (!Array.isArray(pages) || pages.length === 0) {
+      throw new Error('pages is required and must contain at least one page');
+    }
+    if (folder !== undefined && !FOUNDRY_ID_PATTERN.test(folder)) {
+      throw new Error(`Invalid folder format: ${folder}`);
+    }
+
+    const data: Record<string, unknown> = {
+      name,
+      pages: pages.map((p) => ({
+        name: p.name,
+        type: 'text',
+        text: { content: p.content, format: 1 },
+      })),
+    };
+    if (folder) {
+      data.folder = folder;
+    }
+
+    const result = await this.modifyDocument('JournalEntry', 'create', {
+      data: [data],
+    });
+    return result[0] as WorldJournal;
   }
 
   // ==========================================================================
