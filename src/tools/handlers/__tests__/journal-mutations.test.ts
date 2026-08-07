@@ -179,6 +179,7 @@ describe('FoundryClient journal mutations (modifyDocument)', () => {
                 name: 'Summary',
                 type: 'text',
                 text: { content: '<p>The party arrived in Terris.</p>', format: 1 },
+                sort: 100000,
               },
             ],
           },
@@ -200,6 +201,19 @@ describe('FoundryClient journal mutations (modifyDocument)', () => {
     expect(body.operation.data[0].pages).toHaveLength(2);
     expect(body.operation.data[0].pages[0].name).toBe('Summary');
     expect(body.operation.data[0].pages[1].name).toBe('NPCs');
+  });
+
+  it('assigns ascending sort values so pages render in the supplied order', async () => {
+    const client = buildClient();
+    await client.createJournalEntry('Session 11 Recap', [
+      { name: 'Summary', content: 'a' },
+      { name: 'NPCs', content: 'b' },
+      { name: 'Loot', content: 'c' },
+    ]);
+    const [, body] = lastRequest(client);
+    expect(body.operation.data[0].pages.map((p: { sort: number }) => p.sort)).toEqual([
+      100000, 200000, 300000,
+    ]);
   });
 
   it('includes folder when provided', async () => {

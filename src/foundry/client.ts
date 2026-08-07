@@ -37,6 +37,14 @@ import type {
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
 
 /**
+ * Spacing between sibling `sort` values, mirroring Foundry's
+ * `CONST.SORT_INTEGER_DENSITY`. Leaving every sibling at the default `0` makes
+ * ordering depend on incidental collection insertion order, and gives Foundry
+ * no gap to slot a UI-created sibling into later.
+ */
+const SORT_INTEGER_DENSITY = 100000;
+
+/**
  * Accepts the two parent-UUID forms a token's actor can take:
  *  - `Actor.<id>` — a world-linked actor (`actorLink: true`)
  *  - `Scene.<sid>.Token.<tid>.Actor.<aid>` — an unlinked token's synthetic actor
@@ -1147,7 +1155,8 @@ export class FoundryClient {
    * `JournalEntry` is a top-level document (unlike Item/ActiveEffect, which
    * are embedded in an Actor), so the create carries no `parentUuid` —
    * mirrors {@link startCombat}'s top-level Combat create. Each entry in
-   * `pages` is mapped to Foundry's native `JournalEntryPage` text-page shape.
+   * `pages` is mapped to Foundry's native `JournalEntryPage` text-page shape,
+   * with an explicit `sort` so the pages render in the order supplied.
    *
    * @param name - journal entry title
    * @param pages - one or more pages (name + content); at least one required
@@ -1172,10 +1181,11 @@ export class FoundryClient {
 
     const data: Record<string, unknown> = {
       name,
-      pages: pages.map((p) => ({
+      pages: pages.map((p, i) => ({
         name: p.name,
         type: 'text',
         text: { content: p.content, format: 1 },
+        sort: (i + 1) * SORT_INTEGER_DENSITY,
       })),
     };
     if (folder) {
