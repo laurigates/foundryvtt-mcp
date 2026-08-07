@@ -163,6 +163,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `create_actor_item` — add an inline item to an actor
 - `update_actor_item` — apply a JSON merge patch to an actor's item
 - `delete_actor_item` — remove an item from an actor
+- `create_journal_entry` — create a journal entry with one or more text pages
 
 ### World
 

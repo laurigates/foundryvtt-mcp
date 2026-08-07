@@ -710,7 +710,7 @@ export const journalMutationTools = [
   {
     name: 'create_journal_entry',
     description:
-      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection).',
+      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection). The entry is created with default ownership, so it is visible to the GM only until ownership is granted in Foundry. It also will not appear in search_journals/get_journal until refresh_world_data is called.',
     inputSchema: {
       type: 'object',
       properties: {
