@@ -99,11 +99,44 @@ export function parseDocumentBroadcast(payload: unknown): DocumentBroadcast | nu
 }
 
 /**
+ * Keys that must never be copied out of a broadcast payload.
+ *
+ * Broadcast data arrives off the network from whatever FoundryVTT relays, so it
+ * is untrusted input; writing these would reach `Object.prototype` and poison
+ * every object in the process. ADR-010 already mandates hard-failing these in
+ * mutation patches — the same rule applies on the way back in.
+ */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Copies own, safe keys out of an untrusted object.
+ *
+ * Applied to created documents before they enter the cache, so a hostile
+ * payload cannot smuggle a `__proto__` key in through the create path either.
+ */
+function sanitize(doc: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(doc)) {
+    if (FORBIDDEN_KEYS.has(key)) {
+      continue;
+    }
+    clean[key] = value;
+  }
+  return clean;
+}
+
+/**
  * Recursively merges `patch` into `target`, matching FoundryVTT's own update
  * semantics: keys merge, `null` deletes, arrays replace wholesale.
+ *
+ * Prototype-polluting keys are dropped rather than merged (see
+ * {@link FORBIDDEN_KEYS}).
  */
 function mergePatch(target: Record<string, unknown>, patch: Record<string, unknown>): void {
   for (const [key, value] of Object.entries(patch)) {
+    if (FORBIDDEN_KEYS.has(key)) {
+      continue;
+    }
     if (value === null) {
       delete target[key];
       continue;
@@ -154,7 +187,7 @@ function applyToCollection(
       if (existing) {
         mergePatch(existing, doc);
       } else {
-        collection.push({ ...doc });
+        collection.push(sanitize(doc));
       }
       changed = true;
       continue;

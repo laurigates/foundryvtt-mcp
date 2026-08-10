@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { WorldData } from '../types.js';
 import {
   applyDocumentBroadcast,
@@ -152,6 +152,62 @@ describe('applyDocumentBroadcast — top-level documents', () => {
   it('ignores document types the cache does not model', () => {
     const world = buildWorldData();
     expect(applyDocumentBroadcast(world, broadcast({ type: 'Setting' }))).toBe(false);
+  });
+});
+
+// Broadcast payloads are untrusted network input, so a hostile one must not be
+// able to reach Object.prototype. JSON.parse is used to build the payloads
+// because an object literal's `__proto__` sets the prototype instead of
+// creating an own key — which would not reproduce the attack.
+describe('applyDocumentBroadcast — prototype pollution', () => {
+  afterEach(() => {
+    // Fail loudly rather than leaking a poisoned prototype into later tests.
+    delete (Object.prototype as Record<string, unknown>).polluted;
+  });
+
+  it('does not pollute Object.prototype through a nested update patch', () => {
+    const world = buildWorldData();
+    applyDocumentBroadcast(world, broadcast());
+    applyDocumentBroadcast(world, {
+      type: 'JournalEntry',
+      action: 'update',
+      result: [JSON.parse(`{"_id": "${JOURNAL_ID}", "__proto__": {"polluted": "yes"}}`) as unknown],
+    });
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('does not pollute Object.prototype through a create payload', () => {
+    const world = buildWorldData();
+    applyDocumentBroadcast(world, {
+      type: 'JournalEntry',
+      action: 'create',
+      result: [
+        JSON.parse(`{"_id": "newjournal000000", "__proto__": {"polluted": "yes"}}`) as unknown,
+      ],
+    });
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(world.journal).toHaveLength(1);
+  });
+
+  it('drops constructor and prototype keys while keeping the rest of the patch', () => {
+    const world = buildWorldData();
+    applyDocumentBroadcast(world, broadcast());
+    applyDocumentBroadcast(world, {
+      type: 'JournalEntry',
+      action: 'update',
+      result: [
+        JSON.parse(
+          `{"_id": "${JOURNAL_ID}", "constructor": "x", "prototype": "y", "name": "Renamed"}`,
+        ) as unknown,
+      ],
+    });
+
+    const entry = world.journal[0] as unknown as Record<string, unknown>;
+    expect(entry.name).toBe('Renamed');
+    expect(Object.hasOwn(entry, 'prototype')).toBe(false);
+    expect(Object.hasOwn(entry, 'constructor')).toBe(false);
   });
 });
 
