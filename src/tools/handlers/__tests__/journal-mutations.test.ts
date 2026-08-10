@@ -45,7 +45,50 @@ describe('journal mutation handlers', () => {
         'Session 11 Recap',
         [{ name: 'Summary', content: '<p>The party arrived in Terris.</p>' }],
         undefined,
+        undefined,
       );
+    });
+
+    it('defaults to GM-only visibility and says so in the response', async () => {
+      const mockClient = createMockClient();
+      const result = await handleCreateJournalEntry(
+        { name: 'Session 11 Recap', pages: [{ name: 'Summary', content: 'text' }] },
+        mockClient,
+      );
+      expect(result.content[0].text).toContain('**Visible to:** GM only');
+    });
+
+    it('passes visibility through and reports player-readable', async () => {
+      const mockClient = createMockClient();
+      const result = await handleCreateJournalEntry(
+        {
+          name: 'Session 11 Recap',
+          pages: [{ name: 'Summary', content: 'text' }],
+          visibility: 'observer',
+        },
+        mockClient,
+      );
+      expect(mockClient.createJournalEntry).toHaveBeenCalledWith(
+        'Session 11 Recap',
+        [{ name: 'Summary', content: 'text' }],
+        undefined,
+        'observer',
+      );
+      expect(result.content[0].text).toContain('all players (read-only)');
+    });
+
+    it('rejects an unknown visibility with InvalidParams', async () => {
+      const mockClient = createMockClient();
+      await expect(
+        handleCreateJournalEntry(
+          {
+            name: 'Session 11 Recap',
+            pages: [{ name: 'Summary', content: 'text' }],
+            visibility: 'everyone' as unknown as 'observer',
+          },
+          mockClient,
+        ),
+      ).rejects.toThrow(McpError);
     });
 
     it('passes an optional folder id through', async () => {
@@ -63,6 +106,7 @@ describe('journal mutation handlers', () => {
         'Session 11 Recap',
         [{ name: 'Summary', content: 'text' }],
         VALID_FOLDER_ID,
+        undefined,
       );
     });
 
@@ -225,6 +269,41 @@ describe('FoundryClient journal mutations (modifyDocument)', () => {
     );
     const [, body] = lastRequest(client);
     expect(body.operation.data[0].folder).toBe(VALID_FOLDER_ID);
+  });
+
+  it('omits ownership entirely when no visibility is given, leaving Foundry to default it', async () => {
+    const client = buildClient();
+    await client.createJournalEntry('Session 11 Recap', [{ name: 'Summary', content: 'a' }]);
+    const [, body] = lastRequest(client);
+    expect(body.operation.data[0].ownership).toBeUndefined();
+  });
+
+  it.each([
+    ['observer', 2],
+    ['owner', 3],
+    ['gm-only', 0],
+  ] as const)('maps visibility %s to ownership.default %i', async (visibility, level) => {
+    const client = buildClient();
+    await client.createJournalEntry(
+      'Session 11 Recap',
+      [{ name: 'Summary', content: 'a' }],
+      undefined,
+      visibility,
+    );
+    const [, body] = lastRequest(client);
+    expect(body.operation.data[0].ownership).toEqual({ default: level });
+  });
+
+  it('rejects an unknown visibility before emitting', async () => {
+    const client = buildClient();
+    await expect(
+      client.createJournalEntry(
+        'Session 11 Recap',
+        [{ name: 'Summary', content: 'a' }],
+        undefined,
+        'everyone' as unknown as 'observer',
+      ),
+    ).rejects.toThrow(/Invalid visibility/);
   });
 
   it('rejects an empty pages array before emitting', async () => {

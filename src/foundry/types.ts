@@ -615,6 +615,23 @@ export interface JournalPageCreateSource {
 }
 
 /**
+ * Default visibility for a newly created document (#204).
+ *
+ * FoundryVTT ownership levels are `NONE 0`, `LIMITED 1`, `OBSERVER 2`,
+ * `OWNER 3`. A document created without an explicit `ownership` defaults to
+ * `NONE` for everyone but the creating GM — so a journal written for the table
+ * is invisible to the table until someone grants access in the Foundry UI.
+ */
+export type DocumentVisibility = 'gm-only' | 'observer' | 'owner';
+
+/** {@link DocumentVisibility} → the `ownership.default` level it maps to. */
+export const VISIBILITY_LEVELS: Record<DocumentVisibility, number> = {
+  'gm-only': 0,
+  observer: 2,
+  owner: 3,
+};
+
+/**
  * Result structure for an actor attribute update (#143).
  *
  * Returned by `FoundryClient.updateActorAttribute`. The `updatedAttributes`
