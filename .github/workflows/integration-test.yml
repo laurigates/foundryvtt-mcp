@@ -1,29 +1,38 @@
 name: Integration Tests
 
 # ----------------------------------------------------------------------------
-# CI BLOCKER (issue #140): the FoundryVTT secrets needed by this workflow are
-# not currently configured on the repo:
+# CI GATE (issue #140): this workflow needs FoundryVTT credentials that are not
+# currently configured on the repo:
 #
 #   - FOUNDRY_LICENSE_KEY
 #   - FOUNDRY_USERNAME
 #   - FOUNDRY_PASSWORD
 #
-# `gh secret list -R laurigates/foundryvtt-mcp` shows only RELEASE_PLEASE_TOKEN.
-# Without these the felddy/foundryvtt container falls back to the placeholder
-# values in docker-compose.test.yml (test-user/test-password), tries to log in
-# to foundryvtt.com, gets rejected, and never installs Foundry — so the
-# healthcheck never becomes healthy and the inner `timeout 120` aborts the
-# job. Bumping the timeout would not help; the container can't start without
-# valid credentials. Evidence (from the run-25735243106 container.log
-# artifact):
+# Without these the felddy/foundryvtt container tries to log in to
+# foundryvtt.com with the placeholder values in docker-compose.test.yml
+# (test-user/test-password), gets rejected, and never installs Foundry — so the
+# healthcheck never becomes healthy. Evidence (from the run-25735243106
+# container.log artifact):
 #
 #   Authenticate | [error] Unable to log in as test-user, verify your credentials...
 #   Entrypoint   | [warn]  Authentication failed with exit code 255.
 #   Entrypoint   | [error] Unable to install Foundry Virtual Tabletop!
 #
-# Resolution requires the repo owner to add the three secrets above (then
-# this workflow will run end-to-end). Until that happens the preflight step
-# below fails fast with a clear message instead of timing out at 2 minutes.
+# Bumping the healthcheck timeout would not help; the container cannot start
+# without valid credentials.
+#
+# The `preflight` job below detects the missing secrets and *skips* the
+# integration job rather than failing it. Previously it exited 1, which painted
+# every pull request red for a precondition no PR author can satisfy — the
+# signal was pure noise and trained reviewers to ignore a red check. A skipped
+# job still shows the gate in the checks list, but only a genuine integration
+# failure now reports as a failure.
+#
+# `workflow_dispatch` is the exception: an explicit manual run means someone
+# expects the tier to execute, so missing secrets fail loudly there.
+#
+# Once the repo owner adds the three secrets, both jobs run end-to-end with no
+# further changes to this file.
 # ----------------------------------------------------------------------------
 
 on:
@@ -34,7 +43,51 @@ on:
   workflow_dispatch:
 
 jobs:
+  preflight:
+    name: Check FoundryVTT credentials
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Verify FoundryVTT credentials are configured
+        id: check
+        env:
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+        run: |
+          missing=()
+          [ -z "${FOUNDRY_LICENSE_KEY}" ] && missing+=("FOUNDRY_LICENSE_KEY")
+          [ -z "${FOUNDRY_USERNAME}" ] && missing+=("FOUNDRY_USERNAME")
+          [ -z "${FOUNDRY_PASSWORD}" ] && missing+=("FOUNDRY_PASSWORD")
+
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "All required FoundryVTT secrets are present."
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Integration tests skipped"
+            echo
+            echo "The following repository secrets are not configured: ${missing[*]}"
+            echo
+            echo "See issue #140 — without these the felddy/foundryvtt container"
+            echo "cannot authenticate to foundryvtt.com and never becomes healthy."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error title=Missing FoundryVTT secrets::This run was dispatched manually, so the missing secrets are a failure: ${missing[*]}"
+            exit 1
+          fi
+
+          echo "::warning title=Integration tests skipped::Missing FoundryVTT secrets (${missing[*]}); see issue #140."
+
   integration:
+    name: Integration tests
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -47,23 +100,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Verify FoundryVTT credentials are configured
-        env:
-          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
-        run: |
-          missing=()
-          [ -z "${FOUNDRY_LICENSE_KEY}" ] && missing+=("FOUNDRY_LICENSE_KEY")
-          [ -z "${FOUNDRY_USERNAME}" ] && missing+=("FOUNDRY_USERNAME")
-          [ -z "${FOUNDRY_PASSWORD}" ] && missing+=("FOUNDRY_PASSWORD")
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error title=Missing FoundryVTT secrets::The following repository secrets are not configured: ${missing[*]}"
-            echo "::error::See issue #140 for context. Without these the felddy/foundryvtt container cannot authenticate to foundryvtt.com and never becomes healthy."
-            exit 1
-          fi
-          echo "All required FoundryVTT secrets are present."
 
       - name: Create .env.integration
         run: |
@@ -102,4 +138,4 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f docker-compose.test.yml down -v
+        run: docker compose -f docker-compose.test.yml down -v || true
