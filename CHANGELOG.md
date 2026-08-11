@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.4.1...foundryvtt-mcp-v1.5.0) (2026-08-11)
+
+
+### Features
+
+* **foundry:** keep worldData live and add journal visibility ([#208](https://github.com/laurigates/foundryvtt-mcp/issues/208)) ([e4e2548](https://github.com/laurigates/foundryvtt-mcp/commit/e4e2548764c751b5f29269ff2c97f5d00dc99cfe))
+* **tools:** add create_journal_entry write tool ([317f708](https://github.com/laurigates/foundryvtt-mcp/commit/317f708045c5cef70b006148cf571b326d046e9e))
+
+
+### Bug Fixes
+
+* **ci:** clear dependency-audit advisories and stop failing CI on absent secrets ([#209](https://github.com/laurigates/foundryvtt-mcp/issues/209)) ([682fbdc](https://github.com/laurigates/foundryvtt-mcp/commit/682fbdcc06647a7946c05f50bda1f0711e57b72c))
+* **tools:** set explicit page sort on create_journal_entry ([0ca9253](https://github.com/laurigates/foundryvtt-mcp/commit/0ca9253fb1f9a8d1582699ad71f84cb8a34a944c))
+
 ## [1.4.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.4.0...foundryvtt-mcp-v1.4.1) (2026-07-17)
 
 
