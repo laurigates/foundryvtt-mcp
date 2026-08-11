@@ -710,7 +710,7 @@ export const journalMutationTools = [
   {
     name: 'create_journal_entry',
     description:
-      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection). The entry is created with default ownership, so it is visible to the GM only until ownership is granted in Foundry. It also will not appear in search_journals/get_journal until refresh_world_data is called.',
+      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection). Defaults to GM-only visibility — pass visibility to let players read it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -740,6 +740,12 @@ export const journalMutationTools = [
         folder: {
           type: 'string',
           description: 'Optional Folder document id to file the entry under',
+        },
+        visibility: {
+          type: 'string',
+          enum: ['gm-only', 'observer', 'owner'],
+          description:
+            "Who can see the entry. 'gm-only' (default) hides it from players; 'observer' lets every player read it; 'owner' lets every player read and edit it.",
         },
       },
       required: ['name', 'pages'],

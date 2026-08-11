@@ -16,6 +16,7 @@ import type {
   ActorSearchResult,
   CompendiumSearchResult,
   DiceRoll,
+  DocumentVisibility,
   FoundryActor,
   FoundryItem,
   FoundryScene,
@@ -32,6 +33,8 @@ import type {
   WorldScene,
   WorldUser,
 } from './types.js';
+import { VISIBILITY_LEVELS } from './types.js';
+import { applyDocumentBroadcast, parseDocumentBroadcast } from './world-cache.js';
 
 /** FoundryVTT document IDs are 16-character alphanumeric strings. */
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
@@ -255,6 +258,9 @@ export class FoundryClient {
               issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
             });
           }
+          // Keep the snapshot live from here on (#205). Attached only after a
+          // successful handshake so the reject paths have no listener to leak.
+          this.socket?.on('modifyDocument', this.onDocumentBroadcast);
           resolve(worldData);
         });
       };
@@ -270,8 +276,42 @@ export class FoundryClient {
     });
   }
 
+  /**
+   * Applies a FoundryVTT `modifyDocument` broadcast to the cached world state (#205).
+   *
+   * Bound field rather than a method so the same reference can be passed to
+   * `socket.off()` on teardown. Never throws: a malformed or unmodelled payload
+   * leaves the cache untouched (and stale) rather than taking the connection down.
+   */
+  private onDocumentBroadcast = (payload: unknown): void => {
+    if (!this.worldData) {
+      return;
+    }
+
+    const broadcast = parseDocumentBroadcast(payload);
+    if (!broadcast) {
+      return;
+    }
+
+    try {
+      const applied = applyDocumentBroadcast(this.worldData, broadcast);
+      logger.debug(
+        applied
+          ? `Applied ${broadcast.action} ${broadcast.type} broadcast to cached worldData`
+          : `Ignored ${broadcast.action} ${broadcast.type} broadcast (not cached)`,
+      );
+    } catch (error) {
+      logger.warn('Failed to apply document broadcast to cached worldData', {
+        type: broadcast.type,
+        action: broadcast.action,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   async disconnect(): Promise<void> {
     if (this.socket) {
+      this.socket.off('modifyDocument', this.onDocumentBroadcast);
       this.socket.disconnect();
       this.socket = null;
     }
@@ -1161,12 +1201,15 @@ export class FoundryClient {
    * @param name - journal entry title
    * @param pages - one or more pages (name + content); at least one required
    * @param folder - optional 16-char Folder document id to file the entry under
+   * @param visibility - who can see the entry (#204); omitted means GM-only,
+   *   which is FoundryVTT's default for a newly created document
    * @returns the newly created journal entry document
    */
   async createJournalEntry(
     name: string,
     pages: JournalPageCreateSource[],
     folder?: string,
+    visibility?: DocumentVisibility,
   ): Promise<WorldJournal> {
     this.assertWriteable();
     if (!name || typeof name !== 'string') {
@@ -1177,6 +1220,11 @@ export class FoundryClient {
     }
     if (folder !== undefined && !FOUNDRY_ID_PATTERN.test(folder)) {
       throw new Error(`Invalid folder format: ${folder}`);
+    }
+    if (visibility !== undefined && !(visibility in VISIBILITY_LEVELS)) {
+      throw new Error(
+        `Invalid visibility: ${visibility}. Expected one of: ${Object.keys(VISIBILITY_LEVELS).join(', ')}`,
+      );
     }
 
     const data: Record<string, unknown> = {
@@ -1190,6 +1238,9 @@ export class FoundryClient {
     };
     if (folder) {
       data.folder = folder;
+    }
+    if (visibility) {
+      data.ownership = { default: VISIBILITY_LEVELS[visibility] };
     }
 
     const result = await this.modifyDocument('JournalEntry', 'create', {

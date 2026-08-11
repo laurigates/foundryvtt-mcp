@@ -41,8 +41,30 @@ Mutations go over the existing authenticated socket (no bridge), per PRD-003
   Reject on `response.error`; `result` holds created/updated data or deleted ids.
 - Actor `system` updates take **dot-notation keys prefixed with `system.`**
   (e.g. `"system.attributes.hp.value"`); Foundry merges recursively.
-- After a write, `worldData` is stale — document it / expose `refresh_world_data`
-  (the `refreshWorldData()` method re-emits `world`). Do not assume the cache updated.
+
+## The cache follows writes automatically (#205)
+
+`worldData` is no longer a connect-time snapshot. `client.ts` subscribes to the
+`modifyDocument` **broadcast** — the same event, arriving unsolicited — and
+`world-cache.ts` applies it to the cached collections. So a read after a write
+sees the write, and changes made by *other* users (a player moving a token, the
+GM editing in the UI) land in the cache too.
+
+Consequences for new write tools:
+
+- **Do not hand-patch `worldData` in a mutation method.** The broadcast already
+  covers it, and a manual splice would double-apply. Applying is idempotent
+  (`create` upserts by `_id`), so a doubled apply is harmless — but it is still
+  redundant code that will drift.
+- **A new document type needs a map entry**, not new plumbing: add it to
+  `TOP_LEVEL_COLLECTIONS` or `EMBEDDED_COLLECTIONS` in `world-cache.ts`.
+  Unmapped types are dropped silently (by design — an unmodelled payload leaves
+  the cache stale rather than corrupt).
+- **Known gap**: broadcasts parented to a *synthetic token actor*
+  (`Scene.<sid>.Token.<tid>.Actor.<aid>`, unlinked tokens) are not applied —
+  that actor is a per-token delta, not a document in any cached collection.
+  Those still need `refresh_world_data`.
+- `refreshWorldData()` (re-emits `world`) remains the full-resync escape hatch.
 
 ## Verify the protocol against the bundled app source — don't guess
 

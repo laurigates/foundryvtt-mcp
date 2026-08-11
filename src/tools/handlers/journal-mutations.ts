@@ -9,8 +9,16 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
-import type { JournalPageCreateSource } from '../../foundry/types.js';
+import type { DocumentVisibility, JournalPageCreateSource } from '../../foundry/types.js';
+import { VISIBILITY_LEVELS } from '../../foundry/types.js';
 import { withToolError } from './utils.js';
+
+/** Human-readable summary of who can see the entry, for the tool response. */
+const VISIBILITY_SUMMARY: Record<DocumentVisibility, string> = {
+  'gm-only': 'GM only',
+  observer: 'all players (read-only)',
+  owner: 'all players (read/write)',
+};
 
 /**
  * Handles creating a journal entry with one or more text pages.
@@ -20,10 +28,11 @@ export async function handleCreateJournalEntry(
     name: string;
     pages: JournalPageCreateSource[];
     folder?: string;
+    visibility?: DocumentVisibility;
   },
   foundryClient: FoundryClient,
 ) {
-  const { name, pages, folder } = args;
+  const { name, pages, folder, visibility } = args;
 
   if (!name || typeof name !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'name is required and must be a string');
@@ -44,9 +53,15 @@ export async function handleCreateJournalEntry(
       throw new McpError(ErrorCode.InvalidParams, 'each page requires a name and content string');
     }
   }
+  if (visibility !== undefined && !(visibility in VISIBILITY_LEVELS)) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `visibility must be one of: ${Object.keys(VISIBILITY_LEVELS).join(', ')}`,
+    );
+  }
 
   return withToolError('create journal entry', async () => {
-    const journal = await foundryClient.createJournalEntry(name, pages, folder);
+    const journal = await foundryClient.createJournalEntry(name, pages, folder, visibility);
 
     return {
       content: [
@@ -55,7 +70,8 @@ export async function handleCreateJournalEntry(
           text: `📓 **Journal Entry Created**
 **Name:** ${journal.name}
 **ID:** ${journal._id}
-**Pages:** ${journal.pages?.length ?? pages.length}`,
+**Pages:** ${journal.pages?.length ?? pages.length}
+**Visible to:** ${VISIBILITY_SUMMARY[visibility ?? 'gm-only']}`,
         },
       ],
     };

@@ -5,7 +5,11 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
 import type { AttributePatch, FoundryClient } from '../foundry/client.js';
-import type { ActorItemCreateSource, JournalPageCreateSource } from '../foundry/types.js';
+import type {
+  ActorItemCreateSource,
+  DocumentVisibility,
+  JournalPageCreateSource,
+} from '../foundry/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 import type { ToolContext, ToolResult } from './base.js';
@@ -258,7 +262,12 @@ export async function routeToolRequest(
         throw new Error('Missing required parameter: pages');
       }
       return handleCreateJournalEntry(
-        args as { name: string; pages: JournalPageCreateSource[]; folder?: string },
+        args as {
+          name: string;
+          pages: JournalPageCreateSource[];
+          folder?: string;
+          visibility?: DocumentVisibility;
+        },
         foundryClient,
       );
 
