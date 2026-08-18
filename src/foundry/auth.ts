@@ -9,8 +9,30 @@
  */
 
 import axios from 'axios';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Socket.IO connection options carrying a FoundryVTT session.
+ *
+ * FoundryVTT resolves the session from the `session` **cookie** on the
+ * handshake request; the `session` query parameter alone leaves the socket
+ * anonymous. An anonymous socket still connects at the transport level — it
+ * simply never answers `getJoinData` and emits `session` as `null` — so the
+ * only symptom is a bare timeout with no `connect_error` (#206).
+ *
+ * `extraHeaders` is honoured by socket.io-client in Node.js for both the
+ * WebSocket and polling handshakes; the query parameter is kept for servers
+ * that read it.
+ */
+export function sessionSocketOptions(session: string): Partial<ManagerOptions & SocketOptions> {
+  return {
+    transports: ['websocket'],
+    query: { session },
+    extraHeaders: { Cookie: `session=${session}` },
+  };
+}
 
 /**
  * Extracts the session cookie value from a GET /join response.
@@ -54,10 +76,7 @@ async function resolveUserId(baseUrl: string, user: string, session: string): Pr
   logger.debug('Resolving display name to document _id', { displayName: user });
 
   return new Promise((resolve, reject) => {
-    const socket = io(baseUrl, {
-      transports: ['websocket'],
-      query: { session },
-    });
+    const socket = io(baseUrl, sessionSocketOptions(session));
 
     const cleanup = () => {
       socket.off('session', onSession);
@@ -152,14 +171,23 @@ export async function authenticateFoundry(
         'Content-Type': 'application/json',
         Cookie: `session=${session}`,
       },
-      // Accept 200 (success JSON) and 302 (redirect to /game on success)
-      validateStatus: (status) => status === 200 || status === 302,
+      // Accept 200 (success JSON), 302 (redirect to /game on success) and 401
+      // (bad password). 401 carries FoundryVTT's own explanation in the body;
+      // letting axios throw on it would surface a bare
+      // "Request failed with status code 401" instead (#206).
+      validateStatus: (status) => status === 200 || status === 302 || status === 401,
     },
   );
 
   if (joinRes.data?.status !== 'success' && joinRes.data?.redirect !== '/game') {
-    const msg = joinRes.data?.message || joinRes.data?.error || 'Unknown error';
-    throw new Error(`FoundryVTT authentication failed: ${msg}`);
+    // FoundryVTT v13+ answers a rejected /join with a plain-text i18n key
+    // (e.g. "JOIN.ErrorInvalidPassword") rather than a JSON error object.
+    const msg =
+      (typeof joinRes.data === 'string' && joinRes.data.trim()) ||
+      joinRes.data?.message ||
+      joinRes.data?.error ||
+      'Unknown error';
+    throw new Error(`FoundryVTT authentication failed (HTTP ${joinRes.status}): ${msg}`);
   }
 
   logger.info('FoundryVTT authentication successful', { userId });

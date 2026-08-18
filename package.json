@@ -12,6 +12,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "smoke": "node scripts/smoke-test.js",
+    "smoke:dotenv": "node scripts/smoke-dotenv.js",
     "smoke:pack": "node scripts/smoke-pack.js",
     "test": "vitest run",
     "test:watch": "vitest --watch",

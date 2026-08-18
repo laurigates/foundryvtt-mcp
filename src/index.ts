@@ -14,6 +14,8 @@
  * @see {@link https://foundryvtt.com/} FoundryVTT Virtual Tabletop
  */
 
+// Must precede every other import: see src/load-env.ts (#206).
+import './load-env.js';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -27,7 +29,6 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import dotenv from 'dotenv';
 import { config } from './config/index.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
 import { FoundryClient, type FoundryClientConfig } from './foundry/client.js';
@@ -39,9 +40,6 @@ import {
 } from './tools/index.js';
 import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
-
-// Load environment variables
-dotenv.config({ quiet: true });
 
 /**
  * Main FoundryVTT MCP Server class that handles all communication
