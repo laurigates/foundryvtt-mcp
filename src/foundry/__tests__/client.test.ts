@@ -8,6 +8,13 @@ vi.mock('../auth.js', () => ({
   authenticateFoundry: vi
     .fn()
     .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+  // Real implementation — connectAndLoadWorld's handshake options are the
+  // subject of the #206 regression test below.
+  sessionSocketOptions: (session: string) => ({
+    transports: ['websocket'],
+    query: { session },
+    extraHeaders: { Cookie: `session=${session}` },
+  }),
 }));
 vi.mock('../../utils/logger.js', () => ({
   logger: {

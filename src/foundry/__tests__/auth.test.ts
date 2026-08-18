@@ -27,7 +27,7 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
-const { authenticateFoundry } = await import('../auth.js');
+const { authenticateFoundry, sessionSocketOptions } = await import('../auth.js');
 const { logger } = await import('../../utils/logger.js');
 
 const mockAxios = vi.mocked(axios);
@@ -219,5 +219,103 @@ describe('authenticateFoundry — warn-and-continue (CN-7 analogue)', () => {
     await expect(authenticateFoundry('not a real url', 'abc123DEF456ghij', 'pw')).rejects.toThrow();
 
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('authenticateFoundry — session cookie on the Socket.IO handshake (#206)', () => {
+  /**
+   * FoundryVTT resolves the session from the `session` cookie on the handshake
+   * request. Sending it only as a query parameter leaves the socket anonymous:
+   * it connects, `connect_error` never fires, and `getJoinData` is simply never
+   * answered — so the only symptom is the 10s timeout in resolveUserId.
+   */
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+    mockJoinPostSuccess();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('passes the session as a Cookie header, not only as a query param', async () => {
+    const { socket } = buildMockSocket([{ _id: 'resolvedDocId123', name: 'Gamemaster' }]);
+    mockIo.mockReturnValue(socket);
+
+    await authenticateFoundry('http://localhost:30000', 'Gamemaster', 'pw');
+
+    expect(mockIo).toHaveBeenCalledWith(
+      'http://localhost:30000',
+      expect.objectContaining({
+        extraHeaders: { Cookie: 'session=test-session-cookie' },
+        query: { session: 'test-session-cookie' },
+      }),
+    );
+  });
+});
+
+describe('sessionSocketOptions (#206)', () => {
+  it('carries the session in both the Cookie header and the query param', () => {
+    expect(sessionSocketOptions('abc123')).toEqual({
+      transports: ['websocket'],
+      query: { session: 'abc123' },
+      extraHeaders: { Cookie: 'session=abc123' },
+    });
+  });
+});
+
+describe('authenticateFoundry — rejected /join is reported, not thrown raw (#206)', () => {
+  /**
+   * FoundryVTT v13+ answers a rejected /join with HTTP 401 and a plain-text
+   * i18n key body (e.g. "JOIN.ErrorInvalidPassword"). Without 401 in
+   * validateStatus axios throws first, surfacing a bare
+   * "Request failed with status code 401" that says nothing about the cause.
+   */
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('surfaces FoundryVTT’s plain-text 401 body in the error message', async () => {
+    mockAxios.post = vi.fn().mockResolvedValue({
+      status: 401,
+      data: 'JOIN.ErrorInvalidPassword',
+    });
+
+    await expect(
+      authenticateFoundry('http://localhost:30000', 'abc123DEF456ghij', 'wrong'),
+    ).rejects.toThrow('FoundryVTT authentication failed (HTTP 401): JOIN.ErrorInvalidPassword');
+  });
+
+  it('accepts 401 as a readable status rather than letting axios throw', async () => {
+    mockAxios.post = vi.fn().mockResolvedValue({ status: 401, data: 'JOIN.ErrorInvalidPassword' });
+
+    await expect(
+      authenticateFoundry('http://localhost:30000', 'abc123DEF456ghij', 'wrong'),
+    ).rejects.toThrow();
+
+    const validateStatus = mockAxios.post.mock.calls[0]?.[2]?.validateStatus;
+    expect(validateStatus?.(401)).toBe(true);
+    expect(validateStatus?.(200)).toBe(true);
+    expect(validateStatus?.(302)).toBe(true);
+    expect(validateStatus?.(500)).toBe(false);
+  });
+
+  it('still surfaces a JSON { message } body when the server sends one', async () => {
+    mockAxios.post = vi.fn().mockResolvedValue({
+      status: 200,
+      data: { status: 'failed', message: 'You may not join this world' },
+    });
+
+    await expect(
+      authenticateFoundry('http://localhost:30000', 'abc123DEF456ghij', 'pw'),
+    ).rejects.toThrow('FoundryVTT authentication failed (HTTP 200): You may not join this world');
   });
 });

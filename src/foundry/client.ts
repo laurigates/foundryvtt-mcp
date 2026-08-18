@@ -9,7 +9,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse 
 import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { authenticateFoundry } from './auth.js';
+import { authenticateFoundry, sessionSocketOptions } from './auth.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -225,10 +225,7 @@ export class FoundryClient {
    */
   private connectAndLoadWorld(session: string): Promise<WorldData> {
     return new Promise((resolve, reject) => {
-      this.socket = io(this.config.baseUrl, {
-        transports: ['websocket'],
-        query: { session },
-      });
+      this.socket = io(this.config.baseUrl, sessionSocketOptions(session));
 
       const cleanup = () => {
         this.socket?.off('session', onSession);
