@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.0...foundryvtt-mcp-v1.5.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **auth:** send the Foundry session as a Cookie header, and load .env before config ([#210](https://github.com/laurigates/foundryvtt-mcp/issues/210)) ([b3fd356](https://github.com/laurigates/foundryvtt-mcp/commit/b3fd356bd66578bc1d8d228264f1770dd323dbb4))
+
 ## [1.5.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.4.1...foundryvtt-mcp-v1.5.0) (2026-08-11)
 
 
