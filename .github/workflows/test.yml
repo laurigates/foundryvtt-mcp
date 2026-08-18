@@ -32,6 +32,9 @@ jobs:
     - name: Startup smoke test
       run: bun run smoke
 
+    - name: Dotenv load-order smoke test
+      run: bun run smoke:dotenv
+
     - name: Pack smoke test
       run: bun run smoke:pack
 

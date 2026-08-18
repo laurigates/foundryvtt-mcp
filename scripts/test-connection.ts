@@ -5,13 +5,12 @@
  * Run with: npm run test-connection
  */
 
+// Must precede every other import: see src/load-env.ts (#206).
+import '../src/load-env.js';
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { FoundryClient } from '../src/foundry/client.js';
 import { config } from '../src/config/index.js';
 import { logger } from '../src/utils/logger.js';
-
-dotenv.config({ quiet: true });
 
 /**
  * True when a REST-mode request failed because the target's REST module does
