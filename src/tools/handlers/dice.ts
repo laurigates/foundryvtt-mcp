@@ -9,13 +9,14 @@ import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
 // import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { BaseTool, type ToolContext, type ToolResult } from '../base.js';
+import { ROLL_DICE_DESCRIPTION } from '../definitions.js';
 
 /**
  * Dice rolling tool implementation
  */
 export class RollDiceTool extends BaseTool {
   readonly name = 'roll_dice';
-  readonly description = 'Roll dice using standard RPG notation (e.g., 1d20, 3d6+4)';
+  readonly description = ROLL_DICE_DESCRIPTION;
   readonly inputSchema = {
     type: 'object',
     properties: {
