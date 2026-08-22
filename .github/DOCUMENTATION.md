@@ -8,6 +8,7 @@ This repository includes several GitHub Actions workflows for automated document
 **Recommended for public repositories**
 
 - ✅ Deploys to GitHub Pages automatically
+- ✅ Validates the docs build on pull requests (build only, no deploy)
 - ✅ Clean URLs (e.g., `https://username.github.io/repo/`)
 - ✅ Fast CDN delivery
 - ✅ Automatic HTTPS
@@ -16,7 +17,16 @@ This repository includes several GitHub Actions workflows for automated document
 **Setup:**
 1. Go to Repository Settings → Pages
 2. Set Source to "GitHub Actions"
-3. The workflow will deploy on every push to main
+3. The workflow deploys on every push to main (and on manual `workflow_dispatch`
+   runs). Pull requests run the `build` job only — they check out, install, run
+   TypeDoc and `bun run docs:check`, then stop; the Pages steps and the `deploy`
+   job are skipped.
+
+> **Branch protection:** do not add this workflow's `build` or `deploy` job as a
+> required status check. Both `on:` triggers are `paths`-filtered, so a PR that
+> touches nothing under `src/**`, `README.md`, `typedoc.json`, `package.json`, or
+> this workflow never reports a status at all and a required check would wait
+> forever. `deploy` is additionally *skipped* on pull requests by design.
 
 ### 2. `update-docs.yml` - Repository Commit
 **Works for all repositories (public/private)**
@@ -112,8 +122,17 @@ docs/                      # Generated documentation
 
 ## 🔍 Troubleshooting
 
+### Pull Request Run Shows Skipped Steps
+This is expected. On a `pull_request` event, `Setup Pages`, `Upload
+documentation artifact`, and the whole `deploy` job are skipped — a PR
+validates the docs build and never deploys. A skipped job does not fail the
+workflow, so the run is green on `build` alone.
+
 ### Documentation Not Updating
-1. Check that workflows have proper permissions
+1. Check that workflows have proper permissions. `docs.yml` scopes them per job:
+   `build` gets `contents: read` + `pages: write` (needed by
+   `actions/configure-pages`), `deploy` gets `contents: read` + `pages: write` +
+   `id-token: write` (needed by `actions/deploy-pages`).
 2. Ensure the triggering paths match your changes
 3. Review workflow logs in the Actions tab
 

@@ -11,24 +11,38 @@ on:
       - 'package.json'
       - '.github/workflows/docs.yml'
 
+  # Validate the docs build on pull requests (build only, no deploy)
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'README.md'
+      - 'typedoc.json'
+      - 'package.json'
+      - '.github/workflows/docs.yml'
+
   # Allow manual trigger
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Default to least privilege; the deploy job opts into the Pages permissions it needs
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued
+# Deploys share the single "pages" group (never cancelled); PR validation runs get
+# their own per-ref group so they neither queue behind nor cancel a Pages deployment
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Build documentation
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # actions/configure-pages calls the Pages REST API, so the build job needs
+      # the Pages scope on the events where that step actually runs.
+      pages: write
 
     steps:
       - name: Checkout repository
@@ -50,21 +64,38 @@ jobs:
             --skipErrorChecking \
             --cleanOutputDir
 
+      # Docs gate that contributors also run locally (`just docs-check` /
+      # `bun run docs:check`). The deploy build above uses --skipErrorChecking,
+      # so on its own it would only catch a deleted or renamed entry point.
+      - name: Check documentation build (typedoc, no emit)
+        if: github.event_name == 'pull_request'
+        run: bun run docs:check
+
+      # Pages-specific steps only run when we are actually going to deploy.
+      # configure-pages hits the Pages API and needs the pages scope, which a
+      # pull_request GITHUB_TOKEN (especially from a fork) does not have.
       - name: Setup Pages
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/configure-pages@v6
 
       - name: Upload documentation artifact
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-pages-artifact@v5
         with:
           path: './docs'
 
-  # Deploy to GitHub Pages
+  # Deploy to GitHub Pages (push to main / manual runs only — never on pull requests)
   deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
 
     steps:
       - name: Deploy to GitHub Pages
