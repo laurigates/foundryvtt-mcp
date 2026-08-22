@@ -449,20 +449,21 @@ export class FoundryClient {
   }
 
   /**
-   * Patches attributes on an actor's `system` object (#143). WRITE — REST required.
+   * Patches attributes on an actor's `system` object (#143). WRITE — Socket.IO.
    *
    * `patch` keys are dot-paths into `actor.system` (e.g. `attributes.hp.value`,
-   * `currency.gp`, `spells.spell1.value`, `attributes.exhaustion`). The patch is
-   * expanded into a nested object and sent as `PUT /api/actors/:actorId` with the
-   * body `{ system: <expanded patch> }` — matching FoundryVTT's own document model
-   * (`Actor#update`).
+   * `currency.gp`, `spells.spell1.value`, `attributes.exhaustion`). Each key is
+   * prefixed with `system.` and sent through the Socket.IO `modifyDocument`
+   * write protocol as an `Actor` `update` — matching FoundryVTT's own document
+   * model (`Actor#update`). No REST call and no `apiKey` are involved.
    *
    * Client-side validation, using the actor's current data, rejects:
    *  - HP value exceeding `max + temp`,
    *  - spell-slot value exceeding its `max`,
    *  - exhaustion outside `0–10` (2024 rules) or `0–6` (2014 rules).
    *
-   * @throws if `apiKey` is unset, the id is malformed, the actor/path is missing,
+   * @throws via `assertWriteable()` if `writeEnabled` is false or the socket
+   *   is not connected; also if the id is malformed, the actor/path is missing,
    *   or a validation rule is violated.
    */
   async updateActorAttribute(

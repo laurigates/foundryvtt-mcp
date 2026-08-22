@@ -7,6 +7,7 @@ import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import type { ToolContext } from '../base.js';
+import { getAllTools } from '../definitions.js';
 import { RollDiceTool } from '../handlers/dice.js';
 import { toolRegistry } from '../registry.js';
 
@@ -45,6 +46,16 @@ describe('Tool Registry', () => {
     it('should get tool names', () => {
       const names = toolRegistry.getToolNames();
       expect(names).toContain('roll_dice');
+    });
+
+    // The registry class executes roll_dice while getAllTools() is what the
+    // server lists, so a drifted description would be invisible at runtime.
+    it('should describe roll_dice identically in the registry and in getAllTools()', () => {
+      const listed = getAllTools().find((t) => t.name === 'roll_dice');
+      const registered = toolRegistry.getToolDefinitions().find((d) => d.name === 'roll_dice');
+
+      expect(listed?.description).toBeDefined();
+      expect(registered?.description).toBe(listed?.description);
     });
   });
 

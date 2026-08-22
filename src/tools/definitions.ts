@@ -6,12 +6,40 @@
  */
 
 /**
+ * Shared write-safety clause appended to every mutation tool description.
+ *
+ * Both halves are enforced in code by `assertWriteable()`
+ * (`src/foundry/client.ts`): the `FOUNDRY_WRITE_ENABLED` opt-in (default
+ * `false`, see `src/config/index.ts`) and a live authenticated Socket.IO
+ * session. Foundry itself enforces the GM/owner permission (ADR-010).
+ */
+const WRITE_GATE =
+  'WRITE: mutates the live world. Requires FOUNDRY_WRITE_ENABLED=true (default false) and an active Socket.IO connection, and is refused otherwise; Foundry additionally enforces GM/owner permission on the document.';
+
+/**
+ * Extra clause for destructive tools (data removal that this server cannot undo).
+ */
+const CONFIRM_FIRST =
+  'DESTRUCTIVE and not undoable from this server: confirm the exact target with the user before calling.';
+
+/**
+ * Canonical `roll_dice` description.
+ *
+ * Exported so `RollDiceTool` (`src/tools/handlers/dice.ts`) can reuse the exact
+ * same string instead of keeping a second copy that silently drifts: the
+ * registry class is what *executes* the tool while `getAllTools()` is what is
+ * *listed*, so a divergence would be invisible.
+ */
+export const ROLL_DICE_DESCRIPTION =
+  'Roll dice and return the total with a per-term breakdown. Write every term as NdS with any modifier attached directly to it ("1d20+5", "3d6", "2d6 + 1d4"); a count-less "d20", a modifier separated from its term by a space ("1d20 + 5"), a trailing bonus ("1d20+5+3") and parentheses are silently dropped from the total rather than rejected, so a loosely written formula returns a wrong number. Use when: the user asks for a check, save, attack, damage, or any random result.';
+
+/**
  * Dice rolling tool definitions
  */
 export const diceTools = [
   {
     name: 'roll_dice',
-    description: 'Roll dice using standard RPG notation (e.g., 1d20, 3d6+4)',
+    description: ROLL_DICE_DESCRIPTION,
     inputSchema: {
       type: 'object',
       properties: {
@@ -35,7 +63,8 @@ export const diceTools = [
 export const actorTools = [
   {
     name: 'search_actors',
-    description: 'Search for actors (characters, NPCs) in FoundryVTT',
+    description:
+      "Search actors (player characters, NPCs) by name, optionally filtered by type. Returns a summary line per match: name, type, level and current/max HP. Use when: checking whether an actor exists, or getting a quick roster with HP. Do not use when: you already have the actorId and want that actor's ability scores - use get_actor_details; or you need the actorId itself, which this tool does not print - read the foundry://actors resource, whose JSON lists up to the first 100 actors with their _id (not exhaustive in larger worlds).",
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,7 +86,8 @@ export const actorTools = [
   },
   {
     name: 'get_actor_details',
-    description: 'Get detailed information about a specific actor',
+    description:
+      'Get details for one actor by id: type, level, current/max HP, AC and ability scores; no biography or description text is returned (the description line always reads "No description available."). Use when: you have an actorId and need its current HP or ability scores - notably as the read-before-write step for update_actor_attributes. Do not use when: you only have a name - run search_actors first; or you need the ids of items the actor owns, which this tool does not return (no tool in this server lists owned-item ids - ask the user for the itemId).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -81,11 +111,8 @@ export const actorMutationTools = [
   {
     name: 'update_actor_attributes',
     description:
-      "Update attributes on an actor's system data. The patch keys are dot-paths into actor.system " +
-      '(e.g. "attributes.hp.value", "attributes.hp.temp", "currency.gp", "resources.primary.value", ' +
-      '"spells.spell1.value", "attributes.exhaustion"). Returns the post-update value for every patched ' +
-      'path. Validates HP <= max + temp, spell slots <= max, and exhaustion within 0-10 (2024) or 0-6 (2014). ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      'Update fields on an actor\'s system data. Patch keys are dot-paths into actor.system (e.g. "attributes.hp.value", "attributes.hp.temp", "currency.gp", "resources.primary.value", "spells.spell1.value", "attributes.exhaustion") and values are absolute target values, never relative deltas. Validates HP <= max + temp, spell slots <= max, and exhaustion within 0-10 (2024) or 0-6 (2014), and returns the post-update value for every patched path. Use when: applying damage or healing, spending a spell slot or resource, or adjusting currency on a known actorId. Do not use when: changing an item the actor owns (use update_actor_item) or only reading current values (use get_actor_details). ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -114,7 +141,8 @@ export const actorMutationTools = [
 export const itemTools = [
   {
     name: 'search_items',
-    description: 'Search for items in FoundryVTT',
+    description:
+      'Search item documents in the world by name, optionally filtered by type. Returns name, type and rarity per match (rarity shows "Common" when the system records none); price is not available and always prints "Unknown price", and the rarity filter is ignored unless the REST API module is configured (FOUNDRY_API_KEY). Item ids are not printed - read the foundry://items resource, whose JSON lists up to the first 100 items with their _id (not exhaustive in larger worlds). Use when: checking whether an item exists in the world. Do not use when: searching compendium packs (use search_compendium) or listing what one actor carries (this searches world items, not owned items).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,7 +156,8 @@ export const itemTools = [
         },
         rarity: {
           type: 'string',
-          description: 'Item rarity filter (common, uncommon, rare, etc.)',
+          description:
+            'Item rarity filter (common, uncommon, rare, etc.). Applied only in REST API mode (FOUNDRY_API_KEY); ignored on the default Socket.IO path.',
         },
         limit: {
           type: 'number',
@@ -147,7 +176,7 @@ export const compendiumTools = [
   {
     name: 'search_compendium',
     description:
-      'Search FoundryVTT compendium packs by name and metadata. Searches all enabled compendiums by default; the compendiumId filter scopes to one pack. Requires the REST API module (FOUNDRY_API_KEY).',
+      'Search FoundryVTT compendium packs by name and metadata; searches all enabled packs unless compendiumId scopes it to one pack. Use when: looking up spells, monsters, or equipment that are not yet present in the world. Do not use when: the document already exists in the world - use search_items or search_world. Requires the REST API module (FOUNDRY_API_KEY); without it the search returns no results instead of failing.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -208,7 +237,8 @@ export const itemMutationTools = [
   {
     name: 'create_actor_item',
     description:
-      'Create an item on an actor from an inline item document (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Compendium-source create is not yet supported over Socket.IO (see issue #159). Canonical target: D&D 5e v4+ activity schema.',
+      'Create an item on an actor from an inline item document (type, name, system). Use when: adding a new weapon, spell, feature, or piece of equipment to a known actorId. Do not use when: editing an item the actor already owns - use update_actor_item. Replacing an item is not atomic: create the replacement first and delete the old one second, so a mid-sequence failure leaves the actor with a duplicate rather than nothing. Compendium-source create is not yet supported over Socket.IO (see issue #159). Canonical target: D&D 5e v4+ activity schema. ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -219,12 +249,13 @@ export const itemMutationTools = [
         source: {
           type: 'object',
           description:
-            'Item source: { type: "compendium", compendiumId, itemId } to copy a compendium entry, or { type: "inline", item: { type, name, system } } to create directly',
+            'Item source. Use { type: "inline", item: { type, name, system } } to create the item directly. The { type: "compendium", compendiumId, itemId } shape is accepted by the schema but rejected at call time - compendium-source create is not yet supported over Socket.IO.',
           properties: {
             type: {
               type: 'string',
               enum: ['compendium', 'inline'],
-              description: 'Source kind',
+              description:
+                'Source kind. Only "inline" is functional today; "compendium" is rejected at call time.',
             },
             compendiumId: {
               type: 'string',
@@ -248,7 +279,8 @@ export const itemMutationTools = [
   {
     name: 'update_actor_item',
     description:
-      "Apply a JSON merge patch to an item's system data on an actor (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Supports nested paths such as activities.{id}.consumption.targets. Canonical target: D&D 5e v4+ activity schema.",
+      "Apply a JSON merge patch to an item's system data on an actor: nested paths such as activities.{id}.consumption.targets are supported, values are absolute (arrays replace, null deletes). Use when: changing fields on an item the actor already owns, given actorId + itemId. Do not use when: adding a new item (create_actor_item) or removing one (delete_actor_item). Canonical target: D&D 5e v4+ activity schema. " +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -272,7 +304,10 @@ export const itemMutationTools = [
   {
     name: 'delete_actor_item',
     description:
-      'Delete an item owned by an actor (requires FOUNDRY_WRITE_ENABLED + active Socket.IO connection). Canonical target: D&D 5e v4+ activity schema.',
+      "Permanently remove an item owned by an actor. Use when: the user explicitly asks to delete or discard a specific owned item, and has given you the itemId - no tool in this server lists owned-item ids, so never guess one. Do not use when: only the item's data needs to change - use update_actor_item. In a replacement or migration flow, run create_actor_item first and this second: the two calls are not atomic, and failing after the delete loses the item. Echo the actorId and itemId back to the user and get their confirmation before calling. " +
+      CONFIRM_FIRST +
+      ' ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -296,7 +331,8 @@ export const itemMutationTools = [
 export const sceneTools = [
   {
     name: 'get_scene_info',
-    description: 'Get information about the current or specified scene',
+    description:
+      "Get details of the active scene, or of a specific scene by id: name, scene id, active/navigation flags, pixel dimensions, padding and lighting (global light, darkness); no description text is returned unless a module has set a description flag on the scene (the description line otherwise reads 'No description available.'). Use when: you need the sceneId or the scene's pixel extents. Do not use when: looking a scene up by name (use search_world), or you need grid size or token coordinates - this tool returns neither.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -315,7 +351,8 @@ export const sceneTools = [
 export const generationTools = [
   {
     name: 'generate_npc',
-    description: 'Generate a random NPC with stats and background',
+    description:
+      'Generate a random NPC (name, race, class, HP, ability scores, background) as text. Use when: the user needs a throwaway NPC on the spot. Do not use when: the NPC must exist in FoundryVTT - this creates no documents, and the result still has to be entered into the world by hand.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -339,7 +376,8 @@ export const generationTools = [
   },
   {
     name: 'generate_loot',
-    description: 'Generate random loot for encounters',
+    description:
+      "Generate random treasure for an encounter as text. Only the currency amounts vary: they scale with the challenge rating, while the item list is fixed (a Healing Potion and a Silver Ring) and the treasureType argument is accepted but not used. Use when: the user wants a quick coin total for an encounter. Do not use when: the loot should end up in an actor's inventory - this creates no documents; use create_actor_item for that.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -351,14 +389,16 @@ export const generationTools = [
         },
         treasureType: {
           type: 'string',
-          description: 'Type of treasure (hoard, individual, etc.)',
+          description:
+            'Type of treasure (hoard, individual, etc.). Accepted but not used - the generated result is the same whichever value is passed.',
         },
       },
     },
   },
   {
     name: 'lookup_rule',
-    description: 'Look up game rules and mechanics',
+    description:
+      'Stub: builds a templated placeholder from the query and consults no rules source, so the text it returns carries no rules content. No tool in this server looks rules up.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -382,7 +422,8 @@ export const generationTools = [
 export const diagnosticsTools = [
   {
     name: 'get_recent_logs',
-    description: 'Get recent log entries from FoundryVTT',
+    description:
+      'Get recent FoundryVTT server log entries, optionally filtered by level or since a timestamp. Use when: investigating an error or recent server behaviour. Do not use when: you have a specific term to look for - use search_logs. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -407,7 +448,8 @@ export const diagnosticsTools = [
   },
   {
     name: 'search_logs',
-    description: 'Search through FoundryVTT logs',
+    description:
+      'Search the FoundryVTT server logs for a query string. Use when: hunting a specific error message, stack trace, or module name. Do not use when: you just want the latest entries - use get_recent_logs. Note: the level and limit arguments are accepted but are not applied to the search, and matched entries are not rendered - the result reports 0 results and lists no entries whatever the log contains, so get_recent_logs is currently the only tool that returns log content. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -431,7 +473,8 @@ export const diagnosticsTools = [
   },
   {
     name: 'get_system_health',
-    description: 'Get system health and performance metrics',
+    description:
+      'Get the FoundryVTT server\'s overall health status (healthy, warning, or critical). That status is the only value reported: the output\'s CPU, memory, disk, uptime, connection and performance lines have no counterpart in the diagnostics response schema and always read "N/A". Use when: you want a single healthy/warning/critical verdict for the server. Do not use when: you also want connection and world status - use get_health_status. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -440,7 +483,7 @@ export const diagnosticsTools = [
   {
     name: 'diagnose_errors',
     description:
-      'Stub: returns raw logs without analysis. Full diagnostic logic is tracked in #133 and not yet implemented.',
+      'Stub: returns a fixed "no errors detected" summary regardless of input; real diagnostic logic is not implemented, so the summary reflects nothing about the server. For actual log content use get_recent_logs.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -453,7 +496,8 @@ export const diagnosticsTools = [
   },
   {
     name: 'get_health_status',
-    description: 'Get comprehensive health status of FoundryVTT server',
+    description:
+      'Get a combined health report: MCP-to-FoundryVTT connection state, world title/system/core version, and the server\'s health status. The connection line is the last known state - it is set when the client connects and cleared only by an explicit disconnect, not by a dropped socket, so it is not a live probe. Playtime always reports 0 hours, and the CPU, memory and uptime lines always read "N/A", as the underlying responses carry none of those values. Degrades gracefully - sections that need the REST API module (FOUNDRY_API_KEY) report as unavailable rather than failing. Use when: first checking which world is loaded and whether the server reports itself healthy.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -467,7 +511,8 @@ export const diagnosticsTools = [
 export const combatTools = [
   {
     name: 'get_combat_state',
-    description: 'Get the current active combat state including initiative order, HP, and AC',
+    description:
+      "Get the active combat encounter: initiative order with each combatant's name, initiative, HP and AC, plus the current round and which combatant is up. Use when: reporting whose turn it is, or checking whether a combat is already running before start_combat. Do not use when: you need a combatantId for set_initiative - this prints names and ordinals, not ids; read the foundry://combat resource, whose JSON includes each combatant's _id.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -486,9 +531,8 @@ export const combatMutationTools = [
   {
     name: 'next_turn',
     description:
-      'Advance the active combat to the next turn, wrapping to the next round after the last combatant. ' +
-      'When skipDefeated is true, defeated combatants are skipped. ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      'Advance the active combat to the next turn, wrapping to the next round after the last combatant. When skipDefeated is true, defeated combatants are skipped. Use when: the current combatant has finished their turn. Do not use when: only reporting the turn order - use get_combat_state. ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -503,8 +547,10 @@ export const combatMutationTools = [
   {
     name: 'end_combat',
     description:
-      'End (delete) the active combat encounter. ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      'End the active combat encounter by deleting its Combat document, discarding the initiative order and round count. Use when: the fight is over and the user asks to end the encounter. ' +
+      CONFIRM_FIRST +
+      ' ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -513,8 +559,8 @@ export const combatMutationTools = [
   {
     name: 'set_initiative',
     description:
-      "Set a combatant's initiative in the active combat. " +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      "Set a combatant's initiative in the active combat (or in combatId when given), reordering the turn order. Use when: an initiative roll needs to be recorded or corrected for a known combatantId. Do not use when: simply moving on to the next combatant - use next_turn. " +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -537,10 +583,8 @@ export const combatMutationTools = [
   {
     name: 'start_combat',
     description:
-      'Start a new combat encounter, seeding combatants from tokens. ' +
-      'Provide explicit tokenIds, or omit them to seed every token on the scene. ' +
-      'Defaults to the active scene when sceneId is omitted. ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection (GM permission).',
+      'Start a new combat encounter, seeding combatants from tokens: pass explicit tokenIds, or omit them to seed every token on the scene. Defaults to the active scene when sceneId is omitted. Use when: a fight begins and no combat is running. Do not use when: a combat is already active - check get_combat_state first, since this always creates an additional encounter. ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -570,9 +614,8 @@ export const tokenMutationTools = [
   {
     name: 'move_token',
     description:
-      'Move a token to new x/y pixel coordinates on its scene. ' +
-      'The token is located across scenes by id (optionally scoped with sceneId). ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      "Move a token to new x/y pixel coordinates on its scene; the token is located across scenes by id, optionally scoped with sceneId. Coordinates are absolute pixels, not grid squares and not offsets. Use when: repositioning a token to a position the user has given you. Do not use when: you would have to guess the destination - no tool in this server reports a token's current position or the scene grid size, so ask the user for the target coordinates rather than inferring them. " +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -599,9 +642,9 @@ export const tokenMutationTools = [
   {
     name: 'apply_status_effect',
     description:
-      "Apply or remove a status condition (e.g. 'prone', 'stunned') on a token's actor. " +
-      'Set active=false to remove. Matches by status id, so re-applying or clearing-when-absent is a no-op. ' +
-      'Requires FOUNDRY_WRITE_ENABLED=true and an active Socket.IO connection.',
+      'Apply or remove a status condition (e.g. "prone", "stunned") on a token\'s actor. Set active=false to remove. Matches by status id, so re-applying or clearing-when-absent is a no-op. Use when: a condition is gained or lost. Do not use when: changing numeric state such as HP or exhaustion - use update_actor_attributes. ' +
+      WRITE_GATE +
+      ' Exception: the no-op cases (applying an already-present status, or clearing an absent one) report success without attempting a write, so they also return normally while writes are disabled.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -634,7 +677,8 @@ export const tokenMutationTools = [
 export const chatTools = [
   {
     name: 'get_chat_messages',
-    description: 'Get recent chat messages from the game',
+    description:
+      'Get the most recent chat messages from the game log. Use when: you need recent in-game context - what players said, or roll results that already happened.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -656,7 +700,8 @@ export const chatTools = [
 export const userTools = [
   {
     name: 'get_users',
-    description: 'Get the list of users with their online status and roles',
+    description:
+      "List the world's users with their roles and online status. Online status is as of the last world-data load, not a live presence check - no user-activity updates are applied afterwards, so call refresh_world_data first if it matters. Use when: you need to know which user holds the GM role, or who was connected as of that load.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -670,7 +715,8 @@ export const userTools = [
 export const journalTools = [
   {
     name: 'search_journals',
-    description: 'Search journal entries by name or content',
+    description:
+      'Search journal entries by name and page content. Use when: looking for notes, lore, or handouts by keyword. Do not use when: you already have the journalId - use get_journal.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -689,7 +735,8 @@ export const journalTools = [
   },
   {
     name: 'get_journal',
-    description: 'Get a specific journal entry with its pages',
+    description:
+      'Get one journal entry by id with the text of its pages. Page bodies are HTML-stripped and each is truncated to its first 500 characters, marked with a trailing "...", so long pages come back partial. Use when: you have a journalId and need the text of its pages. Do not use when: you only have a title or keyword - run search_journals first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -710,7 +757,8 @@ export const journalMutationTools = [
   {
     name: 'create_journal_entry',
     description:
-      'Create a new journal entry with one or more text pages (requires FOUNDRY_WRITE_ENABLED=true + active Socket.IO connection). Defaults to GM-only visibility — pass visibility to let players read it.',
+      'Create a new journal entry with one or more text pages, optionally filed under a folder. Defaults to GM-only visibility - pass visibility to let players read it. Use when: recording session notes, lore, or a handout in the world. Do not use when: adding text to an existing entry - this always creates a new one. ' +
+      WRITE_GATE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -759,7 +807,8 @@ export const journalMutationTools = [
 export const worldTools = [
   {
     name: 'search_world',
-    description: 'Search across all collections (actors, items, scenes, journals) by name',
+    description:
+      'Search across all collections (actors, items, scenes, journals) by name, grouped by collection. Use when: you do not know which collection holds what you are looking for. Do not use when: you already know the collection - use search_actors, search_items, or search_journals. Of those, only search_journals prints document ids; for actor and item ids read the foundry://actors and foundry://items resources, each of which lists up to the first 100 documents (not exhaustive in larger worlds).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -778,7 +827,8 @@ export const worldTools = [
   },
   {
     name: 'get_world_summary',
-    description: 'Get world metadata and collection counts',
+    description:
+      'Get world metadata (title, game system, core version) and per-collection document counts. Use when: orienting yourself in an unfamiliar world, or confirming the game system before system-specific edits.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -786,7 +836,8 @@ export const worldTools = [
   },
   {
     name: 'refresh_world_data',
-    description: 'Force re-fetch of world data from the FoundryVTT server',
+    description:
+      'Force a re-fetch of the cached world data from the FoundryVTT server. Reads are normally served from a cache that already follows live document changes, so this is rarely needed. Use when: a read still looks stale after an out-of-band change - notably edits to unlinked (synthetic) token actors, which the live update feed does not cover. Refreshes the cache only; it does not modify the world.',
     inputSchema: {
       type: 'object',
       properties: {},

@@ -108,9 +108,9 @@ All features work out of the box with username/password authentication:
 Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` enables 5 server monitoring tools:
 
 - `get_recent_logs` - Retrieve filtered FoundryVTT logs
-- `search_logs` - Search logs with regex patterns
-- `get_system_health` - Server performance and health metrics
-- `diagnose_errors` - Error analysis with troubleshooting suggestions
+- `search_logs` - Search logs by pattern (matched entries are not returned yet; reports 0 results)
+- `get_system_health` - Overall server health status (the resource-metric lines always read "N/A")
+- `diagnose_errors` - **stub**: returns a fixed "no errors detected" summary
 - `get_health_status` - Comprehensive health diagnostics
 
 To enable:
