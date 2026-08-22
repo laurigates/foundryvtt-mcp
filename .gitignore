@@ -88,6 +88,9 @@ temp/
 # Claude local settings (user-specific)
 .claude/settings.local.json
 
+# Claude agent worktrees (transient, per-session state)
+.claude/worktrees/
+
 # Blueprint work orders (task-specific, may contain sensitive details)
 docs/blueprint/work-orders/
 *.swp
