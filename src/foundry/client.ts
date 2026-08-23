@@ -233,6 +233,9 @@ export class FoundryClient {
    * Connects Socket.IO with an authenticated session and loads worldData.
    */
   private connectAndLoadWorld(session: string): Promise<WorldData> {
+    // A previous socket must not outlive its replacement (see `detachSocket`).
+    this.detachSocket();
+
     return new Promise((resolve, reject) => {
       this.socket = io(this.config.baseUrl, sessionSocketOptions(session));
 
@@ -271,7 +274,9 @@ export class FoundryClient {
           // only moves on this event.
           this.socket?.on('userActivity', this.onUserActivity);
           // Liveness (#217): a socket that drops on its own must stop reading
-          // as connected. Removed again in `disconnect()`.
+          // as connected, and one that socket.io reconnects must read as
+          // connected again. Both are removed in `disconnect()`.
+          this.socket?.on('connect', this.onSocketConnect);
           this.socket?.on('disconnect', this.onSocketDisconnect);
           resolve(worldData);
         });
@@ -366,6 +371,28 @@ export class FoundryClient {
    *
    * Bound field rather than a method so the same reference reaches `socket.off()`.
    */
+  /**
+   * Reacts to socket.io bringing the link back up on its own (#217).
+   *
+   * `sessionSocketOptions` leaves socket.io-client's default
+   * `reconnection: true` in place, so after a transient drop the manager
+   * re-handshakes the SAME socket instance (the session cookie rides along in
+   * `extraHeaders`) and the persistent `modifyDocument`/`userActivity`
+   * listeners resume firing. Without this the connected flag would stay
+   * latched off for the rest of the process while writes and broadcasts were
+   * demonstrably working again.
+   *
+   * `worldDataStale` is deliberately *not* cleared: broadcasts emitted while
+   * the socket was down were never delivered and are not replayed, so the
+   * cache stays flagged until an explicit `refreshWorldData()`.
+   *
+   * Bound field rather than a method so the same reference reaches `socket.off()`.
+   */
+  private onSocketConnect = (): void => {
+    this._isConnected = true;
+    logger.info('FoundryVTT socket reconnected — cached world data is still stale until refreshed');
+  };
+
   private onSocketDisconnect = (reason?: unknown): void => {
     this._isConnected = false;
     this.worldDataStale = this.worldData !== null;
@@ -374,14 +401,28 @@ export class FoundryClient {
     });
   };
 
-  async disconnect(): Promise<void> {
-    if (this.socket) {
-      this.socket.off('modifyDocument', this.onDocumentBroadcast);
-      this.socket.off('userActivity', this.onUserActivity);
-      this.socket.off('disconnect', this.onSocketDisconnect);
-      this.socket.disconnect();
-      this.socket = null;
+  /**
+   * Closes the current socket and removes every persistent listener bound to
+   * it. Used both by `disconnect()` and before a socket is replaced: a
+   * superseded socket that kept its `disconnect` handler would otherwise clear
+   * the connected flag of the live socket that replaced it when it finally
+   * closed (`DiagnosticsClient.testAuthentication()` re-connects a live
+   * client, so this is reachable in-repo).
+   */
+  private detachSocket(): void {
+    if (!this.socket) {
+      return;
     }
+    this.socket.off('modifyDocument', this.onDocumentBroadcast);
+    this.socket.off('userActivity', this.onUserActivity);
+    this.socket.off('connect', this.onSocketConnect);
+    this.socket.off('disconnect', this.onSocketDisconnect);
+    this.socket.disconnect();
+    this.socket = null;
+  }
+
+  async disconnect(): Promise<void> {
+    this.detachSocket();
     this.worldData = null;
     this.worldDataStale = false;
     this._isConnected = false;
@@ -394,7 +435,9 @@ export class FoundryClient {
    * Socket.IO mode answers from the socket itself rather than from a latched
    * flag, so a link that dropped without an explicit `disconnect()` — server
    * restart, network loss — reads as disconnected immediately, even if the
-   * `disconnect` event has not been delivered yet.
+   * `disconnect` event has not been delivered yet. It tracks the socket in both
+   * directions: an automatic reconnect (`onSocketConnect`) reads as connected
+   * again rather than staying latched off.
    *
    * REST API mode (`FOUNDRY_API_KEY`) has no socket at all: there the connect
    * probe against `/api/status` is the only liveness signal there is, so the
