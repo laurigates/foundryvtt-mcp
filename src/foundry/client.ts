@@ -138,6 +138,8 @@ export class FoundryClient {
   private config: FoundryClientConfig;
   private _isConnected = false;
   private worldData: WorldData | null = null;
+  /** Set when the socket drops with a cache still loaded (#217). */
+  private worldDataStale = false;
 
   constructor(config: FoundryClientConfig) {
     if (!config.baseUrl || config.baseUrl.trim() === '') {
@@ -212,6 +214,7 @@ export class FoundryClient {
 
     // Connect authenticated socket and load world data
     this.worldData = await this.connectAndLoadWorld(session);
+    this.worldDataStale = false;
     this._isConnected = true;
     logger.info('Connected to FoundryVTT via Socket.IO', {
       actors: this.worldData.actors.length,
@@ -258,6 +261,9 @@ export class FoundryClient {
           // Keep the snapshot live from here on (#205). Attached only after a
           // successful handshake so the reject paths have no listener to leak.
           this.socket?.on('modifyDocument', this.onDocumentBroadcast);
+          // Liveness (#217): a socket that drops on its own must stop reading
+          // as connected. Removed again in `disconnect()`.
+          this.socket?.on('disconnect', this.onSocketDisconnect);
           resolve(worldData);
         });
       };
@@ -306,19 +312,68 @@ export class FoundryClient {
     }
   };
 
+  /**
+   * Reacts to the socket dropping on its own — server restart, network loss,
+   * an idle timeout (#217).
+   *
+   * Clears the connected flag so `isConnected()` and `get_health_status` stop
+   * claiming a live link, and marks the cached snapshot stale: nothing is
+   * applying `modifyDocument` broadcasts while the socket is down, so whatever
+   * is in `worldData` from here on is a point-in-time copy, not live state.
+   * The cache is deliberately *kept* rather than dropped — a stale answer with
+   * an honest connection line beats no answer at all — and Socket.IO's own
+   * reconnect logic may bring the link back, at which point `refreshWorldData()`
+   * resyncs it.
+   *
+   * Bound field rather than a method so the same reference reaches `socket.off()`.
+   */
+  private onSocketDisconnect = (reason?: unknown): void => {
+    this._isConnected = false;
+    this.worldDataStale = this.worldData !== null;
+    logger.warn('FoundryVTT socket disconnected — cached world data is now stale', {
+      reason: typeof reason === 'string' ? reason : undefined,
+    });
+  };
+
   async disconnect(): Promise<void> {
     if (this.socket) {
       this.socket.off('modifyDocument', this.onDocumentBroadcast);
+      this.socket.off('disconnect', this.onSocketDisconnect);
       this.socket.disconnect();
       this.socket = null;
     }
     this.worldData = null;
+    this.worldDataStale = false;
     this._isConnected = false;
     logger.info('FoundryVTT client disconnected');
   }
 
+  /**
+   * Reports whether the client currently has a live link to FoundryVTT (#217).
+   *
+   * Socket.IO mode answers from the socket itself rather than from a latched
+   * flag, so a link that dropped without an explicit `disconnect()` — server
+   * restart, network loss — reads as disconnected immediately, even if the
+   * `disconnect` event has not been delivered yet.
+   *
+   * REST API mode (`FOUNDRY_API_KEY`) has no socket at all: there the connect
+   * probe against `/api/status` is the only liveness signal there is, so the
+   * flag stands on its own.
+   */
   isConnected(): boolean {
-    return this._isConnected;
+    if (this.config.apiKey) {
+      return this._isConnected;
+    }
+    return this._isConnected && this.socket?.connected === true;
+  }
+
+  /**
+   * True when the cached snapshot is no longer being kept live by broadcasts —
+   * i.e. the socket dropped after a world load (#217). Reads still answer from
+   * the cache; this flags that the answer is a point-in-time copy.
+   */
+  isWorldDataStale(): boolean {
+    return this.worldDataStale;
   }
 
   /**
@@ -374,6 +429,7 @@ export class FoundryClient {
       this.socket?.emit('world');
     });
 
+    this.worldDataStale = false;
     logger.info('World data refreshed', {
       actors: this.worldData.actors.length,
       items: this.worldData.items.length,

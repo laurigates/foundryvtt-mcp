@@ -474,4 +474,189 @@ describe('FoundryClient', () => {
       expect(listeners.has('world')).toBe(false);
     });
   });
+
+  /**
+   * Issue #217 — liveness must come from the socket, not a latched flag.
+   *
+   * `_isConnected` used to be cleared only by an explicit `disconnect()`, so a
+   * socket that dropped on its own (server restart, network loss) still read as
+   * connected and `get_health_status` still printed "✅ Connected".
+   */
+  describe('socket liveness (#217)', () => {
+    /** Mock socket that records listeners and lets the test fire them. */
+    function buildHandshakeSocket(worldData: Record<string, unknown>) {
+      const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+      const socket = {
+        connected: true,
+        on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+          const existing = listeners.get(event) ?? [];
+          existing.push(handler);
+          listeners.set(event, existing);
+          return socket;
+        }),
+        once: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+          const existing = listeners.get(event) ?? [];
+          existing.push(handler);
+          listeners.set(event, existing);
+          return socket;
+        }),
+        off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+          const remaining = (listeners.get(event) ?? []).filter((h) => h !== handler);
+          listeners.set(event, remaining);
+          return socket;
+        }),
+        emit: vi.fn((event: string, ack?: (payload: unknown) => void) => {
+          if (event === 'world' && typeof ack === 'function') {
+            ack(worldData);
+          }
+          return socket;
+        }),
+        disconnect: vi.fn(() => {
+          socket.connected = false;
+          return socket;
+        }),
+      };
+      const fire = (event: string, ...args: unknown[]) => {
+        for (const handler of [...(listeners.get(event) ?? [])]) {
+          handler(...args);
+        }
+      };
+      return { socket, listeners, fire };
+    }
+
+    const WORLD_DATA = {
+      userId: 'test-user-id',
+      world: { id: 'w', title: 'Test World' },
+      system: { id: 'dnd5e', version: '3.3.1' },
+      release: { version: '12.331' },
+      actors: [],
+      scenes: [],
+      items: [],
+      journal: [],
+      messages: [],
+      combats: [],
+      users: [
+        { _id: 'user-aaaaaaaaaaaaaa', name: 'GM', role: 4 },
+        { _id: 'user-bbbbbbbbbbbbbb', name: 'Player', role: 1 },
+      ],
+      activeUsers: ['user-aaaaaaaaaaaaaa'],
+      settings: [],
+      macros: [],
+      playlists: [],
+      tables: [],
+      folders: [],
+    };
+
+    async function connectWithMockSocket() {
+      const { io } = await import('socket.io-client');
+      const { authenticateFoundry } = await import('../auth.js');
+      // afterEach's resetAllMocks() clears the module-factory resolved value.
+      vi.mocked(authenticateFoundry).mockResolvedValue({
+        session: 'test-session',
+        userId: 'test-user-id',
+      });
+      const harness = buildHandshakeSocket(structuredClone(WORLD_DATA));
+      vi.mocked(io).mockReturnValue(harness.socket as never);
+
+      const connected = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        username: 'gm',
+        password: 'secret',
+      });
+
+      const connecting = connected.connect();
+      // connect() awaits authentication before attaching the handshake
+      // listeners, so wait for the 'session' listener before firing it.
+      await vi.waitFor(() => expect(harness.listeners.get('session')?.length).toBe(1));
+      harness.fire('session', { userId: 'test-user-id' });
+      await connecting;
+
+      return { client: connected, ...harness };
+    }
+
+    it('reports connected after a successful handshake', async () => {
+      const { client: connected } = await connectWithMockSocket();
+      expect(connected.isConnected()).toBe(true);
+    });
+
+    it('reports disconnected once the socket drops without disconnect()', async () => {
+      const { client: connected, socket, fire } = await connectWithMockSocket();
+
+      // Simulate the server going away: Socket.IO flips `connected` and emits
+      // 'disconnect'. `disconnect()` is deliberately NOT called.
+      socket.connected = false;
+      fire('disconnect', 'transport close');
+
+      expect(connected.isConnected()).toBe(false);
+    });
+
+    it('reports disconnected on a silent drop even without a disconnect event', async () => {
+      const { client: connected, socket } = await connectWithMockSocket();
+      socket.connected = false;
+      expect(connected.isConnected()).toBe(false);
+    });
+
+    it('get_health_status reports the dropped socket', async () => {
+      const { handleGetHealthStatus } = await import('../../tools/handlers/diagnostics.js');
+      const { client: connected, socket, fire } = await connectWithMockSocket();
+      const diagnosticsClient = {
+        getSystemHealth: vi.fn().mockRejectedValue(new Error('no REST module')),
+      };
+
+      const before = await handleGetHealthStatus(
+        {},
+        connected,
+        diagnosticsClient as unknown as Parameters<typeof handleGetHealthStatus>[2],
+      );
+      expect((before.content[0] as { text: string }).text).toContain('✅ Connected');
+
+      socket.connected = false;
+      fire('disconnect', 'transport close');
+
+      const after = await handleGetHealthStatus(
+        {},
+        connected,
+        diagnosticsClient as unknown as Parameters<typeof handleGetHealthStatus>[2],
+      );
+      expect((after.content[0] as { text: string }).text).toContain('❌ Disconnected');
+    });
+
+    it('marks the cached world data stale after a drop, but keeps serving it', async () => {
+      const { client: connected, socket, fire } = await connectWithMockSocket();
+      expect(connected.isWorldDataStale()).toBe(false);
+
+      socket.connected = false;
+      fire('disconnect', 'transport close');
+
+      expect(connected.isWorldDataStale()).toBe(true);
+      // The snapshot is retained — a stale answer beats no answer.
+      expect(connected.hasWorldData()).toBe(true);
+      expect(connected.getUsers().users).toHaveLength(2);
+    });
+
+    it('removes the persistent disconnect listener on explicit disconnect()', async () => {
+      const { client: connected, socket, listeners } = await connectWithMockSocket();
+
+      const registered = socket.on.mock.calls
+        .filter(([event]) => event === 'disconnect')
+        .map(([, handler]) => handler);
+      expect(registered).toHaveLength(1);
+
+      await connected.disconnect();
+
+      expect(socket.off).toHaveBeenCalledWith('disconnect', registered[0]);
+      expect(listeners.get('disconnect') ?? []).toHaveLength(0);
+    });
+
+    it('keeps REST API mode connected — it has no socket at all', async () => {
+      const restClient = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+      });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+
+      await restClient.connect();
+      expect(restClient.isConnected()).toBe(true);
+    });
+  });
 });
