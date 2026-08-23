@@ -11,6 +11,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { WorldCombat, WorldScene } from '../../foundry/types.js';
+import { getTurnOrder } from './combat-order.js';
 import { withToolError } from './utils.js';
 
 /** A combatant seed derived from a scene token, sent to the create wire. */
@@ -26,6 +27,10 @@ interface CombatantSeed {
  * Advances to the next combatant in order; wrapping past the last combatant
  * rolls over to turn 0 of the next round.
  *
+ * `Combat#turn` is an index into the **initiative-sorted** turn order (see
+ * `combat-order.ts`), *not* into the stored/creation order of
+ * `combat.combatants` — the same order `get_combat_state` renders (#214).
+ *
  * When `skipDefeated` is true, `defeated` combatants are skipped — mirroring
  * Foundry's `Combat#nextTurn`/`nextRound` with the `skipDefeated` setting. If
  * every combatant is defeated, the round still advances (turn 0), matching
@@ -37,7 +42,7 @@ export function computeNextTurn(
   combat: WorldCombat,
   skipDefeated = false,
 ): { turn: number; round: number } {
-  const combatants = combat.combatants;
+  const combatants = getTurnOrder(combat);
   const n = combatants.length;
   if (n === 0) {
     throw new Error('Cannot advance turn: active combat has no combatants');
@@ -84,7 +89,7 @@ export async function handleNextTurn(
     const { turn, round } = computeNextTurn(combat, skipDefeated);
     await foundryClient.updateCombat(combat._id, { turn, round });
 
-    const current = combat.combatants[turn];
+    const current = getTurnOrder(combat)[turn];
     const currentName = current ? current.name : 'unknown';
 
     return {

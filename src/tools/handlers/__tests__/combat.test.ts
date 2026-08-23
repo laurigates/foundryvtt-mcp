@@ -176,3 +176,63 @@ describe('handleGetCombatState', () => {
     expect(text).toContain('Round 2');
   });
 });
+
+describe('handleGetCombatState — turn order (#214)', () => {
+  const makeClient = (combat: WorldCombat) =>
+    ({
+      getCombatState: vi.fn().mockReturnValue(combat),
+      getRawActor: vi.fn().mockReturnValue(undefined),
+    }) as unknown as FoundryClient;
+
+  it('does not reorder the cached combatants array (a read must not mutate the cache)', async () => {
+    const combat = buildCombat({
+      turn: 0,
+      combatants: [
+        buildCombatant({ _id: 'c-bob', name: 'Bob', initiative: 5 }),
+        buildCombatant({ _id: 'c-alice', name: 'Alice', initiative: 18 }),
+        buildCombatant({ _id: 'c-charlie', name: 'Charlie', initiative: 12 }),
+      ],
+    });
+    const storedOrder = combat.combatants.map((c) => c.name);
+
+    await handleGetCombatState({}, makeClient(combat));
+
+    expect(combat.combatants.map((c) => c.name)).toEqual(storedOrder);
+  });
+
+  it('marks the combatant at combat.turn in INITIATIVE order as CURRENT', async () => {
+    // Stored (creation) order deliberately differs from initiative order.
+    const combat = buildCombat({
+      turn: 1,
+      combatants: [
+        buildCombatant({ _id: 'c-bob', name: 'Bob', initiative: 5 }),
+        buildCombatant({ _id: 'c-alice', name: 'Alice', initiative: 18 }),
+        buildCombatant({ _id: 'c-charlie', name: 'Charlie', initiative: 12 }),
+      ],
+    });
+
+    const text = getText(await handleGetCombatState({}, makeClient(combat)));
+
+    // Sorted order is Alice (18), Charlie (12), Bob (5) -> turn 1 is Charlie.
+    expect(text).toMatch(/2\. \[12\] \*\*Charlie\*\*.*<-- CURRENT/);
+    expect(text).not.toMatch(/\*\*Alice\*\*.*<-- CURRENT/);
+    expect(text).not.toMatch(/\*\*Bob\*\*.*<-- CURRENT/);
+  });
+
+  it('orders un-rolled (null) initiative last, breaking ties by document id', async () => {
+    const combat = buildCombat({
+      turn: 0,
+      combatants: [
+        buildCombatant({ _id: 'c-zed', name: 'Zed', initiative: null }),
+        buildCombatant({ _id: 'c-ann', name: 'Ann', initiative: null }),
+        buildCombatant({ _id: 'c-rex', name: 'Rex', initiative: 3 }),
+      ],
+    });
+
+    const text = getText(await handleGetCombatState({}, makeClient(combat)));
+
+    expect(text).toContain('1. [3] **Rex**');
+    expect(text).toContain('2. [?] **Ann**');
+    expect(text).toContain('3. [?] **Zed**');
+  });
+});
