@@ -195,7 +195,6 @@ export class DiagnosticsClient {
    * console.log(`Server status: ${health.status}`);
    * console.log(`Active users: ${health.users.active}/${health.users.total}`);
    * console.log(`Recent errors: ${health.logs.recentErrors}`);
-   * console.log(`Health score: ${health.healthScore}%`);
    *
    * if (health.status === 'critical') {
    *   console.warn('Server requires immediate attention!');

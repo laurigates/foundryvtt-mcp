@@ -538,6 +538,27 @@ describe('FoundryClient', () => {
       });
 
       /**
+       * The REST body is external input. A 200 that carries no numeric `total`
+       * must not become a `DiceRoll` whose `total` is `undefined` while the
+       * type promises `number` — `roll_dice` would render that to the caller.
+       * A malformed body is treated like any other REST failure: fall through
+       * to the local roller, which produces a real total.
+       */
+      it('falls back to the local roller when the REST body has no numeric total', async () => {
+        mockAxiosInstance.post.mockResolvedValue({
+          data: { error: 'something went sideways' },
+        });
+
+        const result = await restClient().rollDice('1d20+5');
+
+        expect(mockAxiosInstance.post).toHaveBeenCalled();
+        expect(typeof result.total).toBe('number');
+        expect(Number.isNaN(result.total)).toBe(false);
+        expect(result.total).toBeGreaterThanOrEqual(6);
+        expect(result.total).toBeLessThanOrEqual(25);
+      });
+
+      /**
        * REST accepts a wider grammar, but when it does refuse the message has
        * to be as specific as the local path's: `roll_dice` promises `4d6kh3`
        * and `1d20r1` are "rejected with an error naming the problem", and that
