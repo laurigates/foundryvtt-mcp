@@ -6,6 +6,8 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
+import type { LogEntry } from '../../diagnostics/types.js';
+import { LogEntrySchema } from '../../diagnostics/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { withToolError } from './utils.js';
@@ -15,6 +17,9 @@ const VALID_LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error', 'log', 'noti
 
 /** Hard upper bound on entries returned, regardless of caller-supplied limit */
 const MAX_LOG_LIMIT = 1000;
+
+/** Default number of search hits rendered when the caller supplies no limit */
+const DEFAULT_SEARCH_LIMIT = 50;
 
 /**
  * Handles recent log retrieval requests
@@ -102,7 +107,30 @@ ${logEntries || 'No log entries found.'}`,
 }
 
 /**
+ * Resolves a caller-supplied level string to a level the search endpoint accepts.
+ *
+ * The tool schema advertises `debug`, which has no counterpart in the log
+ * entry level enum; such values are dropped rather than sent upstream.
+ *
+ * @returns the normalized level, or `undefined` when unsupported/absent
+ */
+function resolveSearchLevel(level: string | undefined): LogEntry['level'] | undefined {
+  if (typeof level !== 'string' || level === '') {
+    return undefined;
+  }
+  const parsed = LogEntrySchema.shape.level.safeParse(level.toLowerCase());
+  return parsed.success ? parsed.data : undefined;
+}
+
+/**
  * Handles log search requests
+ *
+ * `searchLogs()` resolves to a `LogSearchResponse` object; matched entries live
+ * under `response.logs` and the upstream match count under `response.matches`.
+ *
+ * - `level`: forwarded to the search request when it names a real log level
+ * - `limit`: applied to the rendered entries (default 50, hard cap 1000); it
+ *   does not shrink the reported `matches` total
  */
 export async function handleSearchLogs(
   args: {
@@ -112,25 +140,32 @@ export async function handleSearchLogs(
   },
   diagnosticsClient: DiagnosticsClient,
 ) {
-  const { query, level } = args;
+  const { query, level, limit } = args;
 
   if (!query || typeof query !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'Query is required and must be a string');
   }
 
+  const searchLevel = resolveSearchLevel(level);
+  const effectiveLimit = Math.min(Math.max(1, limit ?? DEFAULT_SEARCH_LIMIT), MAX_LOG_LIMIT);
+
+  let levelLabel = 'All levels';
+  if (searchLevel !== undefined) {
+    levelLabel = searchLevel;
+  } else if (level) {
+    levelLabel = `${level} (unsupported — not applied)`;
+  }
+
   return withToolError('search logs', async () => {
-    const logs = await diagnosticsClient.searchLogs({ pattern: query });
+    const response = await diagnosticsClient.searchLogs({
+      pattern: query,
+      ...(searchLevel !== undefined ? { level: searchLevel } : {}),
+    });
 
-    const logEntries = Array.isArray(logs)
-      ? logs
-          .map((log: unknown) => {
-            const logEntry = log as { timestamp?: string; level?: string; message?: string };
-            return `[${logEntry.timestamp || new Date().toISOString()}] **${(logEntry.level || 'INFO').toUpperCase()}** ${logEntry.message || String(log)}`;
-          })
-          .join('\n')
-      : 'No logs available';
-
-    const logCount = Array.isArray(logs) ? logs.length : 0;
+    const shown = response.logs.slice(0, effectiveLimit);
+    const logEntries = shown
+      .map((entry) => `[${entry.timestamp}] **${entry.level.toUpperCase()}** ${entry.message}`)
+      .join('\n');
 
     return {
       content: [
@@ -138,8 +173,11 @@ export async function handleSearchLogs(
           type: 'text',
           text: `🔍 **Log Search Results**
 **Query:** "${query}"
-**Level Filter:** ${level || 'All levels'}
-**Results:** ${logCount}
+**Level Filter:** ${levelLabel}
+**Limit:** ${effectiveLimit}
+**Timeframe:** ${response.searchTimeframe}
+**Matches:** ${response.matches}
+**Showing:** ${shown.length}
 
 ${logEntries || 'No matching log entries found.'}`,
         },
