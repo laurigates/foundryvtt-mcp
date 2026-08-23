@@ -10,6 +10,7 @@ import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions } from './auth.js';
+import { evaluateDiceFormula, parseDiceFormula } from './dice-formula.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -1393,11 +1394,26 @@ export class FoundryClient {
   // Dice rolling
   // ==========================================================================
 
+  /**
+   * Rolls a dice formula.
+   *
+   * Two gates apply, and they agree on the accepted language (#219): the
+   * character class below is a cheap sanity check that rejects anything outside
+   * the alphabet (Foundry modifier syntax like `4d6kh3`, `1d20+STR`, `*`), and
+   * {@link parseDiceFormula} — run before either transport, so REST and the
+   * local roller accept exactly the same formulas — is the authority on the
+   * grammar. Anything the parser cannot represent throws a specific error; no
+   * term is ever dropped from a total in silence.
+   */
   async rollDice(formula: string, reason?: string): Promise<DiceRoll> {
     const DICE_FORMULA_REGEX = /^[0-9d\s+\-()]+$/;
     if (!formula || formula.length > 100 || !DICE_FORMULA_REGEX.test(formula)) {
       throw new Error(`Invalid dice formula: ${formula}`);
     }
+    // Throws on anything the grammar cannot represent — parentheses, a dangling
+    // operator, a zero-sided die — rather than letting it reach a roller that
+    // would quietly ignore it.
+    parseDiceFormula(formula);
 
     if (this.config.apiKey) {
       try {
@@ -1427,33 +1443,19 @@ export class FoundryClient {
     return this.fallbackDiceRoll(formula, reason);
   }
 
+  /**
+   * Rolls locally, when FoundryVTT is not doing it for us.
+   *
+   * Delegates the whole formula to {@link evaluateDiceFormula}, which consumes
+   * the input end to end and throws on any leftover it cannot represent (#219).
+   */
   private fallbackDiceRoll(formula: string, reason?: string): DiceRoll {
-    const diceRegex = /(\d+)d(\d+)([+-]\d+)?/g;
-    let total = 0;
-    const breakdown: string[] = [];
-
-    let match: RegExpExecArray | null = diceRegex.exec(formula);
-    while (match !== null) {
-      const [, numDice, numSides, modifier] = match;
-      const diceCount = parseInt(numDice || '1', 10);
-      const sides = parseInt(numSides || '6', 10);
-      const mod = modifier ? parseInt(modifier, 10) : 0;
-
-      const rolls: number[] = [];
-      for (let i = 0; i < diceCount; i++) {
-        rolls.push(Math.floor(Math.random() * sides) + 1);
-      }
-
-      const rollSum = rolls.reduce((sum, roll) => sum + roll, 0) + mod;
-      total += rollSum;
-      breakdown.push(`${rolls.join(', ')}${mod !== 0 ? ` ${modifier}` : ''} = ${rollSum}`);
-      match = diceRegex.exec(formula);
-    }
+    const { total, breakdown } = evaluateDiceFormula(formula);
 
     const result: DiceRoll = {
       formula,
       total,
-      breakdown: breakdown.join(' | '),
+      breakdown,
       timestamp: new Date().toISOString(),
     };
     if (reason) {

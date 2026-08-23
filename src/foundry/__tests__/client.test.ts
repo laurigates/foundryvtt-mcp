@@ -391,6 +391,50 @@ describe('FoundryClient', () => {
       expect(result.total).toBeGreaterThanOrEqual(3);
       expect(result.total).toBeLessThanOrEqual(18);
     });
+
+    /**
+     * Issue #219 — the old parser only captured a modifier glued directly to a
+     * dice term, so every formula below returned a plausible-but-wrong total
+     * with the unparsed part silently dropped. RNG is pinned so the totals are
+     * exact rather than ranges.
+     */
+    describe('formulas that used to be silently mis-totalled (#219)', () => {
+      beforeEach(() => {
+        // Math.floor(0.5 * sides) + 1 — the middle-ish face of every die.
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it.each([
+        { formula: '1d20+5', total: 16, breakdown: '1d20: [11] + 5 = 16' },
+        { formula: '1d20 + 5', total: 16, breakdown: '1d20: [11] + 5 = 16' },
+        { formula: '1d20+5+3', total: 19, breakdown: '1d20: [11] + 5 + 3 = 19' },
+        { formula: 'd20', total: 11, breakdown: '1d20: [11] = 11' },
+        { formula: '2d6+1d4', total: 11, breakdown: '2d6: [4, 4] + 1d4: [3] = 11' },
+        { formula: '2d6 - 1', total: 7, breakdown: '2d6: [4, 4] - 1 = 7' },
+      ])('rolls $formula for exactly $total', async ({ formula, total, breakdown }) => {
+        const result = await client.rollDice(formula);
+        expect(result.total).toBe(total);
+        expect(result.breakdown).toBe(breakdown);
+        // The rendered breakdown must agree with the total it claims.
+        expect(result.breakdown.endsWith(` = ${result.total}`)).toBe(true);
+      });
+
+      it.each([
+        { formula: '(1d20+5)', match: /parenthes/i },
+        { formula: '(1d20+5)*2', match: /Invalid dice formula/ },
+        { formula: '4d6kh3', match: /Invalid dice formula/ },
+        { formula: '1d20+STR', match: /Invalid dice formula/ },
+        { formula: '1d20+', match: /ends with/i },
+        { formula: '1d20 5', match: /unexpected/i },
+        { formula: '1d0', match: /at least 1 side/i },
+      ])('rejects $formula instead of dropping part of it', async ({ formula, match }) => {
+        await expect(client.rollDice(formula)).rejects.toThrow(match);
+      });
+    });
   });
 
   describe('disconnect', () => {
