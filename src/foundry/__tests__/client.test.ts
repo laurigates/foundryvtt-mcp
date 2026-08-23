@@ -591,7 +591,7 @@ describe('FoundryClient', () => {
       folders: [],
     };
 
-    async function connectWithMockSocket() {
+    async function connectWithMockSocket(existing?: FoundryClient) {
       const { io } = await import('socket.io-client');
       const { authenticateFoundry } = await import('../auth.js');
       // afterEach's resetAllMocks() clears the module-factory resolved value.
@@ -602,11 +602,13 @@ describe('FoundryClient', () => {
       const harness = buildHandshakeSocket(structuredClone(WORLD_DATA));
       vi.mocked(io).mockReturnValue(harness.socket as never);
 
-      const connected = new FoundryClient({
-        baseUrl: 'http://localhost:30000',
-        username: 'gm',
-        password: 'secret',
-      });
+      const connected =
+        existing ??
+        new FoundryClient({
+          baseUrl: 'http://localhost:30000',
+          username: 'gm',
+          password: 'secret',
+        });
 
       const connecting = connected.connect();
       // connect() awaits authentication before attaching the handshake
@@ -676,6 +678,64 @@ describe('FoundryClient', () => {
       // The snapshot is retained — a stale answer beats no answer.
       expect(connected.hasWorldData()).toBe(true);
       expect(connected.getUsers().users).toHaveLength(2);
+    });
+
+    /**
+     * socket.io-client reconnects with `reconnection: true` by default and
+     * `sessionSocketOptions` does not turn it off, so after a transient drop
+     * the manager brings the SAME socket back up and re-emits 'connect'.
+     * Liveness has to follow it back up, not latch off for the rest of the
+     * process while broadcasts and writes are working again.
+     */
+    it('reports connected again when the socket auto-reconnects', async () => {
+      const { client: connected, socket, fire } = await connectWithMockSocket();
+
+      socket.connected = false;
+      fire('disconnect', 'transport close');
+      expect(connected.isConnected()).toBe(false);
+
+      // What socket.io does on an automatic reconnect of the same instance.
+      socket.connected = true;
+      fire('connect');
+
+      expect(connected.isConnected()).toBe(true);
+      // The gap was not replayed: broadcasts missed while the socket was down
+      // are gone, so the cache stays flagged until an explicit refresh.
+      expect(connected.isWorldDataStale()).toBe(true);
+    });
+
+    it('removes the persistent connect listener on explicit disconnect()', async () => {
+      const { client: connected, socket, listeners } = await connectWithMockSocket();
+
+      const registered = socket.on.mock.calls
+        .filter(([event]) => event === 'connect')
+        .map(([, handler]) => handler);
+      expect(registered).toHaveLength(1);
+
+      await connected.disconnect();
+
+      expect(socket.off).toHaveBeenCalledWith('connect', registered[0]);
+      expect(listeners.get('connect') ?? []).toHaveLength(0);
+    });
+
+    /**
+     * `DiagnosticsClient.testAuthentication()` calls `connect()` on a client
+     * that is already connected. The superseded socket used to keep the same
+     * bound 'disconnect' handler, so when it closed it cleared liveness for the
+     * live socket that had replaced it.
+     */
+    it('a superseded socket cannot clear liveness for its replacement', async () => {
+      const first = await connectWithMockSocket();
+      const second = await connectWithMockSocket(first.client);
+      expect(second.socket).not.toBe(first.socket);
+      expect(first.client.isConnected()).toBe(true);
+
+      // The orphaned socket finally closes.
+      first.socket.connected = false;
+      first.fire('disconnect', 'transport close');
+
+      expect(first.client.isConnected()).toBe(true);
+      expect(first.client.isWorldDataStale()).toBe(false);
     });
 
     it('removes the persistent disconnect listener on explicit disconnect()', async () => {
