@@ -16,6 +16,7 @@
  * broadcast twice lands on the same state as applying it once.
  */
 
+import { z } from 'zod';
 import type { WorldActor, WorldCombat, WorldData, WorldScene } from './types.js';
 
 /** A `modifyDocument` broadcast, once validated. */
@@ -301,4 +302,76 @@ export function applyDocumentBroadcast(
   }
 
   return applyToCollection(collection as Array<Record<string, unknown>>, action, result);
+}
+
+// ============================================================================
+// User presence (`userActivity`) — #218
+// ============================================================================
+
+/** A validated `userActivity` broadcast: who, and whether they are present. */
+export interface UserActivity {
+  userId: string;
+  active: boolean;
+}
+
+/**
+ * FoundryVTT's `userActivity` payload, as far as presence is concerned.
+ *
+ * The event carries a grab-bag of ephemeral state (cursor position, ruler,
+ * targets, active scene). Only `active` matters here; everything else is
+ * accepted and ignored. The flag is absent on ordinary activity pings — Foundry
+ * itself treats "no flag" as "present", so the parser defaults to `true`.
+ */
+const UserActivityDataSchema = z.object({ active: z.boolean().optional() });
+
+/**
+ * Validates a raw `userActivity` socket payload (#218).
+ *
+ * This is untrusted network data, so it is schema-checked rather than cast.
+ * Returns `null` for anything unrecognized, leaving presence as it was.
+ */
+export function parseUserActivity(userId: unknown, activityData: unknown): UserActivity | null {
+  if (typeof userId !== 'string' || !userId) {
+    return null;
+  }
+  if (activityData === undefined || activityData === null) {
+    return { userId, active: true };
+  }
+
+  const parsed = UserActivityDataSchema.safeParse(activityData);
+  if (!parsed.success) {
+    return null;
+  }
+  return { userId, active: parsed.data.active ?? true };
+}
+
+/**
+ * Applies a presence change to `worldData.activeUsers`, in place.
+ *
+ * `activeUsers` is a top-level `WorldData` field rather than a document
+ * collection, which is exactly why `modifyDocument` broadcasts never reached it
+ * and presence stayed frozen at the connect-time snapshot (#218).
+ *
+ * @returns true if the active-user list changed
+ */
+export function applyUserActivity(worldData: WorldData, activity: UserActivity): boolean {
+  if (!Array.isArray(worldData.activeUsers)) {
+    worldData.activeUsers = [];
+  }
+
+  const index = worldData.activeUsers.indexOf(activity.userId);
+
+  if (activity.active) {
+    if (index !== -1) {
+      return false;
+    }
+    worldData.activeUsers.push(activity.userId);
+    return true;
+  }
+
+  if (index === -1) {
+    return false;
+  }
+  worldData.activeUsers.splice(index, 1);
+  return true;
 }

@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { WorldData } from '../types.js';
 import {
   applyDocumentBroadcast,
+  applyUserActivity,
   type DocumentBroadcast,
   parseDocumentBroadcast,
+  parseUserActivity,
 } from '../world-cache.js';
 
 const ACTOR_ID = 'aaaaaaaaaaaaaaaa';
@@ -291,5 +293,82 @@ describe('applyDocumentBroadcast — embedded documents', () => {
         parentUuid: `Scene.${SCENE_ID}.Token.${TOKEN_ID}.Actor.${ACTOR_ID}`,
       }),
     ).toBe(false);
+  });
+});
+
+/**
+ * Issue #218 — `activeUsers` is a top-level `WorldData` field, not a document
+ * collection, so `modifyDocument` never touches it. FoundryVTT signals presence
+ * on the separate `userActivity` event instead.
+ */
+describe('parseUserActivity', () => {
+  const USER_ID = 'user0000user0001';
+
+  it('parses a logout broadcast', () => {
+    expect(parseUserActivity(USER_ID, { active: false })).toEqual({
+      userId: USER_ID,
+      active: false,
+    });
+  });
+
+  it('parses a login broadcast', () => {
+    expect(parseUserActivity(USER_ID, { active: true })).toEqual({
+      userId: USER_ID,
+      active: true,
+    });
+  });
+
+  it('treats an activity ping with no `active` flag as present, like Foundry does', () => {
+    expect(parseUserActivity(USER_ID, { cursor: { x: 10, y: 20 } })).toEqual({
+      userId: USER_ID,
+      active: true,
+    });
+    expect(parseUserActivity(USER_ID, undefined)).toEqual({ userId: USER_ID, active: true });
+  });
+
+  it.each([
+    ['a non-string user id', 42, { active: true }],
+    ['an empty user id', '', { active: true }],
+    ['a non-object activity payload', 'user0000user0001', 'nope'],
+    ['a non-boolean active flag', 'user0000user0001', { active: 'yes' }],
+  ])('rejects %s', (_label, userId, activityData) => {
+    expect(parseUserActivity(userId, activityData)).toBeNull();
+  });
+});
+
+describe('applyUserActivity', () => {
+  const USER_ID = 'user0000user0001';
+  const OTHER_ID = 'user0000user0002';
+
+  it('adds a user that just logged in', () => {
+    const worldData = buildWorldData();
+    worldData.activeUsers = [OTHER_ID];
+
+    expect(applyUserActivity(worldData, { userId: USER_ID, active: true })).toBe(true);
+    expect(worldData.activeUsers).toEqual([OTHER_ID, USER_ID]);
+  });
+
+  it('removes a user that just logged out', () => {
+    const worldData = buildWorldData();
+    worldData.activeUsers = [OTHER_ID, USER_ID];
+
+    expect(applyUserActivity(worldData, { userId: USER_ID, active: false })).toBe(true);
+    expect(worldData.activeUsers).toEqual([OTHER_ID]);
+  });
+
+  it('is idempotent — an activity ping from an already-active user changes nothing', () => {
+    const worldData = buildWorldData();
+    worldData.activeUsers = [USER_ID];
+
+    expect(applyUserActivity(worldData, { userId: USER_ID, active: true })).toBe(false);
+    expect(worldData.activeUsers).toEqual([USER_ID]);
+  });
+
+  it('is idempotent for a logout of a user that is already absent', () => {
+    const worldData = buildWorldData();
+    worldData.activeUsers = [OTHER_ID];
+
+    expect(applyUserActivity(worldData, { userId: USER_ID, active: false })).toBe(false);
+    expect(worldData.activeUsers).toEqual([OTHER_ID]);
   });
 });
