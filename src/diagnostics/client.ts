@@ -315,15 +315,21 @@ export class DiagnosticsClient {
   /**
    * Monitor system health and return status summary
    *
-   * @returns Promise resolving to simplified health status
+   * Only the overall status: there is no numeric score behind it. The
+   * signature used to declare an optional `score` and the example used to show
+   * one, but nothing ever set it and {@link SystemHealth} has no such field —
+   * so a caller that read it got `undefined` from a documented field.
+   *
+   * @returns Promise resolving to the overall status, `'critical'` if health
+   *   could not be retrieved at all
    *
    * @example
    * ```typescript
    * const status = await diagnostics.getHealthStatus();
-   * // Returns: { status: 'healthy' | 'warning' | 'critical', score: number }
+   * // Returns: { status: 'healthy' | 'warning' | 'critical' }
    * ```
    */
-  async getHealthStatus(): Promise<{ status: SystemHealth['status']; score?: number }> {
+  async getHealthStatus(): Promise<{ status: SystemHealth['status'] }> {
     try {
       const health = await this.getSystemHealth();
       return {

@@ -354,6 +354,27 @@ describe('DiagnosticsClient', () => {
 
       expect(result.status).toBe('critical');
     });
+
+    /**
+     * The signature and the JSDoc example both advertised a `score` the body
+     * never sets — the same "documented field that does not exist" family as
+     * #216. Test files are outside the `tsc` surface (`exclude:
+     * **\/*.test.ts`), so the declared shape is pinned here at runtime: the
+     * result carries `status` and nothing else, on both paths.
+     */
+    it.each([
+      { path: 'success', arrange: () => mockFoundryClient.get.mockResolvedValue({ data: {} }) },
+      {
+        path: 'failure',
+        arrange: () => mockFoundryClient.get.mockRejectedValue(new Error('API Error')),
+      },
+    ])('returns status alone on the $path path — no score field', async ({ arrange }) => {
+      arrange();
+
+      const result = await diagnosticsClient.getHealthStatus();
+
+      expect(Object.keys(result)).toEqual(['status']);
+    });
   });
 
   describe('isAvailable', () => {
