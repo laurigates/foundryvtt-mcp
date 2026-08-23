@@ -330,9 +330,10 @@ describe('handleGetSystemHealth', () => {
 });
 
 describe('handleGetHealthStatus', () => {
-  function worldClient(connected: boolean): FoundryClient {
+  function worldClient(connected: boolean, stale = false): FoundryClient {
     return {
       isConnected: () => connected,
+      isWorldDataStale: () => stale,
       getWorldInfo: vi.fn().mockResolvedValue({
         id: 'test-world',
         title: 'Test World',
@@ -388,6 +389,7 @@ describe('handleGetHealthStatus', () => {
   it('degrades gracefully when world info is unavailable', async () => {
     const failingWorld = {
       isConnected: () => false,
+      isWorldDataStale: () => false,
       getWorldInfo: vi.fn().mockRejectedValue(new Error('not connected')),
     } as unknown as FoundryClient;
 
@@ -395,5 +397,32 @@ describe('handleGetHealthStatus', () => {
 
     expect(text).toContain('ℹ️ Not available');
     expect(text).toContain('**Status:** healthy');
+  });
+
+  /**
+   * #217's second impact bullet: after the socket drops, reads keep being
+   * served from the cache. Rendering that snapshot with no marker presents a
+   * point-in-time copy as though it were live — and after an automatic
+   * reconnect the connection line reads "✅ Connected" again while the cache is
+   * still missing every broadcast from the outage.
+   */
+  it('marks the world section stale when the cache is no longer being kept live', async () => {
+    const text = getText(
+      await handleGetHealthStatus({}, worldClient(true, true), healthClient(makeHealth())),
+    );
+
+    expect(text).toMatch(/stale/i);
+    expect(text).toContain('refresh_world_data');
+    // Still rendered — a flagged answer beats no answer.
+    expect(text).toContain('**Title:** Test World');
+  });
+
+  it('leaves the world section unmarked while the cache is live', async () => {
+    const text = getText(
+      await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),
+    );
+
+    expect(text).not.toMatch(/stale/i);
+    expect(text).not.toContain('refresh_world_data');
   });
 });

@@ -22,6 +22,15 @@ const MAX_LOG_LIMIT = 1000;
 const DEFAULT_SEARCH_LIMIT = 50;
 
 /**
+ * Shown whenever `FoundryClient.isWorldDataStale()` is set (#217): the cached
+ * world snapshot is still being served, but it stopped following live document
+ * changes when the socket dropped and nothing replays the gap.
+ */
+const STALE_WORLD_DATA_NOTICE =
+  '⚠️ **Stale:** this snapshot stopped following live changes when the connection dropped, ' +
+  'and document changes made since are missing. Run `refresh_world_data` to resync.';
+
+/**
  * Handles recent log retrieval requests
  *
  * Filtering is applied after fetching all logs from the underlying source:
@@ -335,6 +344,14 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
  * The system-health section reads the nested fields `SystemHealthSchema`
  * declares. Playtime is not reported: `getWorldInfo()` has no genuine source
  * for it and hard-codes 0.
+ *
+ * The world section carries {@link STALE_WORLD_DATA_NOTICE} whenever the cache
+ * has stopped following live document changes (#217). Reads keep being served
+ * from that snapshot, which is the right call — a flagged answer beats no
+ * answer — but rendering it bare presents a point-in-time copy as though it
+ * were live. It matters most right after an automatic reconnect, where the
+ * connection line legitimately reads "✅ Connected" while the cache is still
+ * missing every broadcast the outage swallowed.
  */
 export async function handleGetHealthStatus(
   _args: Record<string, unknown>,
@@ -346,6 +363,17 @@ export async function handleGetHealthStatus(
       foundryClient.getWorldInfo().catch(() => null),
       diagnosticsClient.getSystemHealth().catch(() => null),
     ]);
+
+    const worldLines = worldInfo
+      ? [
+          `- **Title:** ${worldInfo.title}`,
+          `- **System:** ${worldInfo.system}`,
+          `- **Core Version:** ${worldInfo.coreVersion}`,
+        ]
+      : ['ℹ️ Not available'];
+    if (foundryClient.isWorldDataStale()) {
+      worldLines.unshift(STALE_WORLD_DATA_NOTICE);
+    }
 
     let healthSection = 'ℹ️ Not available';
     if (systemHealth) {
@@ -377,14 +405,7 @@ export async function handleGetHealthStatus(
 ${foundryClient.isConnected() ? '✅ Connected' : '❌ Disconnected'}
 
 **World Information:**
-${
-  worldInfo
-    ? `
-- **Title:** ${worldInfo.title}
-- **System:** ${worldInfo.system}
-- **Core Version:** ${worldInfo.coreVersion}`
-    : 'ℹ️ Not available'
-}
+${worldLines.join('\n')}
 
 **System Health:**
 ${healthSection}`,
