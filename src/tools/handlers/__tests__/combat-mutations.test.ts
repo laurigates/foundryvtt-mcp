@@ -2,6 +2,7 @@ import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 import { FoundryClient } from '../../../foundry/client.js';
 import type { WorldCombat } from '../../../foundry/types.js';
+import { handleGetCombatState } from '../combat.js';
 import {
   computeNextTurn,
   handleEndCombat,
@@ -9,6 +10,7 @@ import {
   handleSetInitiative,
   handleStartCombat,
 } from '../combat-mutations.js';
+import { getTurnOrder } from '../combat-order.js';
 
 const COMBAT_ID = 'cccccccccccccccc'; // 16 alphanumeric chars
 const COMBATANT_ID = 'dddddddddddddddd';
@@ -498,5 +500,176 @@ describe('FoundryClient combat mutations', () => {
     await expect(
       client.setCombatantInitiative(COMBAT_ID, COMBATANT_ID, Number.POSITIVE_INFINITY),
     ).rejects.toThrow(/Invalid initiative/);
+  });
+});
+
+// --------------------------------------------------------------------------
+// #214: `Combat#turn` indexes the INITIATIVE-sorted turn order, not the stored
+// (creation) order of `combat.combatants`. The read tool (get_combat_state) and
+// the write tool (next_turn) must agree on that ordering.
+// --------------------------------------------------------------------------
+describe('initiative-ordered turn semantics (#214)', () => {
+  /**
+   * Stored (creation) order deliberately differs from initiative order:
+   *   stored:   Bob (5), Alice (18), Charlie (12)
+   *   initiative order: Alice (18), Charlie (12), Bob (5)
+   */
+  const makeUnsortedCombat = (overrides: Partial<WorldCombat> = {}): WorldCombat =>
+    makeCombat({
+      turn: 0,
+      round: 1,
+      combatants: [
+        { _id: 'bobbobbobbobbobb', name: 'Bob', initiative: 5, hidden: false, defeated: false },
+        { _id: 'alicealicealice1', name: 'Alice', initiative: 18, hidden: false, defeated: false },
+        {
+          _id: 'charliecharlie11',
+          name: 'Charlie',
+          initiative: 12,
+          hidden: false,
+          defeated: false,
+        },
+      ],
+      ...overrides,
+    });
+
+  const readCurrentName = async (combat: WorldCombat): Promise<string> => {
+    const client = {
+      getCombatState: vi.fn().mockReturnValue(combat),
+      getRawActor: vi.fn().mockReturnValue(undefined),
+    } as unknown as FoundryClient;
+    const text = (await handleGetCombatState({}, client)).content[0]?.text ?? '';
+    const line = text.split('\n').find((l) => l.includes('<-- CURRENT')) ?? '';
+    return /\*\*(.+?)\*\*/.exec(line)?.[1] ?? '';
+  };
+
+  describe('getTurnOrder', () => {
+    it('sorts by initiative descending without mutating the source array', () => {
+      const combat = makeUnsortedCombat();
+      const stored = combat.combatants.map((c) => c.name);
+
+      expect(getTurnOrder(combat).map((c) => c.name)).toEqual(['Alice', 'Charlie', 'Bob']);
+      expect(combat.combatants.map((c) => c.name)).toEqual(stored);
+    });
+
+    it('places un-rolled (null) initiative last and breaks ties by document id', () => {
+      const combat = makeCombat({
+        combatants: [
+          {
+            _id: 'zzzzzzzzzzzzzzzz',
+            name: 'Zed',
+            initiative: null,
+            hidden: false,
+            defeated: false,
+          },
+          {
+            _id: 'aaaaaaaaaaaaaaaa',
+            name: 'Ann',
+            initiative: null,
+            hidden: false,
+            defeated: false,
+          },
+          { _id: 'mmmmmmmmmmmmmmmm', name: 'Mia', initiative: 7, hidden: false, defeated: false },
+          { _id: 'bbbbbbbbbbbbbbbb', name: 'Ben', initiative: 7, hidden: false, defeated: false },
+        ],
+      });
+
+      expect(getTurnOrder(combat).map((c) => c.name)).toEqual(['Ben', 'Mia', 'Ann', 'Zed']);
+    });
+  });
+
+  it('computeNextTurn indexes the initiative order, not the stored order', () => {
+    const combat = makeUnsortedCombat({ turn: 0 });
+    // turn 0 is Alice (18); the next turn is Charlie (12) at sorted index 1.
+    const next = computeNextTurn(combat);
+    expect(next).toEqual({ turn: 1, round: 1 });
+    expect(getTurnOrder(combat)[next.turn]?.name).toBe('Charlie');
+  });
+
+  it('computeNextTurn evaluates skipDefeated against the initiative order', () => {
+    // Alice (18, DEFEATED) is the current turn; the next live combatant is
+    // Charlie at sorted index 1. Indexing stored order would test Alice's
+    // `defeated` flag at index 1 and wrongly skip to index 2 (Charlie's slot
+    // in stored order is 2, but the current combatant there is Bob).
+    const combat = makeUnsortedCombat({ turn: 0 });
+    const alice = combat.combatants.find((c) => c.name === 'Alice');
+    if (!alice) {
+      throw new Error('fixture missing Alice');
+    }
+    alice.defeated = true;
+
+    const next = computeNextTurn(combat, true);
+    expect(next).toEqual({ turn: 1, round: 1 });
+    expect(getTurnOrder(combat)[next.turn]?.name).toBe('Charlie');
+  });
+
+  it('computeNextTurn wraps to the first live combatant in initiative order', () => {
+    // Stored order: Bob (5), Alice (18, defeated), Charlie (12).
+    // Initiative order: Alice (defeated), Charlie, Bob -> first alive is Charlie (1).
+    const combat = makeUnsortedCombat({ turn: 2 });
+    const alice = combat.combatants.find((c) => c.name === 'Alice');
+    if (!alice) {
+      throw new Error('fixture missing Alice');
+    }
+    alice.defeated = true;
+
+    const next = computeNextTurn(combat, true);
+    expect(next).toEqual({ turn: 1, round: 2 });
+    expect(getTurnOrder(combat)[next.turn]?.name).toBe('Charlie');
+  });
+
+  it('next_turn names the same combatant get_combat_state marks as CURRENT', async () => {
+    const combat = makeUnsortedCombat({ turn: 0 });
+    const updateCombat = vi.fn();
+    const client = {
+      getCombatState: vi.fn().mockReturnValue(combat),
+      updateCombat,
+    } as unknown as FoundryClient;
+
+    const text = (await handleNextTurn({}, client)).content[0].text;
+
+    // Alice (18) -> Charlie (12), NOT Alice (stored index 1).
+    expect(text).toContain('**Now acting:** Charlie');
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 1, round: 1 });
+
+    // The cache then receives the write; the read tool must agree.
+    combat.turn = 1;
+    expect(await readCurrentName(combat)).toBe('Charlie');
+  });
+
+  it('stays consistent after set_initiative reshuffles the turn order', async () => {
+    const combat = makeUnsortedCombat({ turn: 0 });
+    const alice = combat.combatants.find((c) => c.name === 'Alice');
+    if (!alice) {
+      throw new Error('fixture missing Alice');
+    }
+
+    // Before: order is Alice (18), Charlie (12), Bob (5) — turn 0 is Alice.
+    expect(await readCurrentName(combat)).toBe('Alice');
+
+    const setCombatantInitiative = vi.fn(() => {
+      // Mirror the cache broadcast: Alice drops to the bottom of the order.
+      alice.initiative = 1;
+    });
+    const updateCombat = vi.fn();
+    const client = {
+      getCombatState: vi.fn().mockReturnValue(combat),
+      setCombatantInitiative,
+      updateCombat,
+    } as unknown as FoundryClient;
+
+    await handleSetInitiative({ combatantId: alice._id, initiative: 1 }, client);
+    expect(setCombatantInitiative).toHaveBeenCalledWith(COMBAT_ID, alice._id, 1);
+
+    // Order is now Charlie (12), Bob (5), Alice (1) — turn 0 is Charlie, and
+    // stored order (Bob, Alice, Charlie) still disagrees with it.
+    expect(getTurnOrder(combat).map((c) => c.name)).toEqual(['Charlie', 'Bob', 'Alice']);
+    expect(await readCurrentName(combat)).toBe('Charlie');
+
+    const text = (await handleNextTurn({}, client)).content[0].text;
+    expect(text).toContain('**Now acting:** Bob');
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 1, round: 1 });
+
+    combat.turn = 1;
+    expect(await readCurrentName(combat)).toBe('Bob');
   });
 });

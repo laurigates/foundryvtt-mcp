@@ -3,6 +3,7 @@
  */
 
 import type { FoundryClient } from '../../foundry/client.js';
+import { getTurnOrder } from './combat-order.js';
 import { withToolError } from './utils.js';
 
 export async function handleGetCombatState(
@@ -18,8 +19,10 @@ export async function handleGetCombatState(
       };
     }
 
-    const combatants = combat.combatants
-      .sort((a, b) => (b.initiative ?? -999) - (a.initiative ?? -999))
+    // `combat` is a live reference into the world-data cache: sort a COPY via
+    // the shared helper so a read never reorders cached state (#214). The same
+    // helper backs `next_turn`, so both tools agree on what `combat.turn` means.
+    const combatants = getTurnOrder(combat)
       .map((c, i) => {
         const current = combat.turn === i ? ' <-- CURRENT' : '';
         const status = c.defeated ? ' [DEFEATED]' : c.hidden ? ' [HIDDEN]' : '';
