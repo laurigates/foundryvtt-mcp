@@ -10,7 +10,7 @@ import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions } from './auth.js';
-import { evaluateDiceFormula, parseDiceFormula } from './dice-formula.js';
+import { evaluateDiceFormula } from './dice-formula.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -44,6 +44,18 @@ import {
 
 /** FoundryVTT document IDs are 16-character alphanumeric strings. */
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
+
+/**
+ * Characters a dice formula may contain. A cheap sanity gate, not a grammar:
+ * it rejects Foundry modifier syntax (`4d6kh3`), attribute references
+ * (`1d20+STR`) and arithmetic this server never forwards (`*`, `/`), while
+ * still allowing parentheses through to FoundryVTT's own `Roll` engine on the
+ * REST transport. See {@link FoundryClient.rollDice}.
+ */
+const DICE_FORMULA_ALPHABET = /^[0-9d\s+\-()]+$/;
+
+/** Upper bound on formula length, common to both transports. */
+const MAX_DICE_FORMULA_LENGTH = 100;
 
 /**
  * Spacing between sibling `sort` values, mirroring Foundry's
@@ -1440,25 +1452,36 @@ export class FoundryClient {
   /**
    * Rolls a dice formula.
    *
-   * Two gates apply, and they agree on the accepted language (#219): the
-   * character class below is a cheap sanity check that rejects anything outside
-   * the alphabet (Foundry modifier syntax like `4d6kh3`, `1d20+STR`, `*`), and
-   * {@link parseDiceFormula} — run before either transport, so REST and the
-   * local roller accept exactly the same formulas — is the authority on the
-   * grammar. Anything the parser cannot represent throws a specific error; no
-   * term is ever dropped from a total in silence.
+   * Validation is deliberately **per transport**, because the two transports
+   * are not equally capable (#219):
+   *
+   *  - **REST (`FOUNDRY_API_KEY`)** posts the formula to `/api/dice/roll`,
+   *    where FoundryVTT's own `Roll` engine evaluates it. That engine
+   *    understands more than this module does — parentheses, for one — so only
+   *    {@link DICE_FORMULA_ALPHABET} applies here. Imposing the local parser's
+   *    narrower grammar would take away a capability the transport has.
+   *  - **Socket.IO / no API key** has no remote evaluator: `fallbackDiceRoll`
+   *    is the roller, so the grammar its parser can represent is the grammar
+   *    accepted, and that parser is the *only* gate. No alphabet pre-check runs
+   *    ahead of it, so its specific message (`unexpected "k" at position 3`)
+   *    reaches the caller instead of a generic `Invalid dice formula: 4d6kh3`.
+   *    Nothing is ever dropped from a total in silence.
+   *
+   * The length cap is common to both. A REST roll that cannot reach FoundryVTT
+   * falls through to the local roller, which then applies the strict grammar —
+   * a formula only Foundry could evaluate errors out rather than being
+   * mis-totalled locally.
    */
   async rollDice(formula: string, reason?: string): Promise<DiceRoll> {
-    const DICE_FORMULA_REGEX = /^[0-9d\s+\-()]+$/;
-    if (!formula || formula.length > 100 || !DICE_FORMULA_REGEX.test(formula)) {
+    if (typeof formula !== 'string' || formula.length > MAX_DICE_FORMULA_LENGTH) {
       throw new Error(`Invalid dice formula: ${formula}`);
     }
-    // Throws on anything the grammar cannot represent — parentheses, a dangling
-    // operator, a zero-sided die — rather than letting it reach a roller that
-    // would quietly ignore it.
-    parseDiceFormula(formula);
 
     if (this.config.apiKey) {
+      if (!formula || !DICE_FORMULA_ALPHABET.test(formula)) {
+        throw new Error(`Invalid dice formula: ${formula}`);
+      }
+
       try {
         const response = await this.http.post('/api/dice/roll', {
           formula,

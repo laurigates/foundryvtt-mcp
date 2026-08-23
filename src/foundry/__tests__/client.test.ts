@@ -423,16 +423,73 @@ describe('FoundryClient', () => {
         expect(result.breakdown.endsWith(` = ${result.total}`)).toBe(true);
       });
 
+      /**
+       * The message has to name the problem, not just the formula: `roll_dice`
+       * advertises `4d6kh3` and `1d20r1` by name as notation that "is rejected
+       * with an error naming the problem". A generic `Invalid dice formula:
+       * 4d6kh3` does not tell the caller which character was not understood.
+       */
       it.each([
         { formula: '(1d20+5)', match: /parenthes/i },
-        { formula: '(1d20+5)*2', match: /Invalid dice formula/ },
-        { formula: '4d6kh3', match: /Invalid dice formula/ },
-        { formula: '1d20+STR', match: /Invalid dice formula/ },
+        { formula: '(1d20+5)*2', match: /parenthes/i },
+        { formula: '4d6kh3', match: /unexpected "k" at position 3/ },
+        { formula: '1d20r1', match: /unexpected "r" at position 4/ },
+        { formula: '1d20*2', match: /unexpected "\*" at position 4/ },
+        { formula: '1d20+STR', match: /unexpected "S" at position 5/ },
         { formula: '1d20+', match: /ends with/i },
         { formula: '1d20 5', match: /unexpected/i },
         { formula: '1d0', match: /at least 1 side/i },
       ])('rejects $formula instead of dropping part of it', async ({ formula, match }) => {
         await expect(client.rollDice(formula)).rejects.toThrow(match);
+      });
+    });
+
+    /**
+     * The transports do not accept the same grammar, and that is deliberate.
+     * REST hands the formula to FoundryVTT's own `Roll` engine, which
+     * understands more than the local fallback parser does; capping REST at
+     * the fallback's grammar would drop a capability #219 never asked to lose.
+     * Both transports still refuse anything outside the dice alphabet.
+     */
+    describe('per-transport formula grammar', () => {
+      function restClient() {
+        return new FoundryClient({
+          baseUrl: 'http://localhost:30000',
+          apiKey: 'test-api-key',
+        });
+      }
+
+      it('lets a parenthesised formula through to FoundryVTT over REST', async () => {
+        mockAxiosInstance.post.mockResolvedValue({
+          data: { total: 21, terms: [{ results: [16] }] },
+        });
+
+        const result = await restClient().rollDice('(1d20+5)', 'Attack');
+
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/dice/roll', {
+          formula: '(1d20+5)',
+          flavor: 'Attack',
+        });
+        expect(result.total).toBe(21);
+      });
+
+      it('still refuses notation outside the dice alphabet on the REST path', async () => {
+        const rest = restClient();
+        await expect(rest.rollDice('4d6kh3')).rejects.toThrow(/Invalid dice formula/);
+        await expect(rest.rollDice('1d20*2')).rejects.toThrow(/Invalid dice formula/);
+        await expect(rest.rollDice('')).rejects.toThrow(/Invalid dice formula/);
+        await expect(rest.rollDice('1d20'.repeat(30))).rejects.toThrow(/Invalid dice formula/);
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+      });
+
+      it('rejects a parenthesised formula on the local path — nothing there can roll it', async () => {
+        await expect(client.rollDice('(1d20+5)')).rejects.toThrow(/parenthes/i);
+      });
+
+      it('reports the parse error when REST is unreachable and the fallback cannot roll it', async () => {
+        mockAxiosInstance.post.mockRejectedValue(new Error('ECONNREFUSED'));
+
+        await expect(restClient().rollDice('(1d20+5)')).rejects.toThrow(/parenthes/i);
       });
     });
   });
