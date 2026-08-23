@@ -636,7 +636,7 @@ describe('initiative-ordered turn semantics (#214)', () => {
     expect(await readCurrentName(combat)).toBe('Charlie');
   });
 
-  it('stays consistent after set_initiative reshuffles the turn order', async () => {
+  it('keeps the same combatant acting after set_initiative reshuffles the turn order', async () => {
     const combat = makeUnsortedCombat({ turn: 0 });
     const alice = combat.combatants.find((c) => c.name === 'Alice');
     if (!alice) {
@@ -660,16 +660,174 @@ describe('initiative-ordered turn semantics (#214)', () => {
     await handleSetInitiative({ combatantId: alice._id, initiative: 1 }, client);
     expect(setCombatantInitiative).toHaveBeenCalledWith(COMBAT_ID, alice._id, 1);
 
-    // Order is now Charlie (12), Bob (5), Alice (1) — turn 0 is Charlie, and
-    // stored order (Bob, Alice, Charlie) still disagrees with it.
+    // Order is now Charlie (12), Bob (5), Alice (1). Core's `setupTurns`
+    // re-finds the combatant that was acting and re-points `turn` at it, so
+    // Alice — not whoever slid under index 0 — must still be acting.
     expect(getTurnOrder(combat).map((c) => c.name)).toEqual(['Charlie', 'Bob', 'Alice']);
-    expect(await readCurrentName(combat)).toBe('Charlie');
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 2 });
 
+    combat.turn = 2;
+    expect(await readCurrentName(combat)).toBe('Alice');
+
+    updateCombat.mockClear();
     const text = (await handleNextTurn({}, client)).content[0].text;
-    expect(text).toContain('**Now acting:** Bob');
-    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 1, round: 1 });
+    expect(text).toContain('**Now acting:** Charlie');
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 0, round: 2 });
 
-    combat.turn = 1;
-    expect(await readCurrentName(combat)).toBe('Bob');
+    combat.turn = 0;
+    combat.round = 2;
+    expect(await readCurrentName(combat)).toBe('Charlie');
+  });
+});
+
+// --------------------------------------------------------------------------
+// #214 follow-up: changing any initiative re-sorts the turn order underneath
+// the stored `turn` index. FoundryVTT's `Combat#setupTurns` re-finds the
+// combatant that was acting and re-points `turn` at its new index; without the
+// same re-anchor here the MCP and Foundry disagree about whose turn it is.
+// --------------------------------------------------------------------------
+describe('set_initiative re-anchors Combat#turn', () => {
+  const ALICE = 'alicealicealice1';
+  const BOB = 'bobbobbobbobbobb';
+  const CHARLIE = 'charliecharlie11';
+
+  /** stored: Bob (5), Alice (18), Charlie (12) — initiative: Alice, Charlie, Bob. */
+  const makeCombatFixture = (overrides: Partial<WorldCombat> = {}): WorldCombat => ({
+    _id: COMBAT_ID,
+    active: true,
+    round: 1,
+    turn: 0,
+    started: true,
+    combatants: [
+      { _id: BOB, name: 'Bob', initiative: 5, hidden: false, defeated: false },
+      { _id: ALICE, name: 'Alice', initiative: 18, hidden: false, defeated: false },
+      { _id: CHARLIE, name: 'Charlie', initiative: 12, hidden: false, defeated: false },
+    ],
+    ...overrides,
+  });
+
+  /** Client whose `setCombatantInitiative` does NOT touch the fixture, so the
+   *  re-anchor cannot rely on the cache broadcast having landed first. */
+  const buildStaleCacheClient = (combat: WorldCombat) => {
+    const updateCombat = vi.fn();
+    const setCombatantInitiative = vi.fn();
+    const client = {
+      getCombatState: vi.fn().mockReturnValue(combat),
+      setCombatantInitiative,
+      updateCombat,
+    } as unknown as FoundryClient;
+    return { client, updateCombat, setCombatantInitiative };
+  };
+
+  it('follows the acting combatant when another combatant slides under the stored turn', async () => {
+    // Charlie is acting (initiative index 1). Bob jumps to 20 -> order becomes
+    // Bob, Alice, Charlie, so Charlie is now index 2.
+    const combat = makeCombatFixture({ turn: 1 });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: BOB, initiative: 20 }, client);
+
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 2 });
+  });
+
+  it('re-anchors from the projected order even before the cache broadcast lands', async () => {
+    // The fixture is never mutated by the mocked write, so a re-anchor that
+    // re-read the cache would compute the OLD index and skip the update.
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);
+
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 2 });
+    expect(combat.combatants.find((c) => c._id === ALICE)?.initiative).toBe(18);
+  });
+
+  it('reports the still-acting combatant in the tool output', async () => {
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client } = buildStaleCacheClient(combat);
+
+    const text = (await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client))
+      .content[0].text;
+
+    expect(text).toContain('**Initiative Set**');
+    expect(text).toContain('Alice');
+    expect(text).toContain('turn 3 of 3');
+  });
+
+  it('leaves `turn` alone when the acting combatant keeps its index', async () => {
+    // Alice is acting at index 0 and stays on top (18 -> 17 still beats 12).
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 17 }, client);
+
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('leaves `turn` alone when no combatant is acting yet (turn null)', async () => {
+    const combat = makeCombatFixture({ turn: null });
+    const { client, updateCombat, setCombatantInitiative } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);
+
+    expect(setCombatantInitiative).toHaveBeenCalledWith(COMBAT_ID, ALICE, 1);
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('leaves `turn` alone before the encounter has started (round 0)', async () => {
+    // Pre-roll setup: initiatives get assigned before anyone is acting.
+    const combat = makeCombatFixture({ round: 0, turn: 0, started: false });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);
+
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('leaves `turn` alone when the stored index resolves to no combatant', async () => {
+    const combat = makeCombatFixture({ turn: 9 });
+    const { client, updateCombat, setCombatantInitiative } = buildStaleCacheClient(combat);
+
+    await expect(
+      handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client),
+    ).resolves.toBeDefined();
+
+    expect(setCombatantInitiative).toHaveBeenCalledWith(COMBAT_ID, ALICE, 1);
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('still writes the initiative when the target combatant is unknown to the cache', async () => {
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client, updateCombat, setCombatantInitiative } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: 'ffffffffffffffff', initiative: 30 }, client);
+
+    expect(setCombatantInitiative).toHaveBeenCalledWith(COMBAT_ID, 'ffffffffffffffff', 30);
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('does not re-anchor a combat other than the active one', async () => {
+    // Only the active combat is readable from the cache, so an explicit
+    // `combatId` for some other encounter has no turn order to recompute.
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client, updateCombat, setCombatantInitiative } = buildStaleCacheClient(combat);
+    const otherCombatId = 'ffffffffffff0000';
+
+    await handleSetInitiative(
+      { combatantId: ALICE, initiative: 1, combatId: otherCombatId },
+      client,
+    );
+
+    expect(setCombatantInitiative).toHaveBeenCalledWith(otherCombatId, ALICE, 1);
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
+
+  it('re-anchors when the active combat is named explicitly', async () => {
+    const combat = makeCombatFixture({ turn: 0 });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1, combatId: COMBAT_ID }, client);
+
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 2 });
   });
 });
