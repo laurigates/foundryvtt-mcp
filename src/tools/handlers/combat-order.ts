@@ -55,6 +55,20 @@ export function getTurnOrder(combat: WorldCombat): WorldCombatant[] {
 }
 
 /**
+ * Whether the encounter is under way, derived the way core derives it.
+ *
+ * `Combat#started` is a **client-side getter** (`turns.length > 0 && round >
+ * 0`), not schema data: `BaseCombat.defineSchema()` does not declare it, so a
+ * Combat document read out of `worldData` never carries the key. Reading
+ * `combat.started` therefore evaluates to `undefined` on every real world —
+ * only hand-written fixtures have it — so started-ness is computed here from
+ * the two fields the transport does deliver.
+ */
+export function isCombatStarted(combat: WorldCombat): boolean {
+  return combat.round > 0 && combat.combatants.length > 0;
+}
+
+/**
  * Returns the combatant `combat.turn` currently points at, if any.
  *
  * Yields `undefined` when nobody is acting yet — the encounter has not been
@@ -62,7 +76,7 @@ export function getTurnOrder(combat: WorldCombat): WorldCombatant[] {
  * null, or the stored index no longer resolves to a combatant.
  */
 export function getCurrentCombatant(combat: WorldCombat): WorldCombatant | undefined {
-  if (!combat.started || combat.turn === null || combat.turn === undefined) {
+  if (!isCombatStarted(combat) || combat.turn === null || combat.turn === undefined) {
     return undefined;
   }
   return getTurnOrder(combat)[combat.turn];

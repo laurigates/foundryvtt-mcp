@@ -537,12 +537,32 @@ describe('FoundryClient', () => {
         expect(result.total).toBe(21);
       });
 
-      it('still refuses notation outside the dice alphabet on the REST path', async () => {
+      /**
+       * REST accepts a wider grammar, but when it does refuse the message has
+       * to be as specific as the local path's: `roll_dice` promises `4d6kh3`
+       * and `1d20r1` are "rejected with an error naming the problem", and that
+       * promise is not scoped to a transport. A bare `Invalid dice formula:
+       * 4d6kh3` names nothing.
+       */
+      it('names the offending character when REST refuses notation outside the dice alphabet', async () => {
         const rest = restClient();
-        await expect(rest.rollDice('4d6kh3')).rejects.toThrow(/Invalid dice formula/);
-        await expect(rest.rollDice('1d20*2')).rejects.toThrow(/Invalid dice formula/);
-        await expect(rest.rollDice('')).rejects.toThrow(/Invalid dice formula/);
+        await expect(rest.rollDice('4d6kh3')).rejects.toThrow(/unexpected "k" at position 3/);
+        await expect(rest.rollDice('1d20r1')).rejects.toThrow(/unexpected "r" at position 4/);
+        await expect(rest.rollDice('1d20*2')).rejects.toThrow(/unexpected "\*" at position 4/);
+        await expect(rest.rollDice('1d20+STR')).rejects.toThrow(/unexpected "S" at position 5/);
+        await expect(rest.rollDice('')).rejects.toThrow(/the formula is empty/);
         await expect(rest.rollDice('1d20'.repeat(30))).rejects.toThrow(/Invalid dice formula/);
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+      });
+
+      it('does not blame parentheses, which REST supports, for an unrelated bad character', async () => {
+        // Delegating to the local parser here would report the parentheses —
+        // the wrong problem, since FoundryVTT evaluates those fine.
+        const rest = restClient();
+        await expect(rest.rollDice('(1d20+5)*2')).rejects.toThrow(/unexpected "\*" at position 8/);
+        await expect(rest.rollDice('(1d20+5)*2')).rejects.not.toThrow(
+          /parentheses are not supported/i,
+        );
         expect(mockAxiosInstance.post).not.toHaveBeenCalled();
       });
 

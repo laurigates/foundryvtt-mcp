@@ -691,13 +691,21 @@ describe('set_initiative re-anchors Combat#turn', () => {
   const BOB = 'bobbobbobbobbobb';
   const CHARLIE = 'charliecharlie11';
 
-  /** stored: Bob (5), Alice (18), Charlie (12) — initiative: Alice, Charlie, Bob. */
+  /**
+   * stored: Bob (5), Alice (18), Charlie (12) — initiative: Alice, Charlie, Bob.
+   *
+   * Deliberately shaped the way FoundryVTT actually persists a Combat: there is
+   * **no `started` field**. `Combat#started` is a client-side getter
+   * (`turns.length > 0 && round > 0`); `BaseCombat.defineSchema()` never
+   * declares it, so no document arriving over the `world` socket payload — nor
+   * any `modifyDocument` broadcast — carries one. A fixture that invents
+   * `started: true` hides a re-anchor that is dead against every real world.
+   */
   const makeCombatFixture = (overrides: Partial<WorldCombat> = {}): WorldCombat => ({
     _id: COMBAT_ID,
     active: true,
     round: 1,
     turn: 0,
-    started: true,
     combatants: [
       { _id: BOB, name: 'Bob', initiative: 5, hidden: false, defeated: false },
       { _id: ALICE, name: 'Alice', initiative: 18, hidden: false, defeated: false },
@@ -718,6 +726,30 @@ describe('set_initiative re-anchors Combat#turn', () => {
     } as unknown as FoundryClient;
     return { client, updateCombat, setCombatantInitiative };
   };
+
+  it('re-anchors on a document with no `started` field, as FoundryVTT persists it', async () => {
+    // The regression guard for the whole describe block: `started` is not part
+    // of the persisted Combat schema, so reading it gates the re-anchor off on
+    // every real world while fabricated fixtures stay green.
+    const combat = makeCombatFixture({ turn: 0 });
+    expect('started' in combat).toBe(false);
+
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);
+
+    expect(updateCombat).toHaveBeenCalledWith(COMBAT_ID, { turn: 2 });
+  });
+
+  it('leaves `turn` alone when the combat has no combatants', async () => {
+    // Derived started-ness needs a turn order to point into.
+    const combat = makeCombatFixture({ turn: 0, combatants: [] });
+    const { client, updateCombat } = buildStaleCacheClient(combat);
+
+    await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);
+
+    expect(updateCombat).not.toHaveBeenCalled();
+  });
 
   it('follows the acting combatant when another combatant slides under the stored turn', async () => {
     // Charlie is acting (initiative index 1). Bob jumps to 20 -> order becomes
@@ -776,7 +808,8 @@ describe('set_initiative re-anchors Combat#turn', () => {
 
   it('leaves `turn` alone before the encounter has started (round 0)', async () => {
     // Pre-roll setup: initiatives get assigned before anyone is acting.
-    const combat = makeCombatFixture({ round: 0, turn: 0, started: false });
+    // Started-ness is derived from `round`, exactly as core derives it.
+    const combat = makeCombatFixture({ round: 0, turn: 0 });
     const { client, updateCombat } = buildStaleCacheClient(combat);
 
     await handleSetInitiative({ combatantId: ALICE, initiative: 1 }, client);

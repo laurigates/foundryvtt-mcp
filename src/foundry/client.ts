@@ -54,8 +54,35 @@ const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
  */
 const DICE_FORMULA_ALPHABET = /^[0-9d\s+\-()]+$/;
 
+/** Single-character form of {@link DICE_FORMULA_ALPHABET}, for locating a violation. */
+const DICE_FORMULA_CHARACTER = /[0-9d\s+\-()]/;
+
 /** Upper bound on formula length, common to both transports. */
 const MAX_DICE_FORMULA_LENGTH = 100;
+
+/**
+ * Builds the REST-path rejection for a formula outside the dice alphabet.
+ *
+ * The local parser cannot be borrowed for this: it rejects parentheses, which
+ * REST *does* support, so for `(1d20+5)*2` it would name the wrong problem.
+ * This scans for the first character the alphabet does not admit and reports
+ * it by name and position, so the REST path is as specific about what it
+ * refused as the local one (#219).
+ */
+function alphabetViolation(formula: string): Error {
+  if (formula === '') {
+    return new Error('Invalid dice formula: the formula is empty.');
+  }
+  const index = [...formula].findIndex((char) => !DICE_FORMULA_CHARACTER.test(char));
+  if (index === -1) {
+    return new Error(`Invalid dice formula: ${formula}`);
+  }
+  return new Error(
+    `Invalid dice formula "${formula}": unexpected "${formula[index]}" at position ${index}. ` +
+      'Supported syntax: dice terms (NdS, or dS for a single die) and whole numbers, joined by ' +
+      '+ or -, optionally grouped in parentheses.',
+  );
+}
 
 /**
  * True when a rejected request carries an HTTP response — FoundryVTT answered,
@@ -1499,7 +1526,10 @@ export class FoundryClient {
    *    where FoundryVTT's own `Roll` engine evaluates it. That engine
    *    understands more than this module does — parentheses, for one — so only
    *    {@link DICE_FORMULA_ALPHABET} applies here. Imposing the local parser's
-   *    narrower grammar would take away a capability the transport has.
+   *    narrower grammar would take away a capability the transport has. What
+   *    the alphabet does refuse is refused by name and position
+   *    (`unexpected "k" at position 3`, see {@link alphabetViolation}), so the
+   *    two transports are equally specific about what they would not evaluate.
    *  - **Socket.IO / no API key** has no remote evaluator: `fallbackDiceRoll`
    *    is the roller, so the grammar its parser can represent is the grammar
    *    accepted, and that parser is the *only* gate. No alphabet pre-check runs
@@ -1519,7 +1549,7 @@ export class FoundryClient {
 
     if (this.config.apiKey) {
       if (!formula || !DICE_FORMULA_ALPHABET.test(formula)) {
-        throw new Error(`Invalid dice formula: ${formula}`);
+        throw alphabetViolation(formula);
       }
 
       try {

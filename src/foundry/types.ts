@@ -876,7 +876,17 @@ export interface WorldCombat {
   active: boolean;
   round: number;
   turn: number | null;
-  started: boolean;
+  /**
+   * **Not persisted by FoundryVTT — do not gate behaviour on it.**
+   *
+   * `Combat#started` is a client-side derived getter (`turns.length > 0 &&
+   * round > 0`); `BaseCombat.defineSchema()` never declares it, so a document
+   * arriving in the `world` socket payload (validated only as
+   * `z.array(z.unknown())` and cast, see `client.ts`) carries no such key.
+   * Optional here so the compiler cannot imply the transport provides it —
+   * derive started-ness from `round` and `combatants` instead.
+   */
+  started?: boolean;
   combatants: Array<{
     _id: string;
     actorId?: string;
