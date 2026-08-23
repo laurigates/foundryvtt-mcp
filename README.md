@@ -144,7 +144,7 @@ Ask your AI assistant things like:
 - `get_scene_info` — current scene details
 - `search_journals` — search notes and handouts
 - `get_journal` — retrieve a specific journal entry
-- `get_users` — list users, roles, and online status as of the last world-data load
+- `get_users` — list users, roles, and live online status
 - `get_combat_state` — combat state and initiative order
 - `get_chat_messages` — recent chat history
 
@@ -177,7 +177,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 ### Game Mechanics
 
-- `roll_dice` — roll dice; each term must be written `NdS` with any modifier attached directly to it
+- `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
+  unsupported notation (parentheses, `4d6kh3`) rejected rather than dropped
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
@@ -188,8 +189,9 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 ### Diagnostics (requires REST API module)
 
 - `get_recent_logs` — retrieve filtered FoundryVTT logs
-- `search_logs` — search logs by pattern (matched entries are not returned yet; reports 0 results)
-- `get_system_health` — overall server health status (the resource-metric lines always read "N/A")
+- `search_logs` — search logs by pattern, listing the matching entries
+- `get_system_health` — server health status with versions, user/module counts, memory
+  and log error counts (no CPU or disk metrics)
 - `diagnose_errors` — **stub**: returns a fixed "no errors detected" summary
 - `get_health_status` — comprehensive health diagnostics
 

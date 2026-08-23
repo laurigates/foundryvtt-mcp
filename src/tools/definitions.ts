@@ -31,7 +31,7 @@ const CONFIRM_FIRST =
  * *listed*, so a divergence would be invisible.
  */
 export const ROLL_DICE_DESCRIPTION =
-  'Roll dice and return the total with a per-term breakdown. Write every term as NdS with any modifier attached directly to it ("1d20+5", "3d6", "2d6 + 1d4"); a count-less "d20", a modifier separated from its term by a space ("1d20 + 5"), a trailing bonus ("1d20+5+3") and parentheses are silently dropped from the total rather than rejected, so a loosely written formula returns a wrong number. Use when: the user asks for a check, save, attack, damage, or any random result.';
+  'Roll dice and return the total with a per-term breakdown. A formula is dice terms and whole numbers joined by + or -, with whitespace allowed anywhere ("1d20+5", "1d20 + 5", "1d20+5+3", "2d6 + 1d4", "3d6"; a count-less "d20" means one die), and every term counts towards the total. Anything outside that grammar - parentheses, multiplication, and Foundry modifier syntax such as "4d6kh3" or "1d20r1" - is rejected with an error naming the problem, never dropped from the total in silence. Use when: the user asks for a check, save, attack, damage, or any random result.';
 
 /**
  * Dice rolling tool definitions
@@ -449,7 +449,7 @@ export const diagnosticsTools = [
   {
     name: 'search_logs',
     description:
-      'Search the FoundryVTT server logs for a query string. Use when: hunting a specific error message, stack trace, or module name. Do not use when: you just want the latest entries - use get_recent_logs. Note: the level and limit arguments are accepted but are not applied to the search, and matched entries are not rendered - the result reports 0 results and lists no entries whatever the log contains, so get_recent_logs is currently the only tool that returns log content. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
+      'Search the FoundryVTT server logs for a query string and list the matching entries. Use when: hunting a specific error message, stack trace, or module name. Do not use when: you just want the latest entries - use get_recent_logs. The reported match count is the server\'s total for the query, while limit caps how many of those entries are rendered (default 50, hard cap 1000). Level filtering accepts info, warn and error; "debug" is not a level this log store records, so it is reported back as unsupported and no level filter is applied. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -459,12 +459,13 @@ export const diagnosticsTools = [
         },
         level: {
           type: 'string',
-          description: 'Log level filter',
+          description:
+            'Log level filter; "debug" is not recorded by this log store and is not applied',
           enum: ['debug', 'info', 'warn', 'error'],
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of results',
+          description: 'Maximum number of matched entries to render (capped at 1000)',
           default: 50,
         },
       },
@@ -474,7 +475,7 @@ export const diagnosticsTools = [
   {
     name: 'get_system_health',
     description:
-      'Get the FoundryVTT server\'s overall health status (healthy, warning, or critical). That status is the only value reported: the output\'s CPU, memory, disk, uptime, connection and performance lines have no counterpart in the diagnostics response schema and always read "N/A". Use when: you want a single healthy/warning/critical verdict for the server. Do not use when: you also want connection and world status - use get_health_status. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
+      "Get the FoundryVTT server's health report: the overall status (healthy, warning, or critical), FoundryVTT and game-system versions, world id and uptime, active/total user counts with the number of GMs, active/installed module counts, connected clients, heap and RSS memory, and the log buffer size with recent error/warning counts and error rate. CPU and disk are not reported - the diagnostics response models no such fields - and the uptime and memory lines are omitted when the server does not supply them. Use when: you want the server's own view of its health. Do not use when: you also want connection and world status - use get_health_status. Requires the REST API module (FOUNDRY_API_KEY); fails without it.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -497,7 +498,7 @@ export const diagnosticsTools = [
   {
     name: 'get_health_status',
     description:
-      'Get a combined health report: MCP-to-FoundryVTT connection state, world title/system/core version, and the server\'s health status. The connection line is the last known state - it is set when the client connects and cleared only by an explicit disconnect, not by a dropped socket, so it is not a live probe. Playtime always reports 0 hours, and the CPU, memory and uptime lines always read "N/A", as the underlying responses carry none of those values. Degrades gracefully - sections that need the REST API module (FOUNDRY_API_KEY) report as unavailable rather than failing. Use when: first checking which world is loaded and whether the server reports itself healthy.',
+      "Get a combined health report: MCP-to-FoundryVTT connection state, world title/system/core version, and the server's health status with its active/total user counts, uptime, heap memory and recent error/warning counts. Uptime and memory are omitted when the server does not report them; CPU, disk and playtime are not reported at all. Degrades gracefully - sections that need the REST API module (FOUNDRY_API_KEY) report as unavailable rather than failing. Use when: first checking which world is loaded and whether the server reports itself healthy.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -701,7 +702,7 @@ export const userTools = [
   {
     name: 'get_users',
     description:
-      "List the world's users with their roles and online status. Online status is as of the last world-data load, not a live presence check - no user-activity updates are applied afterwards, so call refresh_world_data first if it matters. Use when: you need to know which user holds the GM role, or who was connected as of that load.",
+      "List the world's users with their roles and online status. Online status is live: FoundryVTT's userActivity broadcasts are applied to the cached presence list as users connect and disconnect. Use when: you need to know which user holds the GM role, or who is connected right now.",
     inputSchema: {
       type: 'object',
       properties: {},
