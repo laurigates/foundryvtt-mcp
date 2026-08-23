@@ -53,3 +53,44 @@ export function compareCombatants(a: WorldCombatant, b: WorldCombatant): number 
 export function getTurnOrder(combat: WorldCombat): WorldCombatant[] {
   return [...combat.combatants].sort(compareCombatants);
 }
+
+/**
+ * Returns the combatant `combat.turn` currently points at, if any.
+ *
+ * Yields `undefined` when nobody is acting yet — the encounter has not been
+ * started (initiatives are commonly assigned during round 0 setup), `turn` is
+ * null, or the stored index no longer resolves to a combatant.
+ */
+export function getCurrentCombatant(combat: WorldCombat): WorldCombatant | undefined {
+  if (!combat.started || combat.turn === null || combat.turn === undefined) {
+    return undefined;
+  }
+  return getTurnOrder(combat)[combat.turn];
+}
+
+/**
+ * Computes where `actingCombatantId` lands in the turn order once `change` is
+ * applied — i.e. the `turn` index that keeps the same combatant acting.
+ *
+ * The change is projected onto a copy rather than read back from the cache:
+ * `setCombatantInitiative` resolves on the `modifyDocument` ack, while the
+ * cache is updated by the separate broadcast, so the cached initiative may or
+ * may not have caught up by the time this runs. Projecting is correct either
+ * way (re-applying the same value is a no-op).
+ *
+ * @returns the new index, or `undefined` if the acting combatant is gone.
+ */
+export function turnIndexAfterInitiativeChange(
+  combat: WorldCombat,
+  change: { combatantId: string; initiative: number },
+  actingCombatantId: string,
+): number | undefined {
+  const projected: WorldCombat = {
+    ...combat,
+    combatants: combat.combatants.map((c) =>
+      c._id === change.combatantId ? { ...c, initiative: change.initiative } : c,
+    ),
+  };
+  const index = getTurnOrder(projected).findIndex((c) => c._id === actingCombatantId);
+  return index === -1 ? undefined : index;
+}

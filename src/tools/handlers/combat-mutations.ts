@@ -11,7 +11,11 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { WorldCombat, WorldScene } from '../../foundry/types.js';
-import { getTurnOrder } from './combat-order.js';
+import {
+  getCurrentCombatant,
+  getTurnOrder,
+  turnIndexAfterInitiativeChange,
+} from './combat-order.js';
 import { withToolError } from './utils.js';
 
 /** A combatant seed derived from a scene token, sent to the create wire. */
@@ -138,6 +142,16 @@ The active combat encounter has been removed.`,
  * Sets a combatant's initiative in the active combat (FR-018).
  *
  * `combatId` defaults to the active combat when omitted.
+ *
+ * Writing an initiative re-sorts the turn order underneath the stored
+ * `Combat#turn`, which indexes that order (#214) — so a different combatant can
+ * slide under the stored index. FoundryVTT's `Combat#setupTurns` re-finds the
+ * combatant that was acting and re-points `turn` at its new index; this handler
+ * mirrors that, so the MCP and Foundry never disagree about whose turn it is
+ * after an initiative correction. The re-anchor is skipped when there is
+ * nothing to anchor: no combatant is acting yet (round-0 setup, `turn` null, or
+ * a stale index), the acting combatant's index is unchanged, or the write
+ * targets a combat other than the active one (the only one readable here).
  */
 export async function handleSetInitiative(
   args: { combatantId: string; initiative: number; combatId?: string },
@@ -155,7 +169,8 @@ export async function handleSetInitiative(
     );
   }
 
-  const resolvedCombatId = combatId ?? foundryClient.getCombatState()?._id;
+  const activeCombat = foundryClient.getCombatState();
+  const resolvedCombatId = combatId ?? activeCombat?._id;
   if (!resolvedCombatId) {
     throw new McpError(
       ErrorCode.InvalidRequest,
@@ -163,8 +178,23 @@ export async function handleSetInitiative(
     );
   }
 
+  // Only the active combat is readable from the world-data cache, so only its
+  // turn order can be recomputed. Capture who is acting BEFORE the write.
+  const combat = activeCombat?._id === resolvedCombatId ? activeCombat : undefined;
+  const acting = combat ? getCurrentCombatant(combat) : undefined;
+
   return withToolError('set combatant initiative', async () => {
     await foundryClient.setCombatantInitiative(resolvedCombatId, combatantId, initiative);
+
+    let reanchored = '';
+    if (combat && acting) {
+      const turn = turnIndexAfterInitiativeChange(combat, { combatantId, initiative }, acting._id);
+      if (turn !== undefined && turn !== combat.turn) {
+        await foundryClient.updateCombat(resolvedCombatId, { turn });
+        reanchored = `
+**Still acting:** ${acting.name} (turn ${turn + 1} of ${combat.combatants.length})`;
+      }
+    }
 
     return {
       content: [
@@ -173,7 +203,7 @@ export async function handleSetInitiative(
           text: `⚔️ **Initiative Set**
 **Combat:** ${resolvedCombatId}
 **Combatant:** ${combatantId}
-**Initiative:** ${initiative}`,
+**Initiative:** ${initiative}${reanchored}`,
         },
       ],
     };
