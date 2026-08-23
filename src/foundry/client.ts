@@ -117,6 +117,21 @@ const TOKEN_ACTOR_UUID_PATTERN =
   /^(Actor\.[a-zA-Z0-9]{16}|Scene\.[a-zA-Z0-9]{16}\.Token\.[a-zA-Z0-9]{16}\.Actor\.[a-zA-Z0-9]{16})$/;
 
 /**
+ * Minimal Zod schema for the `/api/dice/roll` REST response.
+ *
+ * The REST module is external input, so the body is validated rather than read
+ * off an `any`: a 200 whose payload carries no numeric `total` would otherwise
+ * produce a `DiceRoll` with `total: undefined` while the type claims `number`,
+ * and `roll_dice` would render that straight to the caller. A body that does
+ * not match is treated like any other REST failure and falls through to the
+ * local roller.
+ */
+const RestDiceRollSchema = z.object({
+  total: z.number(),
+  terms: z.array(z.object({ results: z.array(z.number()).optional() })).optional(),
+});
+
+/**
  * Minimal Zod schema for the WorldData Socket.IO payload.
  * Validates the required top-level array fields; extra fields pass through.
  */
@@ -1558,13 +1573,12 @@ export class FoundryClient {
           flavor: reason,
         });
 
+        const rolled = RestDiceRollSchema.parse(response.data);
+
         const result: DiceRoll = {
           formula,
-          total: response.data.total,
-          breakdown:
-            response.data.terms
-              ?.map((term: { results?: number[] }) => term.results?.join(', '))
-              .join(' + ') || formula,
+          total: rolled.total,
+          breakdown: rolled.terms?.map((term) => term.results?.join(', ')).join(' + ') || formula,
           timestamp: new Date().toISOString(),
         };
         if (reason) {
