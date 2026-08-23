@@ -58,6 +58,22 @@ const DICE_FORMULA_ALPHABET = /^[0-9d\s+\-()]+$/;
 const MAX_DICE_FORMULA_LENGTH = 100;
 
 /**
+ * True when a rejected request carries an HTTP response — FoundryVTT answered,
+ * whatever the status. A rejection without one is a transport failure
+ * (connection refused or reset, DNS, timeout): the server is not reachable.
+ *
+ * Read reflectively rather than cast, so a non-axios rejection cannot be
+ * mistaken for a reply.
+ */
+function hasHttpResponse(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const response = Reflect.get(error, 'response');
+  return response !== undefined && response !== null;
+}
+
+/**
  * Spacing between sibling `sort` values, mirroring Foundry's
  * `CONST.SORT_INTEGER_DENSITY`. Leaving every sibling at the default `0` makes
  * ordering depend on incidental collection insertion order, and gives Foundry
@@ -158,6 +174,11 @@ export class FoundryClient {
   private worldData: WorldData | null = null;
   /** Set when the socket drops with a cache still loaded (#217). */
   private worldDataStale = false;
+  /**
+   * Last observed outcome of a REST request: false once one failed to reach
+   * FoundryVTT at all (#217). Unused in Socket.IO mode.
+   */
+  private restLinkLive = true;
 
   constructor(config: FoundryClientConfig) {
     if (!config.baseUrl || config.baseUrl.trim() === '') {
@@ -196,6 +217,19 @@ export class FoundryClient {
         reqConfig.headers['x-api-key'] = this.config.apiKey;
         return reqConfig;
       });
+
+      // REST mode has no socket to ask about liveness, so every request that
+      // does happen doubles as the probe (#217). See `isConnected()`.
+      this.http.interceptors.response.use(
+        (response) => {
+          this.restLinkLive = true;
+          return response;
+        },
+        (error: unknown) => {
+          this.restLinkLive = hasHttpResponse(error);
+          return Promise.reject(error);
+        },
+      );
     }
 
     const mode = this.config.apiKey ? 'REST API' : 'Socket.IO';
@@ -438,6 +472,7 @@ export class FoundryClient {
     this.worldData = null;
     this.worldDataStale = false;
     this._isConnected = false;
+    this.restLinkLive = true;
     logger.info('FoundryVTT client disconnected');
   }
 
@@ -451,13 +486,18 @@ export class FoundryClient {
    * directions: an automatic reconnect (`onSocketConnect`) reads as connected
    * again rather than staying latched off.
    *
-   * REST API mode (`FOUNDRY_API_KEY`) has no socket at all: there the connect
-   * probe against `/api/status` is the only liveness signal there is, so the
-   * flag stands on its own.
+   * REST API mode (`FOUNDRY_API_KEY`) has no socket to ask, so it answers from
+   * the last REST request that actually happened: a request that failed to
+   * reach FoundryVTT (connection refused, reset, timed out) reads as
+   * disconnected from then on, and the next request that gets through reads as
+   * connected again. An HTTP error status does not count as a drop — the
+   * server answered. This is a *last observed outcome*, not a live probe: it
+   * cannot notice a server that went away between requests, and it never does
+   * I/O of its own, because this accessor is synchronous and widely called.
    */
   isConnected(): boolean {
     if (this.config.apiKey) {
-      return this._isConnected;
+      return this._isConnected && this.restLinkLive;
     }
     return this._isConnected && this.socket?.connected === true;
   }
