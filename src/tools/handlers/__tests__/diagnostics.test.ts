@@ -1,11 +1,18 @@
 /**
- * @fileoverview Unit tests for diagnostics handler — get_recent_logs filtering
+ * @fileoverview Unit tests for diagnostics handlers — get_recent_logs
+ * filtering plus the get_system_health / get_health_status reports.
  */
 
 import { describe, expect, it, vi } from 'vitest';
 import type { DiagnosticsClient } from '../../../diagnostics/client.js';
-import type { LogEntry } from '../../../diagnostics/types.js';
-import { handleGetRecentLogs } from '../diagnostics.js';
+import type { LogEntry, SystemHealth } from '../../../diagnostics/types.js';
+import { SystemHealthSchema } from '../../../diagnostics/types.js';
+import type { FoundryClient } from '../../../foundry/client.js';
+import {
+  handleGetHealthStatus,
+  handleGetRecentLogs,
+  handleGetSystemHealth,
+} from '../diagnostics.js';
 
 // Minimal LogEntry factory
 function makeEntry(
@@ -202,5 +209,191 @@ describe('handleGetRecentLogs', () => {
         (result as { content: Array<{ type: string; text: string }> }).content[0]?.text ?? '';
       expect(text).toContain('No log entries found.');
     });
+  });
+});
+
+// ============================================================================
+// System health handlers (#216)
+//
+// `SystemHealthSchema.parse()` strips unknown keys, so the fixtures below are
+// deliberately run through the real schema: anything the handlers read must be
+// a field the schema actually declares, or it will be `undefined` here just as
+// it is in production.
+// ============================================================================
+
+function makeHealth(overrides: Record<string, unknown> = {}): SystemHealth {
+  return SystemHealthSchema.parse({
+    timestamp: '2024-06-01T12:00:00.000Z',
+    server: {
+      foundryVersion: '12.331',
+      systemVersion: 'dnd5e 3.3.1',
+      worldId: 'test-world',
+      uptime: 7320, // 2h 2m
+    },
+    users: { total: 5, active: 3, gm: 1 },
+    modules: { total: 50, active: 35 },
+    performance: {
+      memory: {
+        rss: 209_715_200, // 200 MB
+        heapTotal: 67_108_864, // 64 MB
+        heapUsed: 47_185_920, // 45 MB
+        external: 1_048_576,
+        arrayBuffers: 524_288,
+      },
+      connectedClients: 3,
+    },
+    logs: { bufferSize: 500, recentErrors: 2, recentWarnings: 5, errorRate: 0.1 },
+    status: 'healthy',
+    ...overrides,
+  });
+}
+
+function healthClient(health: SystemHealth): DiagnosticsClient {
+  return {
+    getSystemHealth: vi.fn().mockResolvedValue(health),
+  } as unknown as DiagnosticsClient;
+}
+
+function getText(result: { content: Array<{ type: string; text: string }> }): string {
+  return result.content[0]?.text ?? '';
+}
+
+describe('handleGetSystemHealth', () => {
+  it('renders the nested values the schema actually defines', async () => {
+    const text = getText(await handleGetSystemHealth({}, healthClient(makeHealth())));
+
+    expect(text).toContain('**Overall Status:** healthy');
+    expect(text).toContain('**Reported At:** 2024-06-01T12:00:00.000Z');
+    // server.*
+    expect(text).toContain('12.331');
+    expect(text).toContain('dnd5e 3.3.1');
+    expect(text).toContain('test-world');
+    expect(text).toContain('**Uptime:** 2h 2m');
+    // users.* / modules.*
+    expect(text).toContain('3 active / 5 total');
+    expect(text).toContain('1 GM');
+    expect(text).toContain('35 active / 50 installed');
+    // performance.*
+    expect(text).toContain('**Connected Clients:** 3');
+    expect(text).toContain('45 MB used / 64 MB total');
+    expect(text).toContain('200 MB');
+    // logs.*
+    expect(text).toContain('**Recent Errors:** 2');
+    expect(text).toContain('**Recent Warnings:** 5');
+    expect(text).toContain('**Buffer:** 500 entries');
+    expect(text).toContain('**Error Rate:** 0.1%');
+  });
+
+  it('renders no "N/A" placeholders for a fully populated payload', async () => {
+    const text = getText(await handleGetSystemHealth({}, healthClient(makeHealth())));
+    expect(text).not.toContain('N/A');
+  });
+
+  it('drops metrics the diagnostics schema has no field for', async () => {
+    const text = getText(await handleGetSystemHealth({}, healthClient(makeHealth())));
+
+    // No CPU/disk/throughput/response-time field exists anywhere in SystemHealthSchema
+    expect(text).not.toMatch(/CPU/i);
+    expect(text).not.toMatch(/Disk/i);
+    expect(text).not.toMatch(/Throughput/i);
+    expect(text).not.toMatch(/Response Time/i);
+  });
+
+  it('omits optional server uptime rather than printing a placeholder', async () => {
+    const health = makeHealth({
+      server: { foundryVersion: '12.331', systemVersion: 'dnd5e 3.3.1', worldId: 'test-world' },
+    });
+
+    const text = getText(await handleGetSystemHealth({}, healthClient(health)));
+
+    expect(text).not.toContain('**Uptime:**');
+    expect(text).not.toContain('N/A');
+    expect(text).toContain('**Overall Status:** healthy');
+  });
+
+  it('omits memory lines when performance.memory is absent', async () => {
+    const health = makeHealth({ performance: { connectedClients: 7 } });
+
+    const text = getText(await handleGetSystemHealth({}, healthClient(health)));
+
+    expect(text).toContain('**Connected Clients:** 7');
+    expect(text).not.toContain('MB');
+    expect(text).not.toContain('N/A');
+  });
+
+  it('reports a critical status verbatim', async () => {
+    const text = getText(
+      await handleGetSystemHealth({}, healthClient(makeHealth({ status: 'critical' }))),
+    );
+    expect(text).toContain('**Overall Status:** critical');
+  });
+});
+
+describe('handleGetHealthStatus', () => {
+  function worldClient(connected: boolean): FoundryClient {
+    return {
+      isConnected: () => connected,
+      getWorldInfo: vi.fn().mockResolvedValue({
+        id: 'test-world',
+        title: 'Test World',
+        description: '',
+        system: 'dnd5e',
+        coreVersion: '12.331',
+        systemVersion: '3.3.1',
+        playtime: 0,
+        created: '2024-01-01T00:00:00.000Z',
+        modified: '2024-06-01T00:00:00.000Z',
+      }),
+    } as unknown as FoundryClient;
+  }
+
+  it('renders real world and system-health values, not placeholders', async () => {
+    const text = getText(
+      await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),
+    );
+
+    expect(text).toContain('✅ Connected');
+    expect(text).toContain('**Title:** Test World');
+    expect(text).toContain('**System:** dnd5e');
+    expect(text).toContain('**Core Version:** 12.331');
+    expect(text).toContain('**Status:** healthy');
+    expect(text).toContain('**Uptime:** 2h 2m');
+    expect(text).toContain('3 active / 5 total');
+    expect(text).toContain('45 MB');
+    expect(text).toContain('**Recent Errors:** 2');
+    expect(text).not.toContain('N/A');
+  });
+
+  it('drops the unbacked CPU and playtime lines', async () => {
+    const text = getText(
+      await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),
+    );
+
+    expect(text).not.toMatch(/CPU/i);
+    expect(text).not.toMatch(/Playtime/i);
+  });
+
+  it('degrades gracefully when system health is unavailable', async () => {
+    const failing = {
+      getSystemHealth: vi.fn().mockRejectedValue(new Error('no REST module')),
+    } as unknown as DiagnosticsClient;
+
+    const text = getText(await handleGetHealthStatus({}, worldClient(false), failing));
+
+    expect(text).toContain('❌ Disconnected');
+    expect(text).toContain('**Title:** Test World');
+    expect(text).toContain('ℹ️ Not available');
+  });
+
+  it('degrades gracefully when world info is unavailable', async () => {
+    const failingWorld = {
+      isConnected: () => false,
+      getWorldInfo: vi.fn().mockRejectedValue(new Error('not connected')),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleGetHealthStatus({}, failingWorld, healthClient(makeHealth())));
+
+    expect(text).toContain('ℹ️ Not available');
+    expect(text).toContain('**Status:** healthy');
   });
 });
