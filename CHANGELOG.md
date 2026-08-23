@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.1...foundryvtt-mcp-v1.5.2) (2026-08-23)
+
+
+### Bug Fixes
+
+* **client:** follow the socket back up on reconnect instead of latching off ([8d7c029](https://github.com/laurigates/foundryvtt-mcp/commit/8d7c02969cc1183f5b7e52e3b9f6309eada004f1))
+* **client:** report connection liveness from the socket, not a latched flag ([f22c464](https://github.com/laurigates/foundryvtt-mcp/commit/f22c464a60b62a0f091f5f8e8734b17695662df6)), closes [#217](https://github.com/laurigates/foundryvtt-mcp/issues/217)
+* **client:** stop latching REST liveness on the connect probe ([e0e258f](https://github.com/laurigates/foundryvtt-mcp/commit/e0e258fe3d33448261d03370392853704710ae83))
+* **combat:** derive started-ness instead of a field Foundry never sends ([e44dba4](https://github.com/laurigates/foundryvtt-mcp/commit/e44dba4fd44c91f5abf735f033d181f75d98e1a4))
+* **combat:** index Combat#turn against the initiative-sorted turn order ([c55c205](https://github.com/laurigates/foundryvtt-mcp/commit/c55c2053466e73d863b52e7076320bab22ffb347)), closes [#214](https://github.com/laurigates/foundryvtt-mcp/issues/214)
+* **combat:** re-anchor Combat#turn after set_initiative ([b1f2a8a](https://github.com/laurigates/foundryvtt-mcp/commit/b1f2a8aacfadc10310a1fff81188c83211c04a77)), closes [#214](https://github.com/laurigates/foundryvtt-mcp/issues/214)
+* **diagnostics:** render search_logs results and wire level/limit ([a769e86](https://github.com/laurigates/foundryvtt-mcp/commit/a769e86414dc17fe0350684ae826f435dcaec0dd)), closes [#215](https://github.com/laurigates/foundryvtt-mcp/issues/215)
+* **diagnostics:** report health from the fields the schema defines ([9895df6](https://github.com/laurigates/foundryvtt-mcp/commit/9895df64804bf80f1dfa5b97ef4dac0e0a8df32d)), closes [#216](https://github.com/laurigates/foundryvtt-mcp/issues/216)
+* **diagnostics:** show when the world section is a stale snapshot ([5acae4d](https://github.com/laurigates/foundryvtt-mcp/commit/5acae4d32dfbd9d76abffedf4fd932e6b7cac206))
+* **dice:** parse whole dice formulas instead of dropping what the regex missed ([f34ed0d](https://github.com/laurigates/foundryvtt-mcp/commit/f34ed0dd9383eeb523aeee2bd88da580b4afe6de)), closes [#219](https://github.com/laurigates/foundryvtt-mcp/issues/219)
+* **dice:** validate per transport so REST keeps Foundry's grammar ([5c2565a](https://github.com/laurigates/foundryvtt-mcp/commit/5c2565a528eb238a11cc605fdc56bbcddca789f7))
+* **dice:** validate the REST roll response instead of reading it off any ([e5754f8](https://github.com/laurigates/foundryvtt-mcp/commit/e5754f84c50bfa3fbccd0235be04d06020269f0b))
+* **resources:** emit foundry://combat combatants in turn order ([48fb30b](https://github.com/laurigates/foundryvtt-mcp/commit/48fb30bfa939a10f8698595a96cea292badb6edd))
+* **users:** track live presence from the userActivity socket event ([269d476](https://github.com/laurigates/foundryvtt-mcp/commit/269d476a0174234231049b859d122559a2cb1cc5)), closes [#218](https://github.com/laurigates/foundryvtt-mcp/issues/218)
+
 ## [1.5.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.0...foundryvtt-mcp-v1.5.1) (2026-08-18)
 
 
