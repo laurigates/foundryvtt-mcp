@@ -1525,10 +1525,10 @@ export class FoundryClient {
    *  - **REST (`FOUNDRY_API_KEY`)** posts the formula to `/api/dice/roll`,
    *    where FoundryVTT's own `Roll` engine evaluates it. That engine
    *    understands more than this module does — parentheses, for one — so only
-   *    {@link DICE_FORMULA_ALPHABET} applies here. Imposing the local parser's
-   *    narrower grammar would take away a capability the transport has. What
-   *    the alphabet does refuse is refused by name and position
-   *    (`unexpected "k" at position 3`, see {@link alphabetViolation}), so the
+   *    the `DICE_FORMULA_ALPHABET` check applies here. Imposing the local
+   *    parser's narrower grammar would take away a capability the transport
+   *    has. What the alphabet does refuse is refused by name and position
+   *    (`unexpected "k" at position 3`, via `alphabetViolation`), so the
    *    two transports are equally specific about what they would not evaluate.
    *  - **Socket.IO / no API key** has no remote evaluator: `fallbackDiceRoll`
    *    is the roller, so the grammar its parser can represent is the grammar
