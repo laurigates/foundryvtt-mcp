@@ -187,7 +187,37 @@ ${logEntries || 'No matching log entries found.'}`,
 }
 
 /**
+ * Formats an uptime in seconds as a compact human-readable duration
+ */
+function formatUptime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${total % 60}s`;
+  }
+  return `${total}s`;
+}
+
+/**
+ * Formats a byte count (as reported by `process.memoryUsage()`) in binary
+ * megabytes (MiB, the unit Node.js tooling conventionally labels "MB")
+ */
+function formatMegabytes(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
+/**
  * Handles system health requests
+ *
+ * Every value rendered here is a field `SystemHealthSchema` actually declares.
+ * The schema strips unknown keys, so metrics it does not model (CPU, disk,
+ * response time, throughput) cannot be reported and are deliberately absent
+ * rather than rendered as a permanent `N/A`. Optional fields (`server.uptime`,
+ * `performance.memory`) are omitted when the server does not supply them.
  */
 export async function handleGetSystemHealth(
   _args: Record<string, unknown>,
@@ -195,24 +225,48 @@ export async function handleGetSystemHealth(
 ) {
   return withToolError('get system health', async () => {
     const health = await diagnosticsClient.getSystemHealth();
+    const { server, users, modules, performance, logs } = health;
+
+    const serverLines = [
+      `- **FoundryVTT Version:** ${server.foundryVersion}`,
+      `- **Game System:** ${server.systemVersion}`,
+      `- **World:** ${server.worldId}`,
+    ];
+    if (server.uptime !== undefined) {
+      serverLines.push(`- **Uptime:** ${formatUptime(server.uptime)}`);
+    }
+
+    const performanceLines = [`- **Connected Clients:** ${performance.connectedClients}`];
+    if (performance.memory) {
+      performanceLines.push(
+        `- **Memory (heap):** ${formatMegabytes(performance.memory.heapUsed)} used / ${formatMegabytes(performance.memory.heapTotal)} total`,
+        `- **Memory (RSS):** ${formatMegabytes(performance.memory.rss)}`,
+      );
+    }
 
     return {
       content: [
         {
           type: 'text',
           text: `🏥 **System Health Status**
-**Overall Status:** ${health.status || 'Unknown'}
-**CPU Usage:** ${(health as { cpu?: number }).cpu || 'N/A'}%
-**Memory Usage:** ${(health as { memory?: number }).memory || 'N/A'}%
-**Disk Usage:** ${(health as { disk?: number }).disk || 'N/A'}%
-**Uptime:** ${(health as { uptime?: number }).uptime || 'N/A'} seconds
+**Overall Status:** ${health.status}
+**Reported At:** ${health.timestamp}
 
-**Active Connections:** ${(health as { connections?: number }).connections || 'N/A'}
-**Last Error:** ${(health as { lastError?: string }).lastError || 'None'}
+**Server:**
+${serverLines.join('\n')}
 
-**Performance Metrics:**
-- **Response Time:** ${(health as { responseTime?: number }).responseTime || 'N/A'}ms
-- **Throughput:** ${(health as { throughput?: number }).throughput || 'N/A'} requests/sec`,
+**Sessions:**
+- **Users:** ${users.active} active / ${users.total} total (${users.gm} GM)
+- **Modules:** ${modules.active} active / ${modules.total} installed
+
+**Performance:**
+${performanceLines.join('\n')}
+
+**Logs:**
+- **Buffer:** ${logs.bufferSize} entries
+- **Recent Errors:** ${logs.recentErrors}
+- **Recent Warnings:** ${logs.recentWarnings}
+- **Error Rate:** ${logs.errorRate}%`,
         },
       ],
     };
@@ -277,6 +331,10 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
 
 /**
  * Handles comprehensive health status requests
+ *
+ * The system-health section reads the nested fields `SystemHealthSchema`
+ * declares. Playtime is not reported: `getWorldInfo()` has no genuine source
+ * for it and hard-codes 0.
  */
 export async function handleGetHealthStatus(
   _args: Record<string, unknown>,
@@ -289,11 +347,31 @@ export async function handleGetHealthStatus(
       diagnosticsClient.getSystemHealth().catch(() => null),
     ]);
 
+    let healthSection = 'ℹ️ Not available';
+    if (systemHealth) {
+      const healthLines = [
+        `- **Status:** ${systemHealth.status}`,
+        `- **Users:** ${systemHealth.users.active} active / ${systemHealth.users.total} total`,
+      ];
+      if (systemHealth.server.uptime !== undefined) {
+        healthLines.push(`- **Uptime:** ${formatUptime(systemHealth.server.uptime)}`);
+      }
+      if (systemHealth.performance.memory) {
+        healthLines.push(
+          `- **Memory (heap used):** ${formatMegabytes(systemHealth.performance.memory.heapUsed)}`,
+        );
+      }
+      healthLines.push(
+        `- **Recent Errors:** ${systemHealth.logs.recentErrors} (warnings: ${systemHealth.logs.recentWarnings})`,
+      );
+      healthSection = `\n${healthLines.join('\n')}`;
+    }
+
     return {
       content: [
         {
           type: 'text',
-          text: `🩺 **Comprehensive Health Status**
+          text: `\u{1FA7A} **Comprehensive Health Status**
 
 **FoundryVTT Connection:**
 ${foundryClient.isConnected() ? '✅ Connected' : '❌ Disconnected'}
@@ -304,21 +382,12 @@ ${
     ? `
 - **Title:** ${worldInfo.title}
 - **System:** ${worldInfo.system}
-- **Core Version:** ${worldInfo.coreVersion}
-- **Playtime:** ${Math.floor(worldInfo.playtime / 3600)} hours`
+- **Core Version:** ${worldInfo.coreVersion}`
     : 'ℹ️ Not available'
 }
 
 **System Health:**
-${
-  systemHealth
-    ? `
-- **Status:** ${systemHealth.status || 'Unknown'}
-- **CPU:** ${(systemHealth as { cpu?: number }).cpu || 'N/A'}%
-- **Memory:** ${(systemHealth as { memory?: number }).memory || 'N/A'}%
-- **Uptime:** ${Math.floor(((systemHealth as { uptime?: number }).uptime || 0) / 3600)} hours`
-    : 'ℹ️ Not available'
-}`,
+${healthSection}`,
         },
       ],
     };
