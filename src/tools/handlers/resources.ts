@@ -6,6 +6,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import { logger } from '../../utils/logger.js';
+import { getTurnOrder } from './combat-order.js';
 import { withToolError } from './utils.js';
 
 export async function handleReadResource(
@@ -196,8 +197,22 @@ async function getUsersResource(foundryClient: FoundryClient) {
   };
 }
 
+/**
+ * Serves the active combat encounter (#214 follow-up).
+ *
+ * `Combat#turn` indexes the **initiative-sorted** turn order, and this resource
+ * is the id-bearing companion to `get_combat_state`, whose ordinals are printed
+ * in that same order. Emitting the raw cached `combatants` array — which is in
+ * creation order — next to that `turn` makes both `combat.combatants[turn]` and
+ * "the Nth combatant I just read" resolve to the wrong document, so the emitted
+ * `combatants` are re-ordered here through the shared `getTurnOrder()` helper.
+ *
+ * `getTurnOrder()` sorts a copy: the cached array is a live reference into
+ * worldData and must not be reordered as a side effect of a read.
+ */
 async function getCombatResource(foundryClient: FoundryClient) {
-  const combat = foundryClient.getCombatState();
+  const cached = foundryClient.getCombatState();
+  const combat = cached ? { ...cached, combatants: getTurnOrder(cached) } : cached;
   return {
     contents: [
       {
