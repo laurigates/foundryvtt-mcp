@@ -157,6 +157,70 @@ describe('FoundryClient', () => {
       await expect(client.searchActors({ query: 'test' })).rejects.toThrow('Persistent error');
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
+
+    /**
+     * #217, in the transport that still had it: `_isConnected` latched true at
+     * the connect probe and cleared only inside `disconnect()`, so a server
+     * restart went on reading as "✅ Connected" forever. There is no socket to
+     * ask here, so liveness follows the outcome of the REST requests that do
+     * happen — no extra I/O, and `isConnected()` stays synchronous.
+     */
+    describe('liveness after the connect probe', () => {
+      /** The response interceptor the client registered, as axios would call it. */
+      function interceptor() {
+        const [onFulfilled, onRejected] = mockAxiosInstance.interceptors.response.use.mock
+          .calls[0] as [
+          (response: unknown) => unknown,
+          (error: unknown) => Promise<never>,
+          ...unknown[],
+        ];
+        return { onFulfilled, onRejected };
+      }
+
+      /** An axios rejection with no HTTP response — the server never answered. */
+      function transportFailure() {
+        return Object.assign(new Error('connect ECONNREFUSED'), { isAxiosError: true });
+      }
+
+      /** An axios rejection carrying a reply — the server answered, badly. */
+      function httpError(status: number) {
+        return Object.assign(new Error(`HTTP ${status}`), {
+          isAxiosError: true,
+          response: { status },
+        });
+      }
+
+      beforeEach(async () => {
+        mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+        await client.connect();
+        expect(client.isConnected()).toBe(true);
+      });
+
+      it('reports disconnected once a request finds the server gone', async () => {
+        const { onRejected } = interceptor();
+
+        await expect(onRejected(transportFailure())).rejects.toThrow('ECONNREFUSED');
+
+        expect(client.isConnected()).toBe(false);
+      });
+
+      it('reports connected again once a request succeeds', async () => {
+        const { onFulfilled, onRejected } = interceptor();
+        await expect(onRejected(transportFailure())).rejects.toThrow('ECONNREFUSED');
+
+        onFulfilled({ status: 200, data: {} });
+
+        expect(client.isConnected()).toBe(true);
+      });
+
+      it('treats an error status as reachable — the server answered', async () => {
+        const { onRejected } = interceptor();
+
+        await expect(onRejected(httpError(500))).rejects.toThrow('HTTP 500');
+
+        expect(client.isConnected()).toBe(true);
+      });
+    });
   });
 
   /**
@@ -870,7 +934,12 @@ describe('FoundryClient', () => {
       expect(listeners.get('userActivity') ?? []).toHaveLength(0);
     });
 
-    it('keeps REST API mode connected — it has no socket at all', async () => {
+    /**
+     * REST mode has no socket to consult, so the socket clause must not apply
+     * to it. Its own liveness signal — the last observed request outcome — is
+     * covered in "liveness after the connect probe" above.
+     */
+    it('does not require a socket in REST API mode', async () => {
       const restClient = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
