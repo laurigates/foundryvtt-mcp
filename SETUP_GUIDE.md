@@ -83,7 +83,8 @@ All features work out of the box with username/password authentication:
 
 - Search actors, items, scenes, and journals
 - Get detailed actor/item information
-- Dice rolling with FoundryVTT engine
+- Dice rolling (evaluated locally in this mode; FoundryVTT's own `Roll` engine — and
+  with it parenthesised formulas — is used only when `FOUNDRY_API_KEY` is set)
 - Combat state and initiative tracking
 - Chat message history
 - User list and online status
@@ -111,7 +112,8 @@ Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` e
 - `search_logs` - Search logs by pattern, listing the matching entries
 - `get_system_health` - Server health status with versions, user/module counts, memory and log error counts (no CPU or disk metrics)
 - `diagnose_errors` - **stub**: returns a fixed "no errors detected" summary
-- `get_health_status` - Comprehensive health diagnostics
+- `get_health_status` - Comprehensive health diagnostics; note that in this mode the
+  connection line reports the last REST request's outcome, not a live probe
 
 To enable:
 1. Install the REST API module in FoundryVTT

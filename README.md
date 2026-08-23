@@ -159,7 +159,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
   second encounter)
 - `next_turn` — advance the active combat to the next turn (wraps to the next round)
 - `end_combat` — end (delete) the active combat encounter
-- `set_initiative` — set a combatant's initiative in the active combat
+- `set_initiative` — set a combatant's initiative in the active combat, moving the
+  turn marker with the acting combatant if the reorder shifts them
 - `move_token` — move a token to new x/y coordinates on its scene
 - `apply_status_effect` — apply or remove a status condition (e.g. prone, stunned) on a token's actor
 - `update_actor_attributes` — patch an actor's `system` attributes (HP, currency, spell slots, …)
@@ -173,12 +174,15 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 - `search_world` — full-text search across all game entities
 - `get_world_summary` — overview of the current world state
-- `refresh_world_data` — reload world data from FoundryVTT
+- `refresh_world_data` — reload world data from FoundryVTT; needed after a dropped
+  connection, whose missed updates are never replayed into the cache
 
 ### Game Mechanics
 
 - `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
-  unsupported notation (parentheses, `4d6kh3`) rejected rather than dropped
+  unsupported notation (`4d6kh3`, `1d20r1`, `*`) rejected rather than dropped.
+  Parentheses are the one transport difference: FoundryVTT evaluates them when
+  `FOUNDRY_API_KEY` is set, the local roller rejects them otherwise
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
@@ -193,7 +197,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `get_system_health` — server health status with versions, user/module counts, memory
   and log error counts (no CPU or disk metrics)
 - `diagnose_errors` — **stub**: returns a fixed "no errors detected" summary
-- `get_health_status` — comprehensive health diagnostics
+- `get_health_status` — comprehensive health diagnostics; flags the world snapshot when
+  the cache has stopped following live changes
 
 ## Available Resources
 
@@ -203,7 +208,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `foundry://scenes/current` — current active scene
 - `foundry://journals` — all journal entries
 - `foundry://users` — online users
-- `foundry://combat` — active combat state
+- `foundry://combat` — active combat state; `combatants` are in initiative order, so
+  `combat.turn` indexes them directly
 - `foundry://world/settings` — world and campaign settings
 - `foundry://system/diagnostics` — system diagnostics (requires REST API module)
 
