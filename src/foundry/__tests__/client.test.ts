@@ -482,7 +482,7 @@ describe('FoundryClient', () => {
    * socket that dropped on its own (server restart, network loss) still read as
    * connected and `get_health_status` still printed "✅ Connected".
    */
-  describe('socket liveness (#217)', () => {
+  describe('socket liveness (#217) and live presence (#218)', () => {
     /** Mock socket that records listeners and lets the test fire them. */
     function buildHandshakeSocket(worldData: Record<string, unknown>) {
       const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
@@ -646,6 +646,67 @@ describe('FoundryClient', () => {
 
       expect(socket.off).toHaveBeenCalledWith('disconnect', registered[0]);
       expect(listeners.get('disconnect') ?? []).toHaveLength(0);
+    });
+
+    /**
+     * Issue #218 — presence used to be frozen at the world snapshot: nothing
+     * subscribed to `userActivity`, and `modifyDocument` maps onto document
+     * collections, never the top-level `activeUsers` field.
+     */
+    it('applies a userActivity login to the cache and to get_users', async () => {
+      const { handleGetUsers } = await import('../../tools/handlers/users.js');
+      const { client: connected, fire } = await connectWithMockSocket();
+
+      expect(connected.getUsers().activeUsers).toEqual(['user-aaaaaaaaaaaaaa']);
+      const before = await handleGetUsers({}, connected);
+      expect((before.content[0] as { text: string }).text).toContain('(1/2 online)');
+
+      fire('userActivity', 'user-bbbbbbbbbbbbbb', { active: true });
+
+      expect(connected.getUsers().activeUsers).toEqual([
+        'user-aaaaaaaaaaaaaa',
+        'user-bbbbbbbbbbbbbb',
+      ]);
+      const after = await handleGetUsers({}, connected);
+      const text = (after.content[0] as { text: string }).text;
+      expect(text).toContain('(2/2 online)');
+      expect(text).toContain('**Player** (Player) — Online');
+    });
+
+    it('applies a userActivity logout to the cache and to get_users', async () => {
+      const { handleGetUsers } = await import('../../tools/handlers/users.js');
+      const { client: connected, fire } = await connectWithMockSocket();
+
+      fire('userActivity', 'user-aaaaaaaaaaaaaa', { active: false });
+
+      expect(connected.getUsers().activeUsers).toEqual([]);
+      const after = await handleGetUsers({}, connected);
+      const text = (after.content[0] as { text: string }).text;
+      expect(text).toContain('(0/2 online)');
+      expect(text).toContain('**GM** (Game Master) — Offline');
+    });
+
+    it('ignores a malformed userActivity payload rather than corrupting the cache', async () => {
+      const { client: connected, fire } = await connectWithMockSocket();
+
+      fire('userActivity', 42, { active: false });
+      fire('userActivity', 'user-bbbbbbbbbbbbbb', { active: 'yes' });
+
+      expect(connected.getUsers().activeUsers).toEqual(['user-aaaaaaaaaaaaaa']);
+    });
+
+    it('removes the userActivity listener on disconnect()', async () => {
+      const { client: connected, socket, listeners } = await connectWithMockSocket();
+
+      const registered = socket.on.mock.calls
+        .filter(([event]) => event === 'userActivity')
+        .map(([, handler]) => handler);
+      expect(registered).toHaveLength(1);
+
+      await connected.disconnect();
+
+      expect(socket.off).toHaveBeenCalledWith('userActivity', registered[0]);
+      expect(listeners.get('userActivity') ?? []).toHaveLength(0);
     });
 
     it('keeps REST API mode connected — it has no socket at all', async () => {

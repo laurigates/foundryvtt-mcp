@@ -34,7 +34,12 @@ import type {
   WorldUser,
 } from './types.js';
 import { VISIBILITY_LEVELS } from './types.js';
-import { applyDocumentBroadcast, parseDocumentBroadcast } from './world-cache.js';
+import {
+  applyDocumentBroadcast,
+  applyUserActivity,
+  parseDocumentBroadcast,
+  parseUserActivity,
+} from './world-cache.js';
 
 /** FoundryVTT document IDs are 16-character alphanumeric strings. */
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
@@ -261,6 +266,9 @@ export class FoundryClient {
           // Keep the snapshot live from here on (#205). Attached only after a
           // successful handshake so the reject paths have no listener to leak.
           this.socket?.on('modifyDocument', this.onDocumentBroadcast);
+          // Presence (#218): `activeUsers` is not a document collection, so it
+          // only moves on this event.
+          this.socket?.on('userActivity', this.onUserActivity);
           // Liveness (#217): a socket that drops on its own must stop reading
           // as connected. Removed again in `disconnect()`.
           this.socket?.on('disconnect', this.onSocketDisconnect);
@@ -313,6 +321,36 @@ export class FoundryClient {
   };
 
   /**
+   * Applies a FoundryVTT `userActivity` broadcast to cached presence (#218).
+   *
+   * Foundry emits this on login, on logout, and on ordinary activity, and it is
+   * the only signal that moves `worldData.activeUsers` — that field is a
+   * top-level `WorldData` entry, not a document collection, so the
+   * `modifyDocument` path never touches it and `get_users` would otherwise
+   * answer "who is connected?" from the connect-time snapshot forever.
+   *
+   * Bound field rather than a method so the same reference reaches `socket.off()`.
+   * Never throws: an unrecognized payload leaves presence as it was.
+   */
+  private onUserActivity = (userId: unknown, activityData?: unknown): void => {
+    if (!this.worldData) {
+      return;
+    }
+
+    const activity = parseUserActivity(userId, activityData);
+    if (!activity) {
+      logger.debug('Ignored unrecognized userActivity payload');
+      return;
+    }
+
+    if (applyUserActivity(this.worldData, activity)) {
+      logger.debug(
+        `User ${activity.userId} is now ${activity.active ? 'active' : 'inactive'} (userActivity)`,
+      );
+    }
+  };
+
+  /**
    * Reacts to the socket dropping on its own — server restart, network loss,
    * an idle timeout (#217).
    *
@@ -338,6 +376,7 @@ export class FoundryClient {
   async disconnect(): Promise<void> {
     if (this.socket) {
       this.socket.off('modifyDocument', this.onDocumentBroadcast);
+      this.socket.off('userActivity', this.onUserActivity);
       this.socket.off('disconnect', this.onSocketDisconnect);
       this.socket.disconnect();
       this.socket = null;
