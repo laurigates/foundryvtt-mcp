@@ -33,15 +33,9 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
-    "pal-mcp-server": {
-      "type": "stdio",
+    "pal": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/laurigates/pal-mcp-server.git",
-        "pal-mcp-server"
-      ],
-      "env": {}
+      "args": ["pal-mcp-server"]
     }
   }
 }
