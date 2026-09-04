@@ -8,24 +8,45 @@ export class FoundryTestHelpers {
   constructor(private page: Page) {}
 
   /**
-   * Handle FoundryVTT login if login form is present
+   * Handle FoundryVTT login if login form is present.
+   *
+   * The user control on the world join page differs by Foundry major version,
+   * and neither version can be exercised here (the integration and E2E tiers
+   * do not run in CI — issue #183), so match BOTH rather than swapping one
+   * hardcoded name for another:
+   *
+   * - v13 renders `<select name="userid">`, a dropdown of the world's users.
+   *   The previous `input[name="userid"]` selector never matched it.
+   * - v14.366 replaced that with a text input offering username
+   *   autocompletion, and uses camelCase `userId` — the same casing change
+   *   issue #222 reports for the POST /join request body.
    */
   async loginIfRequired(): Promise<void> {
     const loginForm = this.page.locator('#login-form, form[action="/join"]');
-    
+
     if (await loginForm.isVisible()) {
-      const usernameField = this.page.locator('input[name="userid"], input[name="username"]');
+      const username = process.env.FOUNDRY_USERNAME || 'admin';
+      // `.first()` keeps these out of Playwright strict mode while both the
+      // v13 and v14 shapes are listed.
+      const userSelect = this.page
+        .locator('select[name="userId"], select[name="userid"]')
+        .first();
+      const userInput = this.page
+        .locator('input[name="userId"], input[name="userid"], input[name="username"]')
+        .first();
       const passwordField = this.page.locator('input[name="password"]');
       const loginButton = this.page.locator('button[type="submit"], input[type="submit"]');
-      
-      if (await usernameField.isVisible()) {
-        await usernameField.fill(process.env.FOUNDRY_USERNAME || 'admin');
+
+      if (await userSelect.isVisible()) {
+        await userSelect.selectOption({ label: username });
+      } else if (await userInput.isVisible()) {
+        await userInput.fill(username);
       }
-      
+
       if (await passwordField.isVisible()) {
         await passwordField.fill(process.env.FOUNDRY_PASSWORD || 'admin');
       }
-      
+
       await loginButton.click();
       await this.page.waitForLoadState('networkidle');
     }

@@ -73,8 +73,24 @@ documented on the web** (the wiki is JS-rendered). The authoritative source is
 the actual app, shipped unminified under `data/container_cache/foundryvtt-<ver>.zip`:
 
 ```
-unzip -o -q data/container_cache/foundryvtt-13.348.zip 'resources/app/client/data/client-backend.mjs' -d /tmp/fvtt
+unzip -o -q ../foundryvtt-harness/data/container_cache/foundryvtt-13.348.zip 'resources/app/client/data/client-backend.mjs' -d /tmp/fvtt
 ```
+
+That cache belongs to the sibling **foundryvtt-harness** checkout, not to this
+repo — run the command from the `foundryvtt-mcp` root. It holds exactly one
+build, `foundryvtt-13.348.zip`, and the version is hardcoded here because it
+names the file that is actually present rather than the version this repo pins.
+
+**Current state of this verification:** the shape implemented in `client.ts` was
+read out of that **v13.348** source. `docker-compose.test.yml` now pins
+**14.367**, and the shape has not been re-read against it.
+
+Re-reading it at 14.367 needs a v14 zip, and nothing here produces one. The test
+container uses tmpfs `/data` with `CONTAINER_PRESERVE_CONFIG=false`, so it never
+persists a cache; the harness is the only checkout that does, and it must stay on
+13.348 — a v14 first launch migrates its live worlds irreversibly. Obtain the
+build another way (a throwaway felddy container with a scratch data volume, or a
+direct licensed download) before trusting the write tools on a v14 server.
 
 Key files: `client/data/client-backend.mjs` (`#buildRequest`/`#dispatchRequest`),
 `client/helpers/socket-interface.mjs` (`dispatch` = emit-with-ack), and
