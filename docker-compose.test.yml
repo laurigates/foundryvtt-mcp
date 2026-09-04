@@ -1,14 +1,26 @@
 services:
   fvtt-test:
-    image: felddy/foundryvtt:13
+    image: felddy/foundryvtt:14
     ports:
       - "30001:30000"
     environment:
       - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
-      # Pin the build so integration tests always run against the version the
-      # modifyDocument wire shape is verified against (client.ts), instead of
-      # whatever "latest" felddy resolves to (which also risks 429 rate-limits).
-      - FOUNDRY_VERSION=${FOUNDRY_VERSION:-13.348}
+      # TWO pins, and FOUNDRY_VERSION is the one that decides. The felddy image
+      # ships no Foundry: it downloads the build named by FOUNDRY_VERSION at
+      # container start, so the `image:` tag above only supplies a default.
+      # Changing one without the other silently runs the old core on the new
+      # image — always move both together.
+      #
+      # Pinned to an exact build rather than "latest"/"release" so a run is
+      # reproducible and does not depend on whatever felddy resolves that day
+      # (which also risks foundryvtt.com 429 rate-limits).
+      #
+      # NOTE: the modifyDocument wire shape in src/foundry/client.ts was
+      # verified against the v13.348 client source and has NOT been re-verified
+      # against 14.367. Re-run the procedure in
+      # .claude/rules/foundry-write-protocol.md before trusting the write tools
+      # on this pin.
+      - FOUNDRY_VERSION=${FOUNDRY_VERSION:-14.367}
       - FOUNDRY_ADMIN_KEY=integration-test-admin
       - FOUNDRY_USERNAME=${FOUNDRY_USERNAME:-test-user}
       - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD:-test-password}
