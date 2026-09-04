@@ -99,7 +99,7 @@
     "express-rate-limit": "^8.5.1",
     "ip-address": "^10.3.1",
     "path-to-regexp": "^8.4.2",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.6",
     "socket.io-parser": "^4.2.7",
     "vite": "^7.3.5",
     "rollup": "^4.60.3",
@@ -111,7 +111,7 @@
     "form-data": "^4.0.6",
     "ws": "^8.21.0",
     "markdown-it": "^14.2.0",
-    "qs": "^6.15.2"
+    "qs": "^6.16.0"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx,js,jsx}": [
