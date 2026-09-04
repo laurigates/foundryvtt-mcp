@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.2...foundryvtt-mcp-v1.5.3) (2026-09-04)
+
+
+### Bug Fixes
+
+* **auth:** send the join user id under both key spellings ([#227](https://github.com/laurigates/foundryvtt-mcp/issues/227)) ([010b005](https://github.com/laurigates/foundryvtt-mcp/commit/010b00516f29742f2a98932fa5f4e22c274279b6)), closes [#222](https://github.com/laurigates/foundryvtt-mcp/issues/222)
+* **deps:** raise the fast-uri and qs overrides to their patched versions ([#229](https://github.com/laurigates/foundryvtt-mcp/issues/229)) ([e45e070](https://github.com/laurigates/foundryvtt-mcp/commit/e45e070eb2cc2f17602267d52d4ecad596706174))
+* **mcp:** launch PAL via uvx from PyPI ([#224](https://github.com/laurigates/foundryvtt-mcp/issues/224)) ([2ee9aff](https://github.com/laurigates/foundryvtt-mcp/commit/2ee9affeeac2c46096f447dbcffbde3e88f438ea))
+
 ## [1.5.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.1...foundryvtt-mcp-v1.5.2) (2026-08-23)
 
 
