@@ -319,3 +319,44 @@ describe('authenticateFoundry — rejected /join is reported, not thrown raw (#2
     ).rejects.toThrow('FoundryVTT authentication failed (HTTP 200): You may not join this world');
   });
 });
+
+describe('authenticateFoundry — POST /join body key spellings (#222)', () => {
+  /**
+   * The /join body key is a wire-format contract: the server destructures it by
+   * name and never validates a schema, so a key it does not read is silently
+   * undefined rather than rejected. Both spellings are sent, and this test pins
+   * both — a later "cleanup" of the apparent duplicate must go red.
+   *
+   * Driven through the display-name path so the posted value is the *resolved*
+   * document _id rather than the caller's input. The existing assertions cannot
+   * make that distinction: they read back the same local variable auth.ts posts.
+   */
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+    mockJoinPostSuccess();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('posts the resolved document _id under BOTH userid and userId', async () => {
+    const { socket } = buildMockSocket([{ _id: 'resolvedDocId123', name: 'Gamemaster' }]);
+    mockIo.mockReturnValue(socket);
+
+    await authenticateFoundry('http://localhost:30000', 'Gamemaster', 'pw');
+
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'http://localhost:30000/join',
+      {
+        action: 'join',
+        userid: 'resolvedDocId123',
+        userId: 'resolvedDocId123',
+        password: 'pw',
+      },
+      expect.any(Object),
+    );
+  });
+});

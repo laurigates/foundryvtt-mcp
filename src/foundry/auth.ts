@@ -163,7 +163,16 @@ export async function authenticateFoundry(
     `${baseUrl}/join`,
     {
       action: 'join',
+      // Both spellings are deliberate — do not "de-duplicate" them (#222).
+      // sessions.authenticateUser destructures the id straight off the body and
+      // never validates a schema, so the spelling it does not read is simply
+      // undefined and the other is ignored. Reading the shipped server bundles:
+      // v13.348 and v14.364 both take `{ userid, password }`; #222 reports
+      // v14.367 taking `{ userId, password }`. A key the server does not read
+      // yields `db.User.get(undefined)` → HTTP 401 JOIN.ErrorUserDoesNotExist,
+      // so sending only one spelling breaks whichever generation wants the other.
       userid: userId,
+      userId: userId,
       password,
     },
     {
