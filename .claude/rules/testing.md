@@ -17,6 +17,10 @@ local/CI parity.
 
 - Connects through the shared helper `tests/integration/setup.ts`
   (`createConnectedClient`) in Socket.IO mode (`FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`).
+- The Foundry build under test is pinned **twice** in `docker-compose.test.yml`
+  — the `image:` tag and `FOUNDRY_VERSION` — and the env var is the one that
+  decides what installs. Move both together; a `FOUNDRY_VERSION` left in a
+  local `.env.integration` overrides both.
 - `tests/integration/global-setup.ts` only **waits** for the container at
   `:30001` — it does **not** start it.
 - **Running it:** needs (a) `.env.integration` (copy from

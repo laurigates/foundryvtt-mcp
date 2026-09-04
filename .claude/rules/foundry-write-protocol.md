@@ -73,8 +73,17 @@ documented on the web** (the wiki is JS-rendered). The authoritative source is
 the actual app, shipped unminified under `data/container_cache/foundryvtt-<ver>.zip`:
 
 ```
-unzip -o -q data/container_cache/foundryvtt-13.348.zip 'resources/app/client/data/client-backend.mjs' -d /tmp/fvtt
+FOUNDRY_VERSION=$(grep -oE 'FOUNDRY_VERSION:-[0-9.]+' docker-compose.test.yml | cut -d- -f2)
+unzip -o -q "data/container_cache/foundryvtt-${FOUNDRY_VERSION}.zip" 'resources/app/client/data/client-backend.mjs' -d /tmp/fvtt
 ```
+
+Read the version out of the pin rather than hardcoding it — the pin moves, and
+a hardcoded path sends the next reader to a zip the cache no longer holds.
+
+**Current state of this verification:** the shape implemented in `client.ts` was
+read out of the **v13.348** client source. `docker-compose.test.yml` now pins
+**14.367**, and the shape has not been re-read against it. Run the procedure
+above before relying on the write tools against a v14 server.
 
 Key files: `client/data/client-backend.mjs` (`#buildRequest`/`#dispatchRequest`),
 `client/helpers/socket-interface.mjs` (`dispatch` = emit-with-ack), and
