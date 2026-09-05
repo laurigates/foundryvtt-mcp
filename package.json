@@ -75,7 +75,7 @@
     "ajv": "^8.20.0",
     "axios": "^1.18.0",
     "dotenv": "^17.4.2",
-    "socket.io-client": "^4.8.3",
+    "socket.io-client": "4.8.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -100,7 +100,7 @@
     "ip-address": "^10.3.1",
     "path-to-regexp": "^8.4.2",
     "fast-uri": "^3.1.6",
-    "socket.io-parser": "^4.2.7",
+    "socket.io-parser": "4.2.7",
     "vite": "^7.3.5",
     "rollup": "^4.60.3",
     "postcss": "^8.5.23",
