@@ -29,6 +29,78 @@ jobs:
       - name: Audit dependencies
         run: bun audit --audit-level=moderate
 
+  # Deterministic secret scan. No actor gate, so bot PRs (Renovate,
+  # release-please) are scanned too. Pull requests scan the PR's commits,
+  # pushes scan the pushed range, the weekly schedule scans all history.
+  # Locally, .husky/pre-commit runs `gitleaks protect --staged` with the
+  # same .gitleaks.toml.
+  secrets:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        # A version bump also needs the new GITLEAKS_SHA256, taken from the
+        # release's gitleaks_<version>_checksums.txt.
+        env:
+          GITLEAKS_VERSION: '8.30.1'
+          GITLEAKS_SHA256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tgz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # gitleaks never reports how many rules it loaded, and a .gitleaks.toml
+      # without `[extend] useDefault = true` or [[rules]] loads none, so every
+      # scan passes. Plant a key built at runtime and require a detection.
+      - name: Check the gitleaks config detects a planted key
+        run: |
+          set -euo pipefail
+          if [ -f .gitleaks.toml ]; then
+            echo "GITLEAKS_CONFIG=$PWD/.gitleaks.toml" >> "$GITHUB_ENV"
+            export GITLEAKS_CONFIG="$PWD/.gitleaks.toml"
+          fi
+          d="$RUNNER_TEMP/gitleaks-canary"
+          mkdir -p "$d"
+          rand=$(head -c 20 /dev/urandom | base32)
+          printf 'aws_access_key_id = "AKIA%s"\n' "${rand:0:16}" > "$d/canary.env"
+          rc=0
+          gitleaks dir "$d" --no-banner --redact --exit-code 3 >/dev/null 2>&1 || rc=$?
+          if [ "$rc" -ne 3 ]; then
+            echo "::error file=.gitleaks.toml::the gitleaks config detects nothing (exit $rc); add [extend] useDefault = true"
+            exit 1
+          fi
+
+      - name: Scan commits
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          log_opts=""
+          if [ "$EVENT" = pull_request ]; then
+            log_opts="origin/${BASE_REF}..HEAD"
+          elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            log_opts="${BEFORE}..${GITHUB_SHA}"
+          fi
+          args=(git --no-banner --redact --exit-code 1)
+          if [ -n "$log_opts" ]; then
+            args+=("--log-opts=$log_opts")
+          fi
+          echo "gitleaks ${args[*]}"
+          gitleaks "${args[@]}"
+
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
