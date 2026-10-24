@@ -1,11 +1,21 @@
 title = "foundryvtt-mcp gitleaks configuration"
 
+# Without useDefault (or [[rules]]) gitleaks loads zero rules and every scan
+# reports "no leaks found". The security.yml gitleaks job checks this with a
+# planted canary before it scans.
+[extend]
+useDefault = true
+
 [allowlist]
-  description = "Allow test fixtures and example files"
+  description = "Allow test fixtures, example files and doc placeholders"
   paths = [
     '''src/__tests__/''',
     '''src/.+/__tests__/''',
     '''tests/''',
     '''\.env\.example$''',
     '''\.env\.integration\.example$''',
+  ]
+  # Placeholder in TROUBLESHOOTING.md (`curl -H "x-api-key: YOUR_API_KEY"`).
+  regexes = [
+    '''^YOUR_API_KEY$''',
   ]
