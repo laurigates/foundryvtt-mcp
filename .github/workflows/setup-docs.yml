@@ -64,4 +64,3 @@ jobs:
           echo "### Automatic Updates:" >> $GITHUB_STEP_SUMMARY
           echo "- Documentation will auto-update when you push to main branch" >> $GITHUB_STEP_SUMMARY
           echo "- The \`docs.yml\` workflow handles GitHub Pages deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- The \`update-docs.yml\` workflow commits docs to the repository" >> $GITHUB_STEP_SUMMARY

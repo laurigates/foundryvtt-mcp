@@ -5,8 +5,6 @@ This repository includes several GitHub Actions workflows for automated document
 ## 📋 Available Workflows
 
 ### 1. `docs.yml` - GitHub Pages Deployment
-**Recommended for public repositories**
-
 - ✅ Deploys to GitHub Pages automatically
 - ✅ Validates the docs build on pull requests (build only, no deploy)
 - ✅ Clean URLs (e.g., `https://username.github.io/repo/`)
@@ -28,21 +26,7 @@ This repository includes several GitHub Actions workflows for automated document
 > this workflow never reports a status at all and a required check would wait
 > forever. `deploy` is additionally *skipped* on pull requests by design.
 
-### 2. `update-docs.yml` - Repository Commit
-**Works for all repositories (public/private)**
-
-- ✅ Works without GitHub Pages
-- ✅ Documentation stored in repository
-- ✅ Version-controlled docs
-- ✅ Browse docs directly in GitHub
-- ❌ Larger repository size
-- ❌ No clean hosting URL
-
-**Setup:**
-- No additional setup required
-- Automatically commits to `docs/` folder
-
-### 3. `setup-docs.yml` - One-time Setup
+### 2. `setup-docs.yml` - One-time Setup
 **Initial setup helper**
 
 - Generates initial documentation
@@ -51,18 +35,13 @@ This repository includes several GitHub Actions workflows for automated document
 
 ## 🚀 Quick Start
 
-### Option A: Use GitHub Pages (Recommended)
+### Use GitHub Pages
 1. Run the setup workflow manually:
    - Go to **Actions** → **Setup Documentation Site** → **Run workflow**
 2. Enable GitHub Pages:
    - Go to **Settings** → **Pages**
    - Set Source to "GitHub Actions"
 3. Documentation will be available at `https://[username].github.io/[repository]/`
-
-### Option B: Repository-only Documentation
-1. The `update-docs.yml` workflow is already active
-2. Documentation will be automatically updated in the `docs/` folder
-3. Browse documentation by navigating to the `docs/` folder in GitHub
 
 ## 🔧 Customization
 
@@ -109,7 +88,6 @@ npm run docs:serve  # Generate and serve locally
 .github/
 ├── workflows/
 │   ├── docs.yml           # GitHub Pages deployment
-│   ├── update-docs.yml    # Repository commit workflow
 │   └── setup-docs.yml     # One-time setup helper
 └── DOCUMENTATION.md       # This file
 
