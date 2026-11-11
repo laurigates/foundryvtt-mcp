@@ -74,10 +74,14 @@ jobs:
           mkdir -p "$d"
           rand=$(head -c 20 /dev/urandom | base32)
           printf 'aws_access_key_id = "AKIA%s"\n' "${rand:0:16}" > "$d/canary.env"
+          log="$RUNNER_TEMP/gitleaks-canary.log"
           rc=0
-          gitleaks dir "$d" --no-banner --redact --exit-code 3 >/dev/null 2>&1 || rc=$?
+          gitleaks dir "$d" --no-banner --redact --exit-code 3 >"$log" 2>&1 || rc=$?
           if [ "$rc" -ne 3 ]; then
-            echo "::error file=.gitleaks.toml::the gitleaks config detects nothing (exit $rc); add [extend] useDefault = true"
+            # Show gitleaks' own output: a config it cannot parse also lands
+            # here, and its error says so where the message below cannot.
+            cat "$log"
+            echo "::error file=.gitleaks.toml::gitleaks did not detect the planted canary key (exit $rc); check the output above, and that the config sets [extend] useDefault = true or defines [[rules]]"
             exit 1
           fi
 
