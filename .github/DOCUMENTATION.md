@@ -33,15 +33,19 @@ This repository includes several GitHub Actions workflows for automated document
 - Creates `.nojekyll` file for GitHub Pages
 - Provides setup instructions
 
+> **Do not run it.** `docs.yml` builds and deploys without it. Its
+> `--cleanOutputDir` + `git add docs/` would stage the deletion of the
+> committed ADRs, PRDs, PRPs and guides under `docs/`, and its push to `main`
+> is blocked by the pre-commit hook and the branch rulesets. Removal is
+> tracked in #245.
+
 ## 🚀 Quick Start
 
 ### Use GitHub Pages
-1. Run the setup workflow manually:
-   - Go to **Actions** → **Setup Documentation Site** → **Run workflow**
-2. Enable GitHub Pages:
+1. Enable GitHub Pages:
    - Go to **Settings** → **Pages**
    - Set Source to "GitHub Actions"
-3. Documentation will be available at `https://[username].github.io/[repository]/`
+2. Documentation will be available at `https://[username].github.io/[repository]/`
 
 ## 🔧 Customization
 
