@@ -6,8 +6,7 @@
  */
 
 import { config } from '../config/index.js';
-import { ApiStatusResponseSchema } from '../diagnostics/types.js';
-import type { FoundryClient } from '../foundry/client.js';
+import { type FoundryClient, probeRestModule } from '../foundry/client.js';
 import { logger } from './logger.js';
 
 /**
@@ -318,16 +317,13 @@ export class DiagnosticSystem {
   }
 
   /**
-   * Test REST API availability
+   * Test REST API availability: the module answers its authenticated
+   * /api/world route with JSON (#230). Same probe as `FoundryClient.connect()`.
    */
   private async testRestApiAvailability(): Promise<boolean> {
     try {
-      const response = await this.foundryClient.get('/api/status');
-      return (
-        response?.data !== null &&
-        response?.data !== undefined &&
-        ApiStatusResponseSchema.parse(response.data).status === 'ok'
-      );
+      await probeRestModule((url) => this.foundryClient.get(url));
+      return true;
     } catch (error) {
       logger.debug('REST API not available:', error);
       return false;

@@ -88,11 +88,60 @@ describe('FoundryClient', () => {
       });
     });
 
-    it('should connect via REST API', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+    // #230: `/api/status` is served unauthenticated by Foundry core, so a 200
+    // there proves neither the REST module nor the key. The probe must hit an
+    // authenticated module route and validate the body shape.
+    it('should connect via REST API when /api/world answers with a JSON object', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+      });
       await client.connect();
       expect(client.isConnected()).toBe(true);
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/status');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/api/status');
+    });
+
+    it('should reject and stay disconnected when /api/world answers 200 with HTML', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: '<!DOCTYPE html><html><body>Foundry Virtual Tabletop</body></html>',
+      });
+      await expect(client.connect()).rejects.toThrow(
+        /FOUNDRY_API_KEY is set but the REST module did not answer \/api\/world with JSON/,
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      ['an array', []],
+      ['null', null],
+      ['a string', 'ok'],
+    ])('should reject a /api/world body that is %s', async (_label, data) => {
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data });
+      await expect(client.connect()).rejects.toThrow(/did not answer \/api\/world with JSON/);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      401, 403,
+    ])('should report a rejected key when /api/world answers %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: { error: 'Unauthorized' } },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`FOUNDRY_API_KEY was rejected.*HTTP ${status}`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should send the configured key in the x-api-key header', () => {
+      const onRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0]?.[0];
+      expect(onRequest).toBeTypeOf('function');
+      const reqConfig = onRequest({ headers: {} });
+      expect(reqConfig.headers['x-api-key']).toBe('test-api-key');
     });
 
     it('should search actors via REST API', async () => {
