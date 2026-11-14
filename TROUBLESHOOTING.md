@@ -182,15 +182,20 @@ Test individual components:
    curl -s http://localhost:30000/join | head -20
    ```
 
-3. **REST API status** (if module installed):
+3. **Core status** (server reachability only):
    ```bash
    curl http://localhost:30000/api/status
    ```
+   Foundry core serves this route without authentication, so a 200 here says
+   nothing about the REST module or your key. Use step 4 for that.
 
-4. **Authenticated REST endpoint** (if module installed):
+4. **Authenticated REST endpoint** (REST module and key):
    ```bash
    curl -H "x-api-key: YOUR_API_KEY" http://localhost:30000/api/world
    ```
+   The module and key are working only when this returns a JSON object. An HTML
+   page or a 404 means the module is missing; HTTP 401/403 means the key was rejected.
+   This is the same check the MCP server runs on connect.
 
 ### Test Individual Features
 Use the MCP tools to test specific functionality:
