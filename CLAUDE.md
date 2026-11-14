@@ -50,9 +50,12 @@ bun run test-connection # Test MCP→FoundryVTT connection
 
 - **`FOUNDRY_API_KEY` unset → Socket.IO mode** (default): authenticates with
   `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD` and loads full `worldData`.
-- **`FOUNDRY_API_KEY` set → REST API mode**: connects to the REST module's
-  `/api/status` instead. This is a transport **switch**, not an additive layer —
-  it does not run alongside the Socket.IO `worldData` path.
+- **`FOUNDRY_API_KEY` set → REST API mode**: probes the REST module's
+  authenticated `/api/world` (`probeRestModule()` in `client.ts`) and counts as
+  connected only when it answers with a JSON object. `/api/status` is served
+  unauthenticated by Foundry core, so it proves neither the module nor the key.
+  This is a transport **switch**, not an additive layer — it does not run
+  alongside the Socket.IO `worldData` path.
 - `USE_REST_MODULE` (seen in some `.env`/example files and the `test-connection`
   tips) is **not read** by `src/config/index.ts` — it is a no-op. Transport is
   decided solely by `apiKey` presence.
