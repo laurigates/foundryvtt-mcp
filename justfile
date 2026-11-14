@@ -182,7 +182,9 @@ setup-env:
     LOG_LEVEL=info
     ENVEOF
     # Remove leading whitespace from heredoc
-    sed -i '' 's/^    //' .env
+    # `-i.bak` (not `-i ''`) so this recipe also runs on Linux/CI.
+    sed -i.bak 's/^    //' .env
+    rm -f .env.bak
     echo ".env file created - update with your settings"
 
 # Run the interactive setup wizard
