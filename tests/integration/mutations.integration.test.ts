@@ -9,7 +9,7 @@
  *   - the connected user to hold GM/owner permission (writes are GM-gated).
  *
  * When no mutable actor is present — e.g. the fresh, world-less CI instance
- * (issue #140) or a non-dnd5e system — the suite skips rather than failing,
+ * (issue #183) or a non-dnd5e system — the suite skips rather than failing,
  * matching the live-world precondition shared by the other integration specs.
  *
  * Every mutation is reverted: the created item is deleted and the poked
