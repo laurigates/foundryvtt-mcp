@@ -94,6 +94,20 @@ describe('CacheService', () => {
         vi.useRealTimers();
       }
     });
+
+    it('evicts an empty-string key when it is the least recently used (#264)', () => {
+      const small = new CacheService({ enabled: true, ttlSeconds: 60, maxSize: 2 });
+      try {
+        small.set('', 'empty');
+        small.set('a', 'A');
+        small.set('b', 'B');
+
+        expect(small.getKeys().sort()).toEqual(['a', 'b']);
+        expect(small.getStats().size).toBe(2);
+      } finally {
+        small.destroy();
+      }
+    });
   });
 
   describe('getOrSet', () => {
