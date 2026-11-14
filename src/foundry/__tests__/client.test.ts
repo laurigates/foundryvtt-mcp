@@ -137,6 +137,31 @@ describe('FoundryClient', () => {
       expect(client.isConnected()).toBe(false);
     });
 
+    it.each([
+      404, 500,
+    ])('should report a missing module when /api/world answers %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: 'Not Found' },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`did not answer /api/world with JSON.*: HTTP ${status}$`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should rethrow a transport error (no HTTP response) unchanged', async () => {
+      // "Server unreachable" must stay visible, not be relabelled as a key or
+      // module problem.
+      const transportError = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:30000'), {
+        code: 'ECONNREFUSED',
+      });
+      mockAxiosInstance.get.mockRejectedValue(transportError);
+      await expect(client.connect()).rejects.toBe(transportError);
+      expect(client.isConnected()).toBe(false);
+    });
+
     it('should send the configured key in the x-api-key header', () => {
       const onRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0]?.[0];
       expect(onRequest).toBeTypeOf('function');

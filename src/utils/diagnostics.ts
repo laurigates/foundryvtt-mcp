@@ -336,9 +336,11 @@ export class DiagnosticSystem {
   private async testAuthentication(): Promise<{ valid: boolean; error?: string }> {
     try {
       if (config.foundry.apiKey) {
-        // Test API key authentication
-        const response = await this.foundryClient.get('/api/world');
-        return { valid: !!response };
+        // Test API key authentication: only a JSON-object /api/world body
+        // proves the module accepted the key (#230); probeRestModule throws
+        // otherwise, and the catch below reports it as invalid.
+        await probeRestModule((url) => this.foundryClient.get(url));
+        return { valid: true };
       } else {
         // Test credential authentication (via WebSocket)
         await this.foundryClient.connect();
