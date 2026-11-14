@@ -4,7 +4,6 @@ services:
     ports:
       - "30001:30000"
     environment:
-      - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
       # TWO pins, and FOUNDRY_VERSION is the one that decides. The felddy image
       # ships no Foundry: it downloads the build named by FOUNDRY_VERSION at
       # container start, so the `image:` tag above only supplies a default.
@@ -24,8 +23,6 @@ services:
       # on this pin.
       - FOUNDRY_VERSION=${FOUNDRY_VERSION:-14.367}
       - FOUNDRY_ADMIN_KEY=integration-test-admin
-      - FOUNDRY_USERNAME=${FOUNDRY_USERNAME:-test-user}
-      - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD:-test-password}
       - CONTAINER_PRESERVE_CONFIG=false
     tmpfs:
       - /data
@@ -35,5 +32,11 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+    # .env.integration is the only source of FOUNDRY_LICENSE_KEY,
+    # FOUNDRY_USERNAME and FOUNDRY_PASSWORD (felddy's foundryvtt.com download
+    # credentials). Keep them out of `environment:` above: it overrides
+    # `env_file:`, and `${VAR}` interpolation never reads `env_file:`, so CI's
+    # secrets would be replaced by blanks/defaults (issue #251, pinned by
+    # src/__tests__/integration-compose-env.test.ts).
     env_file:
       - .env.integration
