@@ -12,6 +12,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import { config } from '../src/config/index.js';
+// Not ../src/foundry/client.js: importing that resolves the whole config and
+// exits while FOUNDRY_URL is still unset, the state this wizard exists to fix.
+import { probeRestModule } from '../src/foundry/rest-probe.js';
 
 interface WizardConfig {
   foundryUrl: string;
@@ -290,18 +293,23 @@ class SetupWizard {
 
     try {
       if (this.config.authMethod === 'api-key' && this.config.apiKey) {
-        // Test API key by accessing a protected endpoint
-        const response = await axios.get(`${this.config.foundryUrl}/api/status`, {
-          headers: {
-            'x-api-key': this.config.apiKey
-          },
-          timeout: 5000
-        });
+        // Probe the REST module's authenticated /api/world route and require a
+        // JSON object back. Core FoundryVTT serves /api/status unauthenticated,
+        // so a 200 there proves neither the module nor the key (#230, #255).
+        // probeRestModule turns HTTP errors into messages naming the key or
+        // the missing module; the catch below prefixes them.
+        const { foundryUrl, apiKey } = this.config;
+        const world = await probeRestModule((url) =>
+          axios.get(`${foundryUrl}${url}`, {
+            headers: {
+              'x-api-key': apiKey
+            },
+            timeout: 5000
+          })
+        );
 
-        if (response.status === 200) {
-          console.log('✅ API key authentication successful');
-          console.log(`📊 Connected to world: ${response.data.world || 'Unknown'}\n`);
-        }
+        console.log('✅ API key authentication successful (REST module answered /api/world)');
+        console.log(`📊 Connected to world: ${typeof world.title === 'string' ? world.title : 'Unknown'}\n`);
       } else if (this.config.authMethod === 'credentials') {
         // For credentials, we'll just verify they're provided
         // Full authentication test would require WebSocket connection
