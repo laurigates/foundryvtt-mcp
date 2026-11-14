@@ -48,7 +48,7 @@ npx typedoc src/foundry/client.ts src/foundry/types.ts src/config/index.ts src/u
 ```
 
 ### Change Trigger Conditions
-Modify the `on:` section in workflow files:
+Modify the `on:` section in `docs.yml`:
 ```yaml
 on:
   push:
@@ -97,7 +97,7 @@ validates the docs build and never deploys. A skipped job does not fail the
 workflow, so the run is green on `build` alone.
 
 ### Documentation Not Updating
-1. Check that workflows have proper permissions. `docs.yml` scopes them per job:
+1. Check that `docs.yml` has the permissions it needs. It scopes them per job:
    `build` gets `contents: read` + `pages: write` (needed by
    `actions/configure-pages`), `deploy` gets `contents: read` + `pages: write` +
    `id-token: write` (needed by `actions/deploy-pages`).
@@ -110,7 +110,7 @@ workflow, so the run is green on `build` alone.
 3. Ensure repository is public (for free GitHub accounts)
 
 ### TypeScript Errors
-The workflows use `--skipErrorChecking` to handle incomplete files. If you need stricter checking:
+`docs.yml` uses `--skipErrorChecking` to handle incomplete files. If you need stricter checking:
 1. Remove the `--skipErrorChecking` flag
 2. Fix any TypeScript compilation errors
 3. Or exclude problematic files with `--exclude`
