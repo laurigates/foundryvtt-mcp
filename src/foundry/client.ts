@@ -9,7 +9,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse 
 import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { authenticateFoundry, sessionSocketOptions } from './auth.js';
+import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
 import type {
   ActorAttributeUpdateResult,
@@ -98,6 +98,72 @@ function hasHttpResponse(error: unknown): boolean {
   }
   const response = Reflect.get(error, 'response');
   return response !== undefined && response !== null;
+}
+
+/** HTTP status of a rejected request, read reflectively; undefined without a response. */
+function httpStatusOf(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+  const response: unknown = Reflect.get(error, 'response');
+  if (typeof response !== 'object' || response === null) {
+    return undefined;
+  }
+  const status: unknown = Reflect.get(response, 'status');
+  return typeof status === 'number' ? status : undefined;
+}
+
+/**
+ * Shape the REST module's `/api/world` must answer with: a JSON object. Rejects
+ * the HTML page, string, array or null that a server without the module (or a
+ * proxy in front of it) can return with a 200. Extra fields pass through.
+ */
+const RestWorldProbeSchema = z.looseObject({});
+
+/**
+ * Proves the REST module is installed and accepts `FOUNDRY_API_KEY` (#230).
+ *
+ * `/api/status` cannot do this: Foundry core serves it unauthenticated, so a
+ * 200 there says nothing about the module or the key. `/api/world` is a module
+ * route that requires the key, and the body is validated rather than trusting
+ * any 2xx. Shared by `FoundryClient.connect()` and the diagnostics probe.
+ *
+ * @param get - performs the GET (with the `x-api-key` header applied)
+ * @returns the validated `/api/world` body
+ * @throws Error naming the key on HTTP 401/403, or the missing module on any
+ *   other HTTP status or a non-object body. A transport failure (no HTTP
+ *   response) is rethrown unchanged so "server unreachable" stays visible.
+ */
+export async function probeRestModule(
+  get: (url: string) => Promise<{ data: unknown }>,
+): Promise<Record<string, unknown>> {
+  const notJson =
+    'FOUNDRY_API_KEY is set but the REST module did not answer /api/world with JSON ' +
+    '(module missing or key rejected)';
+
+  let data: unknown;
+  try {
+    ({ data } = await get('/api/world'));
+  } catch (error) {
+    const status = httpStatusOf(error);
+    if (status === 401 || status === 403) {
+      throw new Error(
+        `FOUNDRY_API_KEY was rejected by the REST module at /api/world (HTTP ${status}); ` +
+          'check the key configured in the module settings',
+        { cause: error },
+      );
+    }
+    if (status !== undefined) {
+      throw new Error(`${notJson}: HTTP ${status}`, { cause: error });
+    }
+    throw error;
+  }
+
+  const parsed = RestWorldProbeSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error(`${notJson}: got ${data === null ? 'null' : typeof data} body`);
+  }
+  return parsed.data;
 }
 
 /**
@@ -280,13 +346,14 @@ export class FoundryClient {
 
   /**
    * Connects to FoundryVTT.
-   * REST API mode: tests /api/status endpoint.
+   * REST API mode: probes the module's authenticated /api/world route
+   * (`probeRestModule`); connected only once it answers with a JSON object.
    * Socket.IO mode: authenticates and loads full worldData.
    */
   async connect(): Promise<void> {
     if (this.config.apiKey) {
       try {
-        await this.http.get('/api/status');
+        await probeRestModule((url) => this.http.get(url));
         this._isConnected = true;
         logger.info('Connected to FoundryVTT via REST API module');
       } catch (error) {
@@ -304,7 +371,12 @@ export class FoundryClient {
       );
     }
 
-    const { session } = await authenticateFoundry(this.config.baseUrl, user, this.config.password);
+    const { session } = await authenticateFoundry(
+      this.config.baseUrl,
+      user,
+      this.config.password,
+      this.config.socketPath,
+    );
 
     // Connect authenticated socket and load world data
     this.worldData = await this.connectAndLoadWorld(session);
@@ -325,7 +397,12 @@ export class FoundryClient {
     this.detachSocket();
 
     return new Promise((resolve, reject) => {
-      this.socket = io(this.config.baseUrl, sessionSocketOptions(session));
+      // Origin + `path`, not the full baseUrl: a routePrefix in the URL would
+      // be read as a Socket.IO namespace (#231).
+      this.socket = io(
+        socketOrigin(this.config.baseUrl),
+        sessionSocketOptions(session, this.config.socketPath),
+      );
 
       const cleanup = () => {
         this.socket?.off('session', onSession);

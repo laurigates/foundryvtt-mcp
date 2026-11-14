@@ -372,7 +372,3 @@ export const ErrorDiagnosisSchema = z.object({
   suggestions: z.array(DiagnosticSuggestionSchema),
   healthScore: z.number(),
 });
-
-export const ApiStatusResponseSchema = z.object({
-  status: z.string(),
-});

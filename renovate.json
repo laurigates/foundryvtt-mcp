@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The FOUNDRY_VERSION default in docker-compose.test.yml decides which Foundry build the felddy image downloads at container start; the docker-compose manager sees only the image tag (#233).",
+      "managerFilePatterns": ["/^docker-compose\\.test\\.yml$/"],
+      "matchStrings": [
+        "FOUNDRY_VERSION=\\$\\{FOUNDRY_VERSION:-(?<currentValue>[0-9]+\\.[0-9]+)\\}"
+      ],
+      "depNameTemplate": "felddy/foundryvtt",
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Move the felddy/foundryvtt image tag and the FOUNDRY_VERSION default in one PR (#233), and hold it for approval on the Dependency Dashboard: the modifyDocument wire shape is unverified past 13.348 (#232) and the integration tier does not run in CI (#183), so a FoundryVTT bump has to be approved deliberately.",
+      "matchPackageNames": ["felddy/foundryvtt"],
+      "groupName": "FoundryVTT",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Leave package.json engines alone: the package is published to npm, and an exact engines pin such as v26.13.0 (#235) makes npm warn or refuse to install for consumers on any other Node version.",
+      "matchDepTypes": ["engines"],
+      "enabled": false
+    }
+  ]
+}

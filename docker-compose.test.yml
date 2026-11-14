@@ -1,6 +1,6 @@
 services:
   fvtt-test:
-    image: felddy/foundryvtt:14
+    image: felddy/foundryvtt:14.367
     ports:
       - "30001:30000"
     environment:
@@ -8,7 +8,9 @@ services:
       # ships no Foundry: it downloads the build named by FOUNDRY_VERSION at
       # container start, so the `image:` tag above only supplies a default.
       # Changing one without the other silently runs the old core on the new
-      # image — always move both together.
+      # image — always move both together. renovate.json groups both pins into
+      # one PR, and src/__tests__/foundry-version-pins.test.ts fails unless
+      # the tag equals the FOUNDRY_VERSION default.
       #
       # Pinned to an exact build rather than "latest"/"release" so a run is
       # reproducible and does not depend on whatever felddy resolves that day

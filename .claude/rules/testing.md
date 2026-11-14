@@ -19,10 +19,12 @@ local/CI parity.
   (`createConnectedClient`) in Socket.IO mode (`FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`).
 - The Foundry build under test is pinned **twice** in `docker-compose.test.yml`
   — the `image:` tag and `FOUNDRY_VERSION` — and the env var is the one that
-  decides what installs. Move both together. To override for one run, export
-  `FOUNDRY_VERSION` in the shell; setting it in `.env.integration` does nothing,
-  because compose interpolation never reads an `env_file:` entry and the
-  `environment:` block overrides it regardless.
+  decides what installs. Move both together: `renovate.json` groups both pins
+  into one approval-gated PR, and `src/__tests__/foundry-version-pins.test.ts`
+  fails unless the tag equals the `FOUNDRY_VERSION` default. To override for
+  one run, export `FOUNDRY_VERSION` in the shell; setting it in
+  `.env.integration` does nothing, because compose interpolation never reads
+  an `env_file:` entry and the `environment:` block overrides it regardless.
 - `tests/integration/global-setup.ts` only **waits** for the container at
   `:30001` — it does **not** start it.
 - **Running it:** needs (a) `.env.integration` (copy from
