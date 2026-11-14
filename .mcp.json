@@ -6,20 +6,31 @@
     },
     "context7": {
       "command": "bunx",
-      "args": ["-y", "@upstash/context7-mcp"]
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
     },
     "playwright": {
       "command": "bunx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
     },
     "sequential-thinking": {
       "command": "bunx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "bunx",
-      "args": ["chrome-devtools-mcp@latest"],
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ],
       "env": {}
     },
     "github": {
@@ -35,8 +46,16 @@
     },
     "pal": {
       "command": "uvx",
-      "args": ["pal-mcp-server@latest"]
+      "args": [
+        "pal-mcp-server@latest"
+      ],
+      "env": {
+        "CUSTOM_API_URL": "http://localhost:11434/v1",
+        "CUSTOM_API_KEY": "",
+        "DEFAULT_MODEL": "auto",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
     }
   }
 }
-
