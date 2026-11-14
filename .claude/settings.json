@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "CronCreate",
@@ -22,19 +23,27 @@
     ]
   },
   "extraKnownMarketplaces": {
-    "claude-plugins": {
-      "source": { "source": "github", "repo": "laurigates/claude-plugins" },
+    "laurigates-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "laurigates/claude-plugins"
+      },
       "autoUpdate": true
     }
   },
   "enabledPlugins": {
-    "code-quality-plugin@claude-plugins": true,
-    "configure-plugin@claude-plugins": true,
-    "git-plugin@claude-plugins": true,
-    "github-actions-plugin@claude-plugins": true,
-    "health-plugin@claude-plugins": true,
-    "hooks-plugin@claude-plugins": true,
-    "testing-plugin@claude-plugins": true,
-    "typescript-plugin@claude-plugins": true
-  }
+    "code-quality-plugin@laurigates-claude-plugins": true,
+    "configure-plugin@laurigates-claude-plugins": true,
+    "git-plugin@laurigates-claude-plugins": true,
+    "github-actions-plugin@laurigates-claude-plugins": true,
+    "health-plugin@laurigates-claude-plugins": true,
+    "hooks-plugin@laurigates-claude-plugins": true,
+    "testing-plugin@laurigates-claude-plugins": true,
+    "typescript-plugin@laurigates-claude-plugins": true
+  },
+  "enabledMcpjsonServers": [
+    "pal",
+    "context7",
+    "sequential-thinking"
+  ]
 }

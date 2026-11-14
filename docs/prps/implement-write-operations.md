@@ -72,7 +72,7 @@ Client methods: `updateCombat`, `endCombat`, `setCombatantInitiative`, `startCom
 - [x] Unit: all write handlers tested with mocked Socket.IO
 - [x] Unit: write guard returns error when `FOUNDRY_WRITE_ENABLED=false`
 - [x] Unit: emitted `modifyDocument` wire shape asserted (Combat update / delete, Combatant `parentUuid`)
-- [~] Integration: `set_initiative` + `next_turn` live round-trip+restore — gated; skips when no active GM combat or no licensed test instance (CI gap #140)
+- [~] Integration: `set_initiative` + `next_turn` live round-trip+restore — gated; skips when no active GM combat or no licensed test instance (CI gap #183)
 
 ## Deferred (separate issues)
 
