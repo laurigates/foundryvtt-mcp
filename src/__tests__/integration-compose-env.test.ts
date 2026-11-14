@@ -177,9 +177,7 @@ describe(`docker-compose.test.yml ${SERVICE} credentials (#251)`, () => {
     expect(readServiceEntries(compose, SERVICE, 'env_file')).toContain('.env.integration');
   });
 
-  it.each(
-    CREDENTIAL_VARS,
-  )('does not set %s in environment: (it would override env_file:)', (name) => {
+  it.each(CREDENTIAL_VARS)('does not set %s in environment: (overrides env_file:)', (name) => {
     expect(environment.filter((entry) => definedName(entry) === name)).toEqual([]);
   });
 
