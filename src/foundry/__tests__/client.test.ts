@@ -31,6 +31,7 @@ vi.mock('../../config/index.js', () => ({
 }));
 
 const { FoundryClient } = await import('../client.js');
+const { logger } = await import('../../utils/logger.js');
 
 const mockAxios = vi.mocked(axios);
 
@@ -669,6 +670,92 @@ describe('FoundryClient', () => {
         mockAxiosInstance.post.mockRejectedValue(new Error('ECONNREFUSED'));
 
         await expect(restClient().rollDice('(1d20+5)')).rejects.toThrow(/parenthes/i);
+      });
+    });
+
+    /**
+     * Issue #254 — a REST failure used to fall through to the local roller in
+     * silence: nothing at warn level, and a result indistinguishable from a
+     * server roll. The fallback stays; it just has to be visible.
+     */
+    describe('where the roll was made (#254)', () => {
+      const API_KEY = 'secret-api-key-254';
+
+      function restClient() {
+        return new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: API_KEY });
+      }
+
+      it('marks a roll FoundryVTT evaluated as source "server" and warns about nothing', async () => {
+        mockAxiosInstance.post.mockResolvedValue({
+          data: { total: 21, terms: [{ results: [16] }] },
+        });
+
+        const result = await restClient().rollDice('1d20+5');
+
+        expect(result.source).toBe('server');
+        expect(result.total).toBe(21);
+        expect(logger.warn).not.toHaveBeenCalled();
+      });
+
+      it('warns with the HTTP status and marks the result "local" when the REST call is rejected', async () => {
+        mockAxiosInstance.post.mockRejectedValue(
+          Object.assign(new Error('Request failed with status code 503'), {
+            isAxiosError: true,
+            code: 'ERR_BAD_RESPONSE',
+            response: { status: 503, data: 'Service Unavailable' },
+            config: { headers: { 'x-api-key': API_KEY } },
+          }),
+        );
+
+        const result = await restClient().rollDice('1d20+5');
+
+        expect(result.source).toBe('local');
+        expect(result.total).toBeGreaterThanOrEqual(6);
+        expect(result.total).toBeLessThanOrEqual(25);
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        const [message, meta] = vi.mocked(logger.warn).mock.calls[0] ?? [];
+        expect(String(message)).toMatch(/REST dice roll failed/i);
+        expect(meta).toMatchObject({ status: 503, code: 'ERR_BAD_RESPONSE' });
+        // The request config carries the API key header; it must not be logged.
+        expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain(API_KEY);
+      });
+
+      it('warns with the error code when the REST server cannot be reached', async () => {
+        mockAxiosInstance.post.mockRejectedValue(
+          Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:30000'), {
+            isAxiosError: true,
+            code: 'ECONNREFUSED',
+          }),
+        );
+
+        const result = await restClient().rollDice('3d6');
+
+        expect(result.source).toBe('local');
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logger.warn).mock.calls[0]?.[1]).toMatchObject({ code: 'ECONNREFUSED' });
+      });
+
+      it('warns and marks the result "local" when the REST body fails validation', async () => {
+        mockAxiosInstance.post.mockResolvedValue({ status: 200, data: { error: 'nope' } });
+
+        const result = await restClient().rollDice('1d20');
+
+        expect(result.source).toBe('local');
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logger.warn).mock.calls[0]?.[1]).toMatchObject({
+          reason: expect.stringMatching(/schema|body/i),
+        });
+      });
+
+      it('marks a Socket.IO / no-API-key roll as source "local" — nothing remote evaluates it', async () => {
+        const result = await new FoundryClient({ baseUrl: 'http://localhost:30000' }).rollDice(
+          '1d20',
+        );
+
+        expect(result.source).toBe('local');
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+        // Rolling locally is the normal path here, not a failure worth a warning.
+        expect(logger.warn).not.toHaveBeenCalled();
       });
     });
   });

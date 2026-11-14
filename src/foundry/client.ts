@@ -198,6 +198,43 @@ const RestDiceRollSchema = z.object({
 });
 
 /**
+ * Loggable summary of why a REST dice call failed (#254).
+ *
+ * Reads only the HTTP status and the error code, structurally rather than via
+ * `axios.isAxiosError`, so nothing else on the error — in particular
+ * `config.headers`, which carries the `x-api-key` — reaches the log.
+ */
+function describeRestFailure(error: unknown): {
+  reason: string;
+  status?: number;
+  code?: string;
+} {
+  if (error instanceof z.ZodError) {
+    return { reason: 'response body failed schema validation' };
+  }
+  if (typeof error !== 'object' || error === null) {
+    return { reason: 'request failed' };
+  }
+
+  const summary: { reason: string; status?: number; code?: string } = {
+    reason: 'request failed',
+  };
+  const response: unknown = 'response' in error ? error.response : undefined;
+  if (typeof response === 'object' && response !== null && 'status' in response) {
+    const status: unknown = response.status;
+    if (typeof status === 'number') {
+      summary.status = status;
+      summary.reason = 'HTTP error response';
+    }
+  }
+  const code: unknown = 'code' in error ? error.code : undefined;
+  if (typeof code === 'string') {
+    summary.code = code;
+  }
+  return summary;
+}
+
+/**
  * Minimal Zod schema for the WorldData Socket.IO payload.
  * Validates the required top-level array fields; extra fields pass through.
  */
@@ -1657,13 +1694,20 @@ export class FoundryClient {
           total: rolled.total,
           breakdown: rolled.terms?.map((term) => term.results?.join(', ')).join(' + ') || formula,
           timestamp: new Date().toISOString(),
+          source: 'server',
         };
         if (reason) {
           result.reason = reason;
         }
         return result;
-      } catch {
-        // Fall through to local roll
+      } catch (error) {
+        // Keep the fallback, but never in silence (#254): the result is marked
+        // `source: 'local'` and the failure is logged without the request
+        // config, which carries the API key header.
+        logger.warn(
+          'REST dice roll failed — falling back to the local roller',
+          describeRestFailure(error),
+        );
       }
     }
 
@@ -1684,6 +1728,7 @@ export class FoundryClient {
       total,
       breakdown,
       timestamp: new Date().toISOString(),
+      source: 'local',
     };
     if (reason) {
       result.reason = reason;

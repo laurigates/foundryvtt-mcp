@@ -469,7 +469,8 @@ export interface FoundryCombat {
  *   total: 18,
  *   breakdown: '13 + 5',
  *   reason: 'Sword attack',
- *   timestamp: '2024-01-15T10:30:00Z'
+ *   timestamp: '2024-01-15T10:30:00Z',
+ *   source: 'server'
  * };
  * ```
  */
@@ -479,6 +480,13 @@ export interface DiceRoll {
   breakdown: string;
   reason?: string;
   timestamp: string;
+  /**
+   * Where the roll was evaluated: `'server'` when FoundryVTT's own `Roll`
+   * engine produced it over the REST transport, `'local'` when this MCP server
+   * rolled it itself — always on the Socket.IO transport, and on REST when the
+   * server call failed and fell back (#254).
+   */
+  source: 'server' | 'local';
 }
 
 export interface FoundryUser {
