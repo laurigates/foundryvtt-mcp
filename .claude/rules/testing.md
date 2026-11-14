@@ -26,8 +26,11 @@ local/CI parity.
 - `tests/integration/global-setup.ts` only **waits** for the container at
   `:30001` — it does **not** start it.
 - **Running it:** needs (a) `.env.integration` (copy from
-  `.env.integration.example`, add a real `FOUNDRY_LICENSE_KEY` — the file is
-  gitignored and ships only as the `.example`) and (b) the ephemeral test
+  `.env.integration.example` — the file is gitignored and ships only as the
+  `.example`) holding a real `FOUNDRY_LICENSE_KEY` and your real foundryvtt.com
+  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`, which the felddy container uses to
+  download Foundry. All three must be in that file: a shell export or a project
+  `.env` does not reach the container (issue #251). It also needs (b) the ephemeral test
   container up on `:30001`. Use **`just test-integration-docker`** (wraps `bun
   run test:integration:docker`: `docker-compose.test.yml up --wait` → run suite
   → `down -v`). Plain `just test-integration` assumes the `:30001` container is
