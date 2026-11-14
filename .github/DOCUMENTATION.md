@@ -1,10 +1,10 @@
 # Documentation Automation Setup
 
-This repository includes several GitHub Actions workflows for automated documentation generation and deployment.
+This repository builds and deploys its documentation with one GitHub Actions workflow, `docs.yml`.
 
-## 📋 Available Workflows
+## 📋 Workflow
 
-### 1. `docs.yml` - GitHub Pages Deployment
+### `docs.yml` - GitHub Pages Deployment
 - ✅ Deploys to GitHub Pages automatically
 - ✅ Validates the docs build on pull requests (build only, no deploy)
 - ✅ Clean URLs (e.g., `https://username.github.io/repo/`)
@@ -26,19 +26,6 @@ This repository includes several GitHub Actions workflows for automated document
 > this workflow never reports a status at all and a required check would wait
 > forever. `deploy` is additionally *skipped* on pull requests by design.
 
-### 2. `setup-docs.yml` - One-time Setup
-**Initial setup helper**
-
-- Generates initial documentation
-- Creates `.nojekyll` file for GitHub Pages
-- Provides setup instructions
-
-> **Do not run it.** `docs.yml` builds and deploys without it. Its
-> `--cleanOutputDir` + `git add docs/` would stage the deletion of the
-> committed ADRs, PRDs, PRPs and guides under `docs/`, and its push to `main`
-> is blocked by the pre-commit hook and the branch rulesets. Removal is
-> tracked in #245.
-
 ## 🚀 Quick Start
 
 ### Use GitHub Pages
@@ -50,7 +37,7 @@ This repository includes several GitHub Actions workflows for automated document
 ## 🔧 Customization
 
 ### Modify Documentation Generation
-Edit the TypeDoc command in the workflows:
+Edit the TypeDoc command in `docs.yml`:
 ```yaml
 npx typedoc src/foundry/client.ts src/foundry/types.ts src/config/index.ts src/utils/logger.ts \
   --out docs \
@@ -91,8 +78,7 @@ npm run docs:serve  # Generate and serve locally
 ```
 .github/
 ├── workflows/
-│   ├── docs.yml           # GitHub Pages deployment
-│   └── setup-docs.yml     # One-time setup helper
+│   └── docs.yml           # GitHub Pages deployment
 └── DOCUMENTATION.md       # This file
 
 docs/                      # Generated documentation
