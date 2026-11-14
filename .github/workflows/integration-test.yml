@@ -1,18 +1,17 @@
 name: Integration Tests
 
 # ----------------------------------------------------------------------------
-# CI GATE (issue #140): this workflow needs FoundryVTT credentials that are not
+# CI GATE (issue #183): this workflow needs FoundryVTT credentials that are not
 # currently configured on the repo:
 #
 #   - FOUNDRY_LICENSE_KEY
 #   - FOUNDRY_USERNAME
 #   - FOUNDRY_PASSWORD
 #
-# Without these the felddy/foundryvtt container tries to log in to
-# foundryvtt.com with the placeholder values in docker-compose.test.yml
-# (test-user/test-password), gets rejected, and never installs Foundry — so the
-# healthcheck never becomes healthy. Evidence (from the run-25735243106
-# container.log artifact):
+# Without valid credentials the felddy/foundryvtt container cannot log in to
+# foundryvtt.com, so it never installs Foundry and the healthcheck never
+# becomes healthy. Evidence (from the run-25735243106 container.log artifact,
+# when docker-compose.test.yml still defaulted to test-user/test-password):
 #
 #   Authenticate | [error] Unable to log in as test-user, verify your credentials...
 #   Entrypoint   | [warn]  Authentication failed with exit code 255.
@@ -31,8 +30,11 @@ name: Integration Tests
 # `workflow_dispatch` is the exception: an explicit manual run means someone
 # expects the tier to execute, so missing secrets fail loudly there.
 #
-# Once the repo owner adds the three secrets, both jobs run end-to-end with no
-# further changes to this file.
+# Adding the three secrets makes both jobs run, and the container receives
+# them: the "Create .env.integration" step writes them to .env.integration,
+# the only place docker-compose.test.yml takes them from (issue #251). That is
+# not yet a green run: the container starts world-less, so the specs that need
+# a live world still need a bootstrapped world first (issue #252).
 # ----------------------------------------------------------------------------
 
 on:
@@ -73,7 +75,7 @@ jobs:
             echo
             echo "The following repository secrets are not configured: ${missing[*]}"
             echo
-            echo "See issue #140 — without these the felddy/foundryvtt container"
+            echo "See issue #183 — without these the felddy/foundryvtt container"
             echo "cannot authenticate to foundryvtt.com and never becomes healthy."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -82,7 +84,7 @@ jobs:
             exit 1
           fi
 
-          echo "::warning title=Integration tests skipped::Missing FoundryVTT secrets (${missing[*]}); see issue #140."
+          echo "::warning title=Integration tests skipped::Missing FoundryVTT secrets (${missing[*]}); see issue #183."
 
   integration:
     name: Integration tests
@@ -92,9 +94,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.1.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version: latest
 
@@ -130,7 +132,7 @@ jobs:
 
       - name: Upload container logs
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: integration-logs
           path: tests/integration/logs/

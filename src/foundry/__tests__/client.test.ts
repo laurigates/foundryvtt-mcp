@@ -4,18 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies
 vi.mock('axios');
 vi.mock('socket.io-client');
-vi.mock('../auth.js', () => ({
-  authenticateFoundry: vi
-    .fn()
-    .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
-  // Real implementation — connectAndLoadWorld's handshake options are the
-  // subject of the #206 regression test below.
-  sessionSocketOptions: (session: string) => ({
-    transports: ['websocket'],
-    query: { session },
-    extraHeaders: { Cookie: `session=${session}` },
-  }),
-}));
+vi.mock('../auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../auth.js')>();
+  return {
+    authenticateFoundry: vi
+      .fn()
+      .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+    // The real implementations, not copies — connectAndLoadWorld's handshake
+    // URL and options are the subject of the #206/#231 handshake tests below.
+    sessionSocketOptions: actual.sessionSocketOptions,
+    socketOrigin: actual.socketOrigin,
+  };
+});
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -31,6 +31,7 @@ vi.mock('../../config/index.js', () => ({
 }));
 
 const { FoundryClient } = await import('../client.js');
+const { logger } = await import('../../utils/logger.js');
 
 const mockAxios = vi.mocked(axios);
 
@@ -88,11 +89,81 @@ describe('FoundryClient', () => {
       });
     });
 
-    it('should connect via REST API', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+    // #230: `/api/status` is served unauthenticated by Foundry core, so a 200
+    // there proves neither the REST module nor the key. The probe must hit an
+    // authenticated module route and validate the body shape.
+    it('should connect via REST API when /api/world answers with a JSON object', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+      });
       await client.connect();
       expect(client.isConnected()).toBe(true);
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/status');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/api/status');
+    });
+
+    it('should reject and stay disconnected when /api/world answers 200 with HTML', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: '<!DOCTYPE html><html><body>Foundry Virtual Tabletop</body></html>',
+      });
+      await expect(client.connect()).rejects.toThrow(
+        /FOUNDRY_API_KEY is set but the REST module did not answer \/api\/world with JSON/,
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      ['an array', []],
+      ['null', null],
+      ['a string', 'ok'],
+    ])('should reject a /api/world body that is %s', async (_label, data) => {
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data });
+      await expect(client.connect()).rejects.toThrow(/did not answer \/api\/world with JSON/);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([401, 403])('should report a rejected key on /api/world %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: { error: 'Unauthorized' } },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`FOUNDRY_API_KEY was rejected.*HTTP ${status}`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([404, 500])('should report a missing module on /api/world %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: 'Not Found' },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`did not answer /api/world with JSON.*: HTTP ${status}$`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should rethrow a transport error (no HTTP response) unchanged', async () => {
+      // "Server unreachable" must stay visible, not be relabelled as a key or
+      // module problem.
+      const transportError = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:30000'), {
+        code: 'ECONNREFUSED',
+      });
+      mockAxiosInstance.get.mockRejectedValue(transportError);
+      await expect(client.connect()).rejects.toBe(transportError);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should send the configured key in the x-api-key header', () => {
+      const onRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0]?.[0];
+      expect(onRequest).toBeTypeOf('function');
+      const reqConfig = onRequest({ headers: {} });
+      expect(reqConfig.headers['x-api-key']).toBe('test-api-key');
     });
 
     it('should search actors via REST API', async () => {
@@ -597,6 +668,92 @@ describe('FoundryClient', () => {
         await expect(restClient().rollDice('(1d20+5)')).rejects.toThrow(/parenthes/i);
       });
     });
+
+    /**
+     * Issue #254 — a REST failure used to fall through to the local roller in
+     * silence: nothing at warn level, and a result indistinguishable from a
+     * server roll. The fallback stays; it just has to be visible.
+     */
+    describe('where the roll was made (#254)', () => {
+      const API_KEY = 'secret-api-key-254';
+
+      function restClient() {
+        return new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: API_KEY });
+      }
+
+      it('marks a roll FoundryVTT evaluated as source "server" and warns about nothing', async () => {
+        mockAxiosInstance.post.mockResolvedValue({
+          data: { total: 21, terms: [{ results: [16] }] },
+        });
+
+        const result = await restClient().rollDice('1d20+5');
+
+        expect(result.source).toBe('server');
+        expect(result.total).toBe(21);
+        expect(logger.warn).not.toHaveBeenCalled();
+      });
+
+      it('warns with the HTTP status and marks the result "local" when the REST call is rejected', async () => {
+        mockAxiosInstance.post.mockRejectedValue(
+          Object.assign(new Error('Request failed with status code 503'), {
+            isAxiosError: true,
+            code: 'ERR_BAD_RESPONSE',
+            response: { status: 503, data: 'Service Unavailable' },
+            config: { headers: { 'x-api-key': API_KEY } },
+          }),
+        );
+
+        const result = await restClient().rollDice('1d20+5');
+
+        expect(result.source).toBe('local');
+        expect(result.total).toBeGreaterThanOrEqual(6);
+        expect(result.total).toBeLessThanOrEqual(25);
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        const [message, meta] = vi.mocked(logger.warn).mock.calls[0] ?? [];
+        expect(String(message)).toMatch(/REST dice roll failed/i);
+        expect(meta).toMatchObject({ status: 503, code: 'ERR_BAD_RESPONSE' });
+        // The request config carries the API key header; it must not be logged.
+        expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain(API_KEY);
+      });
+
+      it('warns with the error code when the REST server cannot be reached', async () => {
+        mockAxiosInstance.post.mockRejectedValue(
+          Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:30000'), {
+            isAxiosError: true,
+            code: 'ECONNREFUSED',
+          }),
+        );
+
+        const result = await restClient().rollDice('3d6');
+
+        expect(result.source).toBe('local');
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logger.warn).mock.calls[0]?.[1]).toMatchObject({ code: 'ECONNREFUSED' });
+      });
+
+      it('warns and marks the result "local" when the REST body fails validation', async () => {
+        mockAxiosInstance.post.mockResolvedValue({ status: 200, data: { error: 'nope' } });
+
+        const result = await restClient().rollDice('1d20');
+
+        expect(result.source).toBe('local');
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logger.warn).mock.calls[0]?.[1]).toMatchObject({
+          reason: expect.stringMatching(/schema|body/i),
+        });
+      });
+
+      it('marks a Socket.IO / no-API-key roll as source "local" — nothing remote evaluates it', async () => {
+        const result = await new FoundryClient({ baseUrl: 'http://localhost:30000' }).rollDice(
+          '1d20',
+        );
+
+        expect(result.source).toBe('local');
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+        // Rolling locally is the normal path here, not a failure worth a warning.
+        expect(logger.warn).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('disconnect', () => {
@@ -785,6 +942,46 @@ describe('FoundryClient', () => {
     it('reports connected after a successful handshake', async () => {
       const { client: connected } = await connectWithMockSocket();
       expect(connected.isConnected()).toBe(true);
+    });
+
+    it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
+      const { io } = await import('socket.io-client');
+      await connectWithMockSocket();
+
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'http://localhost:30000',
+        expect.objectContaining({
+          path: '/socket.io/',
+          extraHeaders: { Cookie: 'session=test-session' },
+          query: { session: 'test-session' },
+        }),
+      );
+    });
+
+    it('connects to the origin with the configured socketPath behind a routePrefix (#231)', async () => {
+      const { io } = await import('socket.io-client');
+      const { authenticateFoundry } = await import('../auth.js');
+      const prefixed = new FoundryClient({
+        baseUrl: 'https://host.example/foundry',
+        username: 'gm',
+        password: 'secret',
+        socketPath: '/foundry/socket.io/',
+      });
+
+      await connectWithMockSocket(prefixed);
+
+      // The URL pathname would be read as a namespace, so io() gets the origin.
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'https://host.example',
+        expect.objectContaining({ path: '/foundry/socket.io/' }),
+      );
+      // /join stays on the prefixed baseUrl; the socket path rides along.
+      expect(vi.mocked(authenticateFoundry)).toHaveBeenCalledWith(
+        'https://host.example/foundry',
+        'gm',
+        'secret',
+        '/foundry/socket.io/',
+      );
     });
 
     it('reports disconnected once the socket drops without disconnect()', async () => {

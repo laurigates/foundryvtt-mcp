@@ -10,7 +10,7 @@
  *   - the connected user to hold GM/owner permission (writes are GM-gated).
  *
  * When no active combat / combatant is present — e.g. the fresh, world-less CI
- * instance (issue #140) — the suite skips rather than failing, matching the
+ * instance (issue #183) — the suite skips rather than failing, matching the
  * live-world precondition shared by the other integration specs.
  *
  * Reversible mutations are reverted: initiative is restored to its original

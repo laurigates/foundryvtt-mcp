@@ -18,16 +18,23 @@ jobs:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.1.0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # GHSA-g3hv-75wg-m249 (minimatch < 11.0.1 ReDoS) is ignored because its
+      # only path is the devDependency typedoc > minimatch 10: typedoc 0.28.x
+      # declares minimatch ^10 and crashes on minimatch 11 (TypeStrong/typedoc#3150,
+      # fix in #3151). The ReDoS needs attacker-controlled glob patterns, and
+      # typedoc only globs this repo's own config and entry points.
+      # src/__tests__/audit-ignore-tripwire.test.ts fails once typedoc stops
+      # requiring minimatch < 11, or another package starts to; then drop this.
       - name: Audit dependencies
-        run: bun audit --audit-level=moderate
+        run: bun audit --audit-level=moderate --ignore=GHSA-g3hv-75wg-m249
 
   # Deterministic secret scan. No actor gate, so bot PRs (Renovate,
   # release-please) are scanned too. Pull requests scan the PR's commits,
@@ -41,7 +48,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -112,14 +119,14 @@ jobs:
       security-events: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.1.0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v4.39.3
         with:
           languages: javascript-typescript
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v4.39.3
         with:
           category: "/language:javascript-typescript"

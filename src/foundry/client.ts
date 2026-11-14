@@ -9,8 +9,9 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse 
 import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { authenticateFoundry, sessionSocketOptions } from './auth.js';
+import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
+import { probeRestModule } from './rest-probe.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -41,6 +42,9 @@ import {
   parseDocumentBroadcast,
   parseUserActivity,
 } from './world-cache.js';
+
+// Re-exported so existing importers of `client.js` keep working (#255 moved it).
+export { probeRestModule };
 
 /** FoundryVTT document IDs are 16-character alphanumeric strings. */
 const FOUNDRY_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
@@ -130,6 +134,43 @@ const RestDiceRollSchema = z.object({
   total: z.number(),
   terms: z.array(z.object({ results: z.array(z.number()).optional() })).optional(),
 });
+
+/**
+ * Loggable summary of why a REST dice call failed (#254).
+ *
+ * Reads only the HTTP status and the error code, structurally rather than via
+ * `axios.isAxiosError`, so nothing else on the error — in particular
+ * `config.headers`, which carries the `x-api-key` — reaches the log.
+ */
+function describeRestFailure(error: unknown): {
+  reason: string;
+  status?: number;
+  code?: string;
+} {
+  if (error instanceof z.ZodError) {
+    return { reason: 'response body failed schema validation' };
+  }
+  if (typeof error !== 'object' || error === null) {
+    return { reason: 'request failed' };
+  }
+
+  const summary: { reason: string; status?: number; code?: string } = {
+    reason: 'request failed',
+  };
+  const response: unknown = 'response' in error ? error.response : undefined;
+  if (typeof response === 'object' && response !== null && 'status' in response) {
+    const status: unknown = response.status;
+    if (typeof status === 'number') {
+      summary.status = status;
+      summary.reason = 'HTTP error response';
+    }
+  }
+  const code: unknown = 'code' in error ? error.code : undefined;
+  if (typeof code === 'string') {
+    summary.code = code;
+  }
+  return summary;
+}
 
 /**
  * Minimal Zod schema for the WorldData Socket.IO payload.
@@ -280,13 +321,14 @@ export class FoundryClient {
 
   /**
    * Connects to FoundryVTT.
-   * REST API mode: tests /api/status endpoint.
+   * REST API mode: probes the module's authenticated /api/world route
+   * (`probeRestModule`); connected only once it answers with a JSON object.
    * Socket.IO mode: authenticates and loads full worldData.
    */
   async connect(): Promise<void> {
     if (this.config.apiKey) {
       try {
-        await this.http.get('/api/status');
+        await probeRestModule((url) => this.http.get(url));
         this._isConnected = true;
         logger.info('Connected to FoundryVTT via REST API module');
       } catch (error) {
@@ -304,7 +346,12 @@ export class FoundryClient {
       );
     }
 
-    const { session } = await authenticateFoundry(this.config.baseUrl, user, this.config.password);
+    const { session } = await authenticateFoundry(
+      this.config.baseUrl,
+      user,
+      this.config.password,
+      this.config.socketPath,
+    );
 
     // Connect authenticated socket and load world data
     this.worldData = await this.connectAndLoadWorld(session);
@@ -325,7 +372,12 @@ export class FoundryClient {
     this.detachSocket();
 
     return new Promise((resolve, reject) => {
-      this.socket = io(this.config.baseUrl, sessionSocketOptions(session));
+      // Origin + `path`, not the full baseUrl: a routePrefix in the URL would
+      // be read as a Socket.IO namespace (#231).
+      this.socket = io(
+        socketOrigin(this.config.baseUrl),
+        sessionSocketOptions(session, this.config.socketPath),
+      );
 
       const cleanup = () => {
         this.socket?.off('session', onSession);
@@ -1580,13 +1632,20 @@ export class FoundryClient {
           total: rolled.total,
           breakdown: rolled.terms?.map((term) => term.results?.join(', ')).join(' + ') || formula,
           timestamp: new Date().toISOString(),
+          source: 'server',
         };
         if (reason) {
           result.reason = reason;
         }
         return result;
-      } catch {
-        // Fall through to local roll
+      } catch (error) {
+        // Keep the fallback, but never in silence (#254): the result is marked
+        // `source: 'local'` and the failure is logged without the request
+        // config, which carries the API key header.
+        logger.warn(
+          'REST dice roll failed — falling back to the local roller',
+          describeRestFailure(error),
+        );
       }
     }
 
@@ -1607,6 +1666,7 @@ export class FoundryClient {
       total,
       breakdown,
       timestamp: new Date().toISOString(),
+      source: 'local',
     };
     if (reason) {
       result.reason = reason;

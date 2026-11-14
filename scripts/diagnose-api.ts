@@ -7,11 +7,44 @@
 
 import axios from 'axios';
 import dotenv from 'dotenv';
+// rest-probe has no config/logger imports, so it is safe to load before dotenv runs.
+import { probeRestModule } from '../src/foundry/rest-probe.js';
 
 dotenv.config({ quiet: true });
 
 const FOUNDRY_URL = process.env.FOUNDRY_URL || 'http://localhost:30000';
 const API_KEY = process.env.FOUNDRY_API_KEY;
+
+interface RestProbeResult {
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * Whether the REST module is installed and accepts the key: the same
+ * authenticated /api/world probe as FoundryClient.connect(). Core FoundryVTT
+ * serves /api/status unauthenticated, so a 2xx there proves neither (#230, #255).
+ */
+async function probeRest(apiKey: string): Promise<RestProbeResult> {
+  try {
+    const world = await probeRestModule((url) =>
+      axios.get(`${FOUNDRY_URL}${url}`, {
+        headers: {
+          'x-api-key': apiKey,
+          'User-Agent': 'FoundryMCP-Diagnostic/1.0'
+        },
+        timeout: 10000
+      })
+    );
+    const keys = Object.keys(world);
+    return {
+      ok: true,
+      detail: `Response keys: ${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}`
+    };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 interface TestResult {
   endpoint: string;
@@ -84,7 +117,7 @@ async function runDiagnostics() {
     authRequired: boolean;
   }> = [
     {
-      name: 'Status Endpoint (No Auth)',
+      name: 'Foundry Reachable (core /api/status, no auth)',
       endpoint: '/api/status',
       method: 'GET',
       authRequired: false
@@ -156,6 +189,12 @@ async function runDiagnostics() {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
+  let restProbe: RestProbeResult | undefined;
+  if (API_KEY) {
+    console.log('Probing REST API module (authenticated /api/world)...');
+    restProbe = await probeRest(API_KEY);
+  }
+
   console.log('\n📊 Test Results:');
   console.log('================\n');
 
@@ -205,20 +244,30 @@ async function runDiagnostics() {
   console.log('🔍 Analysis:');
   
   if (statusTest?.status === 'PASS') {
-    console.log('   ✅ FoundryVTT server is accessible');
-    console.log('   ✅ REST API module is likely installed');
+    console.log('   ✅ FoundryVTT server is accessible (core /api/status)');
+    console.log('   ℹ️  /api/status is served by FoundryVTT core without auth; it says nothing about the REST module');
   } else if (statusTest?.status === 'FAIL') {
     console.log('   ❌ FoundryVTT server connection issues');
     console.log('   💡 Check if FoundryVTT is running and accessible');
   }
-  
+
+  if (restProbe?.ok) {
+    console.log('   ✅ REST API module answered /api/world with JSON (API key accepted)');
+    console.log(`   ${restProbe.detail}`);
+  } else if (restProbe) {
+    console.log(`   ❌ REST API module check failed: ${restProbe.detail}`);
+  }
+
   if (authTests.length > 0) {
     const authPassed = authTests.filter(r => r.status === 'PASS').length;
     const authFailed = authTests.filter(r => r.status === 'FAIL').length;
-    
-    if (authPassed > 0) {
+
+    if (authPassed > 0 && restProbe?.ok) {
       console.log('   ✅ API authentication is working');
       console.log('   ✅ REST API module is properly configured');
+    } else if (authPassed > 0) {
+      console.log(`   ⚠️  ${authPassed} authenticated endpoint(s) answered HTTP < 400, but /api/world did not return JSON`);
+      console.log('   💡 Those responses may come from FoundryVTT core, not the REST API module');
     } else if (authFailed > 0) {
       console.log('   ❌ API authentication issues detected');
       const auth404 = authTests.filter(r => r.statusCode === 404).length;

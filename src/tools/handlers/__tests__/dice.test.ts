@@ -12,6 +12,7 @@ interface MockDiceRoll {
   breakdown: string;
   reason?: string;
   timestamp: string;
+  source: 'server' | 'local';
 }
 
 function mockFoundryClient(roll: MockDiceRoll): FoundryClient {
@@ -32,6 +33,7 @@ describe('handleRollDice', () => {
         total: 14,
         breakdown: '[14]',
         timestamp: '2024-06-01T12:00:00.000Z',
+        source: 'server',
       });
 
       const result = await handleRollDice({ formula: '1d20' }, client);
@@ -54,6 +56,7 @@ describe('handleRollDice', () => {
         breakdown: '[5,4,4] + 4',
         reason: 'Damage roll',
         timestamp: '2024-06-01T12:00:00.000Z',
+        source: 'server',
       });
 
       const result = await handleRollDice({ formula: '3d6+4', reason: 'Damage roll' }, client);
@@ -63,6 +66,38 @@ describe('handleRollDice', () => {
       expect(text).toContain('**Total:** 17');
       expect(text).toContain('**Reason:** Damage roll');
       expect(client.rollDice).toHaveBeenCalledWith('3d6+4', 'Damage roll');
+    });
+  });
+
+  /**
+   * Issue #254 — the caller has to be able to tell a FoundryVTT roll from one
+   * this server made itself (the Socket.IO default, or a REST call that failed
+   * and fell back).
+   */
+  describe('roll source (#254)', () => {
+    const base = {
+      formula: '1d20',
+      total: 12,
+      breakdown: '1d20: [12] = 12',
+      timestamp: '2024-06-01T12:00:00.000Z',
+    };
+
+    it('says the roll was made locally, not by FoundryVTT, when source is "local"', async () => {
+      const client = mockFoundryClient({ ...base, source: 'local' });
+
+      const text = getText(await handleRollDice({ formula: '1d20' }, client));
+
+      expect(text).toMatch(/\*\*Source:\*\* local/);
+      expect(text).toContain('not FoundryVTT');
+    });
+
+    it('says FoundryVTT rolled it when source is "server"', async () => {
+      const client = mockFoundryClient({ ...base, source: 'server' });
+
+      const text = getText(await handleRollDice({ formula: '1d20' }, client));
+
+      expect(text).toContain('**Source:** FoundryVTT server');
+      expect(text).not.toMatch(/\*\*Source:\*\* local/);
     });
   });
 

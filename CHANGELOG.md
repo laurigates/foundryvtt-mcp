@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.4](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.3...foundryvtt-mcp-v1.5.4) (2026-11-14)
+
+
+### Bug Fixes
+
+* **auth:** pass FOUNDRY_SOCKET_PATH to Socket.IO as `path` ([#262](https://github.com/laurigates/foundryvtt-mcp/issues/262)) ([9fb9267](https://github.com/laurigates/foundryvtt-mcp/commit/9fb92675933f15a700abb6da70d9e66128880b22)), closes [#231](https://github.com/laurigates/foundryvtt-mcp/issues/231)
+* **cache:** evict an empty-string LRU key instead of skipping it ([#268](https://github.com/laurigates/foundryvtt-mcp/issues/268)) ([28e1042](https://github.com/laurigates/foundryvtt-mcp/commit/28e1042fef0623ee61d8898d63c85a7400d1fa68)), closes [#264](https://github.com/laurigates/foundryvtt-mcp/issues/264)
+* **cache:** order LRU eviction by access sequence, not wall-clock ms ([#259](https://github.com/laurigates/foundryvtt-mcp/issues/259)) ([ba0fca6](https://github.com/laurigates/foundryvtt-mcp/commit/ba0fca6b8a3819b5c47033c25eac2993939b3f6d)), closes [#258](https://github.com/laurigates/foundryvtt-mcp/issues/258)
+* **ci:** take integration credentials from .env.integration only ([#263](https://github.com/laurigates/foundryvtt-mcp/issues/263)) ([7a3f8de](https://github.com/laurigates/foundryvtt-mcp/commit/7a3f8deec5a4221277e7ab27c041e4297267a190)), closes [#251](https://github.com/laurigates/foundryvtt-mcp/issues/251) [#183](https://github.com/laurigates/foundryvtt-mcp/issues/183)
+* **client:** log and mark the local dice fallback when REST fails ([#269](https://github.com/laurigates/foundryvtt-mcp/issues/269)) ([dd486b6](https://github.com/laurigates/foundryvtt-mcp/commit/dd486b6e9747f832fe5203965132ad28458a00e2)), closes [#254](https://github.com/laurigates/foundryvtt-mcp/issues/254) [#230](https://github.com/laurigates/foundryvtt-mcp/issues/230)
+* **client:** probe the REST module's /api/world instead of core /api/status ([#260](https://github.com/laurigates/foundryvtt-mcp/issues/260)) ([dd93471](https://github.com/laurigates/foundryvtt-mcp/commit/dd934719d0f7fb3681051d74c6a119b3754ec817)), closes [#230](https://github.com/laurigates/foundryvtt-mcp/issues/230)
+* **deps:** clear the bun audit advisories and ignore the typedoc minimatch one ([#256](https://github.com/laurigates/foundryvtt-mcp/issues/256)) ([c150ae7](https://github.com/laurigates/foundryvtt-mcp/commit/c150ae75ba817643a5e8cf5c36e9718ffe87d7cb)), closes [#247](https://github.com/laurigates/foundryvtt-mcp/issues/247) [#240](https://github.com/laurigates/foundryvtt-mcp/issues/240)
+* **justfile:** use portable sed -i.bak so env-setup runs on Linux ([#234](https://github.com/laurigates/foundryvtt-mcp/issues/234)) ([e93c2fe](https://github.com/laurigates/foundryvtt-mcp/commit/e93c2fe835e0dd7bce04fd7c9f2aea52945eb0d1))
+* **scripts:** decide "REST module works" via probeRestModule, not core /api/status ([#270](https://github.com/laurigates/foundryvtt-mcp/issues/270)) ([8e95bb7](https://github.com/laurigates/foundryvtt-mcp/commit/8e95bb7e82e61a08766ac833c9fbfd634b2361cd)), closes [#255](https://github.com/laurigates/foundryvtt-mcp/issues/255) [#230](https://github.com/laurigates/foundryvtt-mcp/issues/230)
+
 ## [1.5.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.2...foundryvtt-mcp-v1.5.3) (2026-09-04)
 
 

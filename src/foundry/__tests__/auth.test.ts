@@ -256,13 +256,77 @@ describe('authenticateFoundry — session cookie on the Socket.IO handshake (#20
   });
 });
 
-describe('sessionSocketOptions (#206)', () => {
+describe('sessionSocketOptions (#206, #231)', () => {
   it('carries the session in both the Cookie header and the query param', () => {
     expect(sessionSocketOptions('abc123')).toEqual({
       transports: ['websocket'],
+      path: '/socket.io/',
       query: { session: 'abc123' },
       extraHeaders: { Cookie: 'session=abc123' },
     });
+  });
+
+  it('sets the Socket.IO `path` option from a configured socket path (#231)', () => {
+    expect(sessionSocketOptions('abc123', '/foundry/socket.io/')).toMatchObject({
+      path: '/foundry/socket.io/',
+    });
+  });
+});
+
+describe('authenticateFoundry — configured socket path behind a routePrefix (#231)', () => {
+  /**
+   * socket.io-client reads the URL's pathname as the namespace, not the
+   * transport path, so io('https://host/foundry') would join namespace
+   * `/foundry` on `/socket.io/`. The handshake must get the origin plus `path`,
+   * while the /join HTTP calls keep the full baseUrl (it carries the prefix).
+   */
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+    mockJoinPostSuccess();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('connects to the origin with the configured path, and keeps /join on the prefix', async () => {
+    const { socket } = buildMockSocket([{ _id: 'resolvedDocId123', name: 'Gamemaster' }]);
+    mockIo.mockReturnValue(socket);
+
+    await authenticateFoundry(
+      'https://host.example/foundry',
+      'Gamemaster',
+      'pw',
+      '/foundry/socket.io/',
+    );
+
+    expect(mockIo).toHaveBeenCalledWith(
+      'https://host.example',
+      expect.objectContaining({ path: '/foundry/socket.io/' }),
+    );
+    expect(mockAxios.get).toHaveBeenCalledWith(
+      'https://host.example/foundry/join',
+      expect.anything(),
+    );
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'https://host.example/foundry/join',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('defaults the handshake path to /socket.io/ when none is given', async () => {
+    const { socket } = buildMockSocket([{ _id: 'resolvedDocId123', name: 'Gamemaster' }]);
+    mockIo.mockReturnValue(socket);
+
+    await authenticateFoundry('http://localhost:30000', 'Gamemaster', 'pw');
+
+    expect(mockIo).toHaveBeenCalledWith(
+      'http://localhost:30000',
+      expect.objectContaining({ path: '/socket.io/' }),
+    );
   });
 });
 

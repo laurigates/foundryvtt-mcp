@@ -19,22 +19,27 @@ local/CI parity.
   (`createConnectedClient`) in Socket.IO mode (`FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`).
 - The Foundry build under test is pinned **twice** in `docker-compose.test.yml`
   — the `image:` tag and `FOUNDRY_VERSION` — and the env var is the one that
-  decides what installs. Move both together. To override for one run, export
-  `FOUNDRY_VERSION` in the shell; setting it in `.env.integration` does nothing,
-  because compose interpolation never reads an `env_file:` entry and the
-  `environment:` block overrides it regardless.
+  decides what installs. Move both together: `renovate.json` groups both pins
+  into one approval-gated PR, and `src/__tests__/foundry-version-pins.test.ts`
+  fails unless the tag equals the `FOUNDRY_VERSION` default. To override for
+  one run, export `FOUNDRY_VERSION` in the shell; setting it in
+  `.env.integration` does nothing, because compose interpolation never reads
+  an `env_file:` entry and the `environment:` block overrides it regardless.
 - `tests/integration/global-setup.ts` only **waits** for the container at
   `:30001` — it does **not** start it.
 - **Running it:** needs (a) `.env.integration` (copy from
-  `.env.integration.example`, add a real `FOUNDRY_LICENSE_KEY` — the file is
-  gitignored and ships only as the `.example`) and (b) the ephemeral test
+  `.env.integration.example` — the file is gitignored and ships only as the
+  `.example`) holding a real `FOUNDRY_LICENSE_KEY` and your real foundryvtt.com
+  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD`, which the felddy container uses to
+  download Foundry. All three must be in that file: a shell export or a project
+  `.env` does not reach the container (issue #251). It also needs (b) the ephemeral test
   container up on `:30001`. Use **`just test-integration-docker`** (wraps `bun
   run test:integration:docker`: `docker-compose.test.yml up --wait` → run suite
   → `down -v`). Plain `just test-integration` assumes the `:30001` container is
   already running and otherwise blocks ~120s before failing in global-setup.
 - The test container uses tmpfs `/data` + `CONTAINER_PRESERVE_CONFIG=false`, so
   it starts world-less; Socket.IO auth specs need a bootstrapped world (still
-  manual — the CI wiring for this tier is gated on `FOUNDRY_*` secrets, issue #140).
+  manual — the CI wiring for this tier is gated on `FOUNDRY_*` secrets, issue #183).
 - **Write-tool tests** (`mutations.integration.test.ts`) exercise the
   `modifyDocument` write protocol: they require `writeEnabled: true` and a world
   **GM** user, target an actor with a mutable attribute, and **revert every
@@ -43,7 +48,7 @@ local/CI parity.
   integration specs.
 - The bridge/REST path is **read-only**; `search_compendium` integration
   coverage is blocked on the bridge implementing `/api/compendium/search`.
-- CI runs this tier only once the `FOUNDRY_*` secrets are configured (issue #140).
+- CI runs this tier only once the `FOUNDRY_*` secrets are configured (issue #183).
 
 ## Coverage areas
 

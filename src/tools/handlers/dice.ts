@@ -46,6 +46,7 @@ export class RollDiceTool extends BaseTool {
 **Total:** ${result.total}
 **Breakdown:** ${result.breakdown}
 ${result.reason ? `**Reason:** ${result.reason}` : ''}
+**Source:** ${result.source === 'server' ? 'FoundryVTT server' : 'local roller (this MCP server, not FoundryVTT)'}
 **Timestamp:** ${result.timestamp}`);
   }
 }
