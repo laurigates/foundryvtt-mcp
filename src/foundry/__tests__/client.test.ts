@@ -4,18 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies
 vi.mock('axios');
 vi.mock('socket.io-client');
-vi.mock('../auth.js', () => ({
-  authenticateFoundry: vi
-    .fn()
-    .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
-  // Real implementation — connectAndLoadWorld's handshake options are the
-  // subject of the #206 regression test below.
-  sessionSocketOptions: (session: string) => ({
-    transports: ['websocket'],
-    query: { session },
-    extraHeaders: { Cookie: `session=${session}` },
-  }),
-}));
+vi.mock('../auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../auth.js')>();
+  return {
+    authenticateFoundry: vi
+      .fn()
+      .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+    // The real implementations, not copies — connectAndLoadWorld's handshake
+    // URL and options are the subject of the #206/#231 handshake tests below.
+    sessionSocketOptions: actual.sessionSocketOptions,
+    socketOrigin: actual.socketOrigin,
+  };
+});
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -88,11 +88,85 @@ describe('FoundryClient', () => {
       });
     });
 
-    it('should connect via REST API', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+    // #230: `/api/status` is served unauthenticated by Foundry core, so a 200
+    // there proves neither the REST module nor the key. The probe must hit an
+    // authenticated module route and validate the body shape.
+    it('should connect via REST API when /api/world answers with a JSON object', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+      });
       await client.connect();
       expect(client.isConnected()).toBe(true);
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/status');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/api/status');
+    });
+
+    it('should reject and stay disconnected when /api/world answers 200 with HTML', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: '<!DOCTYPE html><html><body>Foundry Virtual Tabletop</body></html>',
+      });
+      await expect(client.connect()).rejects.toThrow(
+        /FOUNDRY_API_KEY is set but the REST module did not answer \/api\/world with JSON/,
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      ['an array', []],
+      ['null', null],
+      ['a string', 'ok'],
+    ])('should reject a /api/world body that is %s', async (_label, data) => {
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data });
+      await expect(client.connect()).rejects.toThrow(/did not answer \/api\/world with JSON/);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      401, 403,
+    ])('should report a rejected key when /api/world answers %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: { error: 'Unauthorized' } },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`FOUNDRY_API_KEY was rejected.*HTTP ${status}`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it.each([
+      404, 500,
+    ])('should report a missing module when /api/world answers %i', async (status) => {
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error(`Request failed with status code ${status}`), {
+          response: { status, data: 'Not Found' },
+        }),
+      );
+      await expect(client.connect()).rejects.toThrow(
+        new RegExp(`did not answer /api/world with JSON.*: HTTP ${status}$`),
+      );
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should rethrow a transport error (no HTTP response) unchanged', async () => {
+      // "Server unreachable" must stay visible, not be relabelled as a key or
+      // module problem.
+      const transportError = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:30000'), {
+        code: 'ECONNREFUSED',
+      });
+      mockAxiosInstance.get.mockRejectedValue(transportError);
+      await expect(client.connect()).rejects.toBe(transportError);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should send the configured key in the x-api-key header', () => {
+      const onRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0]?.[0];
+      expect(onRequest).toBeTypeOf('function');
+      const reqConfig = onRequest({ headers: {} });
+      expect(reqConfig.headers['x-api-key']).toBe('test-api-key');
     });
 
     it('should search actors via REST API', async () => {
@@ -785,6 +859,46 @@ describe('FoundryClient', () => {
     it('reports connected after a successful handshake', async () => {
       const { client: connected } = await connectWithMockSocket();
       expect(connected.isConnected()).toBe(true);
+    });
+
+    it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
+      const { io } = await import('socket.io-client');
+      await connectWithMockSocket();
+
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'http://localhost:30000',
+        expect.objectContaining({
+          path: '/socket.io/',
+          extraHeaders: { Cookie: 'session=test-session' },
+          query: { session: 'test-session' },
+        }),
+      );
+    });
+
+    it('connects to the origin with the configured socketPath behind a routePrefix (#231)', async () => {
+      const { io } = await import('socket.io-client');
+      const { authenticateFoundry } = await import('../auth.js');
+      const prefixed = new FoundryClient({
+        baseUrl: 'https://host.example/foundry',
+        username: 'gm',
+        password: 'secret',
+        socketPath: '/foundry/socket.io/',
+      });
+
+      await connectWithMockSocket(prefixed);
+
+      // The URL pathname would be read as a namespace, so io() gets the origin.
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'https://host.example',
+        expect.objectContaining({ path: '/foundry/socket.io/' }),
+      );
+      // /join stays on the prefixed baseUrl; the socket path rides along.
+      expect(vi.mocked(authenticateFoundry)).toHaveBeenCalledWith(
+        'https://host.example/foundry',
+        'gm',
+        'secret',
+        '/foundry/socket.io/',
+      );
     });
 
     it('reports disconnected once the socket drops without disconnect()', async () => {

@@ -66,7 +66,7 @@ All gated on `FOUNDRY_API_KEY`.
 | ID | Story | Surface | Coverage |
 |---|---|---|---|
 | CN-1 | As a new user, I run the setup wizard and get a working `.env`. | `scripts/setup-wizard.ts` | ❌ |
-| CN-2 | As a user behind a reverse proxy, I configure HTTPS + custom socket path. | `FOUNDRY_URL`, `FOUNDRY_SOCKET_PATH` | ⚠ config schema tested; live HTTPS path not |
+| CN-2 | As a user behind a reverse proxy, I configure HTTPS + custom socket path (`routePrefix` → `FOUNDRY_SOCKET_PATH=/<prefix>/socket.io/`). | `FOUNDRY_URL`, `FOUNDRY_SOCKET_PATH`, `auth.ts` `sessionSocketOptions`/`socketOrigin` | ⚠ config schema tested; unit tests assert both `io()` calls get the URL origin plus the configured `path` and `/join` keeps the prefixed URL (`auth.test.ts`, `client.test.ts`, #231); live HTTPS/prefixed server not |
 | CN-3 | As a user, plaintext HTTP to a non-localhost host warns me. | `auth.ts:117-132` | ❌ warning is emitted in code; no unit test asserts `logger.warn` is called |
 | CN-4 | As a user with `FOUNDRY_USER_ID` set, I skip the username→ID lookup step. | `auth.ts:47-52`, `client.ts:146` | ⚠ `auth.integration.test.ts:41-62` covers ID resolution; pure unit branch (16-char regex shortcut, no Socket.IO emit) not isolated |
 | CN-5 | As a user, when Foundry restarts mid-session the client surfaces the disconnect cleanly. | `client.ts` disconnect/cleanup | ⚠ `connectAndLoadWorld` cleans listeners on resolve/reject/timeout (`client.ts:169-217`); `refreshWorldData` (`client.ts:247-270`) leaks the `world` listener on timeout — see DEF-2 |
