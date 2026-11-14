@@ -249,12 +249,14 @@ describe('FoundryVTT Types', () => {
         breakdown: '(4 + 5) + 3',
         reason: 'Attack roll',
         timestamp: '2024-01-01T12:00:00.000Z',
+        source: 'local',
       };
 
       expect(roll.formula).toBe('2d6+3');
       expect(roll.total).toBe(11);
       expect(roll.breakdown).toContain('4 + 5');
       expect(roll.reason).toBe('Attack roll');
+      expect(roll.source).toBe('local');
     });
   });
 
