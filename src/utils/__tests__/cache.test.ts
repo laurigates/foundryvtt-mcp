@@ -58,12 +58,9 @@ describe('CacheService', () => {
   });
 
   describe('LRU Eviction', () => {
-    it('should evict least recently used entries when max size exceeded', async () => {
+    it('should evict least recently used entries when max size exceeded', () => {
       cache.set('key1', 'value1');
-      // Small delay to ensure different timestamps
-      await new Promise((resolve) => setTimeout(resolve, 1));
       cache.set('key2', 'value2');
-      await new Promise((resolve) => setTimeout(resolve, 1));
       cache.set('key3', 'value3');
 
       // Access key1 and key3 to make them recently used
@@ -77,6 +74,25 @@ describe('CacheService', () => {
       expect(cache.get('key2')).toBeUndefined(); // Evicted
       expect(cache.get('key3')).toBe('value3'); // Still there
       expect(cache.get('key4')).toBe('value4'); // New entry
+    });
+
+    it('orders by access, not by wall-clock millisecond, when every access shares one timestamp (#258)', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+        cache.set('key1', 'value1');
+        cache.set('key2', 'value2');
+        cache.set('key3', 'value3');
+        cache.get('key1');
+        cache.get('key3');
+
+        // key2 is the least recently used even though all five calls share one Date.now().
+        cache.set('key4', 'value4');
+
+        expect(cache.getKeys().sort()).toEqual(['key1', 'key3', 'key4']);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

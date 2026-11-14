@@ -16,6 +16,8 @@ interface CacheEntry<T> {
   ttl: number;
   accessCount: number;
   lastAccessed: number;
+  /** Monotonic access order; eviction uses this, not lastAccessed (#258). */
+  accessSeq: number;
 }
 
 /**
@@ -50,6 +52,11 @@ export class CacheService {
     evictions: 0,
   };
   private cleanupInterval: ReturnType<typeof setInterval> | undefined;
+  /**
+   * Incremented on every set and cache hit. Date.now() has millisecond
+   * resolution, so accesses within one millisecond would tie (#258).
+   */
+  private accessClock = 0;
 
   constructor(private config: CacheConfig) {
     if (config.enabled) {
@@ -100,6 +107,7 @@ export class CacheService {
     // Update access metadata
     entry.accessCount++;
     entry.lastAccessed = now;
+    entry.accessSeq = ++this.accessClock;
 
     this.stats.hits++;
     logger.debug('Cache hit', { key, accessCount: entry.accessCount });
@@ -128,6 +136,7 @@ export class CacheService {
       ttl,
       accessCount: 0,
       lastAccessed: now,
+      accessSeq: ++this.accessClock,
     };
 
     this.cache.set(key, entry);
@@ -245,11 +254,13 @@ export class CacheService {
    */
   private evictLeastRecentlyUsed(): void {
     let lruKey: string | undefined;
-    let lruTime = Date.now(); // Start with current time
+    let lruSeq = Number.POSITIVE_INFINITY;
+    let lruTime = 0;
 
-    // Find the entry with the oldest lastAccessed time
+    // Find the entry with the lowest access sequence number
     for (const [key, entry] of this.cache.entries()) {
-      if (entry.lastAccessed <= lruTime) {
+      if (entry.accessSeq < lruSeq) {
+        lruSeq = entry.accessSeq;
         lruTime = entry.lastAccessed;
         lruKey = key;
       }
