@@ -40,7 +40,7 @@ This repository builds and deploys its documentation with one GitHub Actions wor
 Edit the TypeDoc command in `docs.yml`:
 ```yaml
 npx typedoc src/foundry/client.ts src/foundry/types.ts src/config/index.ts src/utils/logger.ts \
-  --out docs \
+  --out build/docs \
   --name "Your Custom Title" \
   --readme README.md \
   --skipErrorChecking \
@@ -81,12 +81,19 @@ npm run docs:serve  # Generate and serve locally
 │   └── docs.yml           # GitHub Pages deployment
 └── DOCUMENTATION.md       # This file
 
-docs/                      # Generated documentation
+build/docs/                # Generated TypeDoc site (gitignored; built and deployed by docs.yml)
 ├── index.html             # Main documentation page
 ├── classes/               # Class documentation
 ├── interfaces/            # Interface documentation
 └── ...                    # Other generated files
+
+docs/                      # Hand-written docs, committed: ADRs, PRDs, PRPs, guides, blueprint
 ```
+
+TypeDoc must never write into `docs/`: its `cleanOutputDir` option defaults to
+`true` and would delete the hand-written files there. `typedoc.json`, the
+`docs` script in `package.json`, and `docs.yml` all use `build/docs`, and
+`src/__tests__/docs-output.test.ts` fails if they drift apart.
 
 ## 🔍 Troubleshooting
 
@@ -105,7 +112,9 @@ workflow, so the run is green on `build` alone.
 3. Review workflow logs in the Actions tab
 
 ### GitHub Pages Not Working
-1. Verify Pages is enabled in repository settings
+1. Verify Pages is enabled in repository settings with Source set to "GitHub Actions".
+   In the legacy "Deploy from a branch" mode, Pages publishes `main:/docs`, which
+   holds no `index.html`, so the site root returns 404.
 2. Check that `docs.yml` workflow completed successfully
 3. Ensure repository is public (for free GitHub accounts)
 

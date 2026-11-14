@@ -81,7 +81,7 @@ npm run dev
 Complete API documentation is auto-generated from TypeScript source code and JSDoc comments.
 
 ```bash
-npm run docs        # Generate documentation
+npm run docs        # Generate documentation into build/docs/ (gitignored)
 npm run docs:serve  # Generate and serve locally
 ```
 

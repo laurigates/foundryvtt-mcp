@@ -157,7 +157,7 @@ docs-serve: ## Generate and serve documentation locally
 	npm run docs:serve
 
 docs-clean: ## Remove generated documentation
-	rm -rf docs
+	rm -rf build/docs
 
 # Release targets
 .PHONY: prerelease verify-ready
