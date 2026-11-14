@@ -83,11 +83,18 @@ function readServiceEntries(compose: string, service: string, key: string): stri
   if (inline !== '') {
     return [inline];
   }
-  return childLines(body, keyAt).map((line) => line.trim().replace(/^-\s*/, ''));
+  return childLines(body, keyAt).map((line) => unquote(line.trim().replace(/^-\s*/, '')));
 }
 
-/** The variable name an `environment:` entry sets (`KEY=value` or `KEY: value`). */
-const definedName = (entry: string): string => (entry.split(/[=:]/, 1)[0] ?? '').trim();
+/**
+ * Strips one layer of surrounding YAML quotes (`"..."` or `'...'`). Compose
+ * reads `- "FOUNDRY_USERNAME=x"` as `FOUNDRY_USERNAME=x`, so a quoted entry
+ * must not hide the variable name from the assertions below.
+ */
+const unquote = (text: string): string => text.replace(/^(["'])(.*)\1$/, '$2');
+
+/** The variable name an `environment:` entry sets (`KEY=value` or `KEY: value`, key optionally quoted). */
+const definedName = (entry: string): string => unquote((entry.split(/[=:]/, 1)[0] ?? '').trim());
 
 const FIXTURE = `services:
   other:
@@ -103,6 +110,13 @@ const FIXTURE = `services:
       - CONTAINER_PRESERVE_CONFIG=false
     env_file:
       - .env.integration
+  quoted:
+    environment:
+      - "FOUNDRY_USERNAME=test-user"
+      - 'FOUNDRY_PASSWORD=test-password'
+  quotedmap:
+    environment:
+      "FOUNDRY_LICENSE_KEY": key
   mapform:
     environment:
       FOUNDRY_PASSWORD: \${FOUNDRY_PASSWORD}
@@ -139,6 +153,15 @@ describe('readServiceEntries (inline fixture)', () => {
       'FOUNDRY_USERNAME',
     );
     expect(definedName(`FOUNDRY_PASSWORD: \${FOUNDRY_PASSWORD}`)).toBe('FOUNDRY_PASSWORD');
+  });
+
+  it('strips one layer of double or single quotes, as compose does', () => {
+    const quoted = readServiceEntries(FIXTURE, 'quoted', 'environment');
+    expect(quoted).toEqual(['FOUNDRY_USERNAME=test-user', 'FOUNDRY_PASSWORD=test-password']);
+    expect(quoted.map(definedName)).toEqual(['FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD']);
+    expect(readServiceEntries(FIXTURE, 'quotedmap', 'environment').map(definedName)).toEqual([
+      'FOUNDRY_LICENSE_KEY',
+    ]);
   });
 });
 
