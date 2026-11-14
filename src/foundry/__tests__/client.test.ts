@@ -124,9 +124,7 @@ describe('FoundryClient', () => {
       expect(client.isConnected()).toBe(false);
     });
 
-    it.each([
-      401, 403,
-    ])('should report a rejected key when /api/world answers %i', async (status) => {
+    it.each([401, 403])('should report a rejected key on /api/world %i', async (status) => {
       mockAxiosInstance.get.mockRejectedValue(
         Object.assign(new Error(`Request failed with status code ${status}`), {
           response: { status, data: { error: 'Unauthorized' } },
@@ -138,9 +136,7 @@ describe('FoundryClient', () => {
       expect(client.isConnected()).toBe(false);
     });
 
-    it.each([
-      404, 500,
-    ])('should report a missing module when /api/world answers %i', async (status) => {
+    it.each([404, 500])('should report a missing module on /api/world %i', async (status) => {
       mockAxiosInstance.get.mockRejectedValue(
         Object.assign(new Error(`Request failed with status code ${status}`), {
           response: { status, data: 'Not Found' },
