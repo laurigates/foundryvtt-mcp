@@ -17,12 +17,13 @@ import { logger } from '../utils/logger.js';
  * Socket.IO connection options carrying a FoundryVTT session.
  *
  * The session is sent twice, and both copies are load-bearing — do not drop
- * either. Per #231 (read from the shipped server bundles), FoundryVTT v14
- * resolves the session from the `session` **cookie** on the handshake request,
- * while v13 reads it from `handshake.query`. A socket whose server finds no
- * session still connects at the transport level — it simply never answers
- * `getJoinData` and emits `session` as `null` — so the only symptom of losing
- * either copy is a bare timeout with no `connect_error` (#206).
+ * either. Per #231, FoundryVTT v14 resolves the session from the `session`
+ * **cookie** on the handshake request, while v13 reads it from
+ * `handshake.query` (not yet verified against a server; tracked in #253).
+ * A socket whose server finds no session still connects at the transport
+ * level — it simply never answers `getJoinData` and emits `session` as
+ * `null` — so the only symptom of losing either copy is a bare timeout with
+ * no `connect_error` (#206).
  *
  * `extraHeaders` is honoured by socket.io-client in Node.js for both the
  * WebSocket and polling handshakes.

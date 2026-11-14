@@ -230,7 +230,8 @@ FOUNDRY_USER_ID=abc123def456ghij
 `FOUNDRY_SOCKET_PATH` is the Socket.IO endpoint path on the server; it defaults
 to `/socket.io/`. FoundryVTT serves Socket.IO under its `routePrefix`, so a
 server behind a prefix needs both settings — the prefix in `FOUNDRY_URL` and
-again in the socket path:
+again in the socket path. That prefixed socket path follows issue #231 and has
+not yet been verified against a live server behind a `routePrefix` (#253).
 
 ```env
 FOUNDRY_URL=https://example.com/foundry
