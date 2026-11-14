@@ -63,6 +63,7 @@ async function testConnection() {
       apiKey: config.foundry.apiKey,
       username: config.foundry.username,
       password: config.foundry.password,
+      socketPath: config.foundry.socketPath,
       timeout: config.foundry.timeout,
     });
 

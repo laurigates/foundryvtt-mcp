@@ -4,18 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies
 vi.mock('axios');
 vi.mock('socket.io-client');
-vi.mock('../auth.js', () => ({
-  authenticateFoundry: vi
-    .fn()
-    .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
-  // Real implementation — connectAndLoadWorld's handshake options are the
-  // subject of the #206 regression test below.
-  sessionSocketOptions: (session: string) => ({
-    transports: ['websocket'],
-    query: { session },
-    extraHeaders: { Cookie: `session=${session}` },
-  }),
-}));
+vi.mock('../auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../auth.js')>();
+  return {
+    authenticateFoundry: vi
+      .fn()
+      .mockResolvedValue({ session: 'test-session', userId: 'test-user-id' }),
+    // The real implementations, not copies — connectAndLoadWorld's handshake
+    // URL and options are the subject of the #206/#231 handshake tests below.
+    sessionSocketOptions: actual.sessionSocketOptions,
+    socketOrigin: actual.socketOrigin,
+  };
+});
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -859,6 +859,46 @@ describe('FoundryClient', () => {
     it('reports connected after a successful handshake', async () => {
       const { client: connected } = await connectWithMockSocket();
       expect(connected.isConnected()).toBe(true);
+    });
+
+    it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
+      const { io } = await import('socket.io-client');
+      await connectWithMockSocket();
+
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'http://localhost:30000',
+        expect.objectContaining({
+          path: '/socket.io/',
+          extraHeaders: { Cookie: 'session=test-session' },
+          query: { session: 'test-session' },
+        }),
+      );
+    });
+
+    it('connects to the origin with the configured socketPath behind a routePrefix (#231)', async () => {
+      const { io } = await import('socket.io-client');
+      const { authenticateFoundry } = await import('../auth.js');
+      const prefixed = new FoundryClient({
+        baseUrl: 'https://host.example/foundry',
+        username: 'gm',
+        password: 'secret',
+        socketPath: '/foundry/socket.io/',
+      });
+
+      await connectWithMockSocket(prefixed);
+
+      // The URL pathname would be read as a namespace, so io() gets the origin.
+      expect(vi.mocked(io)).toHaveBeenCalledWith(
+        'https://host.example',
+        expect.objectContaining({ path: '/foundry/socket.io/' }),
+      );
+      // /join stays on the prefixed baseUrl; the socket path rides along.
+      expect(vi.mocked(authenticateFoundry)).toHaveBeenCalledWith(
+        'https://host.example/foundry',
+        'gm',
+        'secret',
+        '/foundry/socket.io/',
+      );
     });
 
     it('reports disconnected once the socket drops without disconnect()', async () => {

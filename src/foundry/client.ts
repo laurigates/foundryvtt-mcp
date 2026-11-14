@@ -9,7 +9,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse 
 import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { authenticateFoundry, sessionSocketOptions } from './auth.js';
+import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
 import type {
   ActorAttributeUpdateResult,
@@ -371,7 +371,12 @@ export class FoundryClient {
       );
     }
 
-    const { session } = await authenticateFoundry(this.config.baseUrl, user, this.config.password);
+    const { session } = await authenticateFoundry(
+      this.config.baseUrl,
+      user,
+      this.config.password,
+      this.config.socketPath,
+    );
 
     // Connect authenticated socket and load world data
     this.worldData = await this.connectAndLoadWorld(session);
@@ -392,7 +397,12 @@ export class FoundryClient {
     this.detachSocket();
 
     return new Promise((resolve, reject) => {
-      this.socket = io(this.config.baseUrl, sessionSocketOptions(session));
+      // Origin + `path`, not the full baseUrl: a routePrefix in the URL would
+      // be read as a Socket.IO namespace (#231).
+      this.socket = io(
+        socketOrigin(this.config.baseUrl),
+        sessionSocketOptions(session, this.config.socketPath),
+      );
 
       const cleanup = () => {
         this.socket?.off('session', onSession);
