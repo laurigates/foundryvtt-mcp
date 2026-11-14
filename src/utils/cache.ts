@@ -266,7 +266,8 @@ export class CacheService {
       }
     }
 
-    if (lruKey) {
+    // '' is a valid key, so test for absence rather than truthiness (#264).
+    if (lruKey !== undefined) {
       this.cache.delete(lruKey);
       this.stats.evictions++;
       logger.debug('Cache evicted LRU entry', {
