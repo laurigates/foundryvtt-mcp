@@ -34,8 +34,8 @@
     "format": "biome format --write src",
     "docs:check": "typedoc --emit none",
     "clean": "rimraf dist",
-    "docs": "typedoc src/index.ts --out docs --exclude '**/*.test.ts'",
-    "docs:serve": "npm run docs && npx http-server docs",
+    "docs": "typedoc src/index.ts --out build/docs --exclude '**/*.test.ts'",
+    "docs:serve": "npm run docs && npx http-server build/docs",
     "setup": "npm run clean && npm run build && npm run test-connection",
     "prepare": "husky",
     "prepublishOnly": "bun run build"

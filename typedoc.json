@@ -1,6 +1,6 @@
 {
   "entryPoints": ["src/index.ts", "src/foundry/client.ts", "src/foundry/dice-formula.ts", "src/config/index.ts", "src/foundry/types.ts", "src/utils/logger.ts"],
-  "out": "docs",
+  "out": "build/docs",
   "exclude": ["**/*.test.ts", "**/node_modules/**", "src/tools/**", "src/character/**", "src/combat/**", "src/resources/**"],
   "name": "FoundryVTT MCP Server",
   "readme": "README.md",

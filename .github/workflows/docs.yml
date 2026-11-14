@@ -58,7 +58,7 @@ jobs:
         run: |
           # Generate TypeDoc documentation with error checking disabled for problematic files
           bunx typedoc src/foundry/client.ts src/foundry/types.ts src/config/index.ts src/utils/logger.ts \
-            --out docs \
+            --out build/docs \
             --name "FoundryVTT MCP Server Documentation" \
             --readme README.md \
             --skipErrorChecking \
@@ -82,7 +82,7 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-pages-artifact@v5
         with:
-          path: './docs'
+          path: './build/docs'
 
   # Deploy to GitHub Pages (push to main / manual runs only — never on pull requests)
   deploy:
