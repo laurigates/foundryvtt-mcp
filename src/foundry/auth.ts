@@ -16,22 +16,44 @@ import { logger } from '../utils/logger.js';
 /**
  * Socket.IO connection options carrying a FoundryVTT session.
  *
- * FoundryVTT resolves the session from the `session` **cookie** on the
- * handshake request; the `session` query parameter alone leaves the socket
- * anonymous. An anonymous socket still connects at the transport level — it
- * simply never answers `getJoinData` and emits `session` as `null` — so the
- * only symptom is a bare timeout with no `connect_error` (#206).
+ * The session is sent twice, and both copies are load-bearing — do not drop
+ * either. Per #231 (read from the shipped server bundles), FoundryVTT v14
+ * resolves the session from the `session` **cookie** on the handshake request,
+ * while v13 reads it from `handshake.query`. A socket whose server finds no
+ * session still connects at the transport level — it simply never answers
+ * `getJoinData` and emits `session` as `null` — so the only symptom of losing
+ * either copy is a bare timeout with no `connect_error` (#206).
  *
  * `extraHeaders` is honoured by socket.io-client in Node.js for both the
- * WebSocket and polling handshakes; the query parameter is kept for servers
- * that read it.
+ * WebSocket and polling handshakes.
+ *
+ * `path` is the server's Socket.IO endpoint (`FOUNDRY_SOCKET_PATH`): behind a
+ * `routePrefix` it is `/<prefix>/socket.io/` (#231). Pair it with
+ * {@link socketOrigin} — the URL handed to `io()` must not carry the prefix.
  */
-export function sessionSocketOptions(session: string): Partial<ManagerOptions & SocketOptions> {
+export function sessionSocketOptions(
+  session: string,
+  path = '/socket.io/',
+): Partial<ManagerOptions & SocketOptions> {
   return {
     transports: ['websocket'],
+    path,
     query: { session },
     extraHeaders: { Cookie: `session=${session}` },
   };
+}
+
+/**
+ * The URL to hand `io()` for a FoundryVTT base URL: its origin only.
+ *
+ * socket.io-client reads the URL's pathname as the **namespace**, not the
+ * transport path, so `io('https://host/foundry')` would join namespace
+ * `/foundry` instead of reaching a server behind a `routePrefix` (#231). The
+ * prefix belongs in the `path` option ({@link sessionSocketOptions}); the
+ * HTTP `/join` calls keep the full base URL.
+ */
+export function socketOrigin(baseUrl: string): string {
+  return new URL(baseUrl).origin;
 }
 
 /**
@@ -66,7 +88,12 @@ async function getSessionCookie(baseUrl: string): Promise<string> {
  * returns it directly. Otherwise, connects via Socket.IO and emits getJoinData
  * to look up the _id by display name.
  */
-async function resolveUserId(baseUrl: string, user: string, session: string): Promise<string> {
+async function resolveUserId(
+  baseUrl: string,
+  user: string,
+  session: string,
+  socketPath?: string,
+): Promise<string> {
   // FoundryVTT document IDs are 16-character alphanumeric strings
   if (/^[a-zA-Z0-9]{16}$/.test(user)) {
     logger.debug('User identifier is already a document _id', { userId: user });
@@ -76,7 +103,7 @@ async function resolveUserId(baseUrl: string, user: string, session: string): Pr
   logger.debug('Resolving display name to document _id', { displayName: user });
 
   return new Promise((resolve, reject) => {
-    const socket = io(baseUrl, sessionSocketOptions(session));
+    const socket = io(socketOrigin(baseUrl), sessionSocketOptions(session, socketPath));
 
     const cleanup = () => {
       socket.off('session', onSession);
@@ -126,12 +153,15 @@ async function resolveUserId(baseUrl: string, user: string, session: string): Pr
 /**
  * Authenticates with FoundryVTT using the proven 4-step flow.
  *
+ * @param socketPath Socket.IO endpoint for the user-resolution handshake;
+ *   defaults to `/socket.io/` (see {@link sessionSocketOptions}).
  * @returns Session cookie and resolved user document _id
  */
 export async function authenticateFoundry(
   baseUrl: string,
   user: string,
   password: string,
+  socketPath?: string,
 ): Promise<{ session: string; userId: string }> {
   // Warn when credentials are sent over plaintext HTTP to a non-localhost host
   try {
@@ -156,7 +186,7 @@ export async function authenticateFoundry(
   const session = await getSessionCookie(baseUrl);
 
   // Step 2: Resolve user to document _id
-  const userId = await resolveUserId(baseUrl, user, session);
+  const userId = await resolveUserId(baseUrl, user, session, socketPath);
 
   // Step 3: POST /join as JSON with document _id
   const joinRes = await axios.post(

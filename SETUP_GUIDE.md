@@ -225,13 +225,23 @@ If username resolution fails, set the user ID directly. Find the 16-character do
 FOUNDRY_USER_ID=abc123def456ghij
 ```
 
-### Custom Socket Path
+### Custom Socket Path (reverse proxy / `routePrefix`)
 
-If FoundryVTT uses a custom socket path:
+`FOUNDRY_SOCKET_PATH` is the Socket.IO endpoint path on the server; it defaults
+to `/socket.io/`. FoundryVTT serves Socket.IO under its `routePrefix`, so a
+server behind a prefix needs both settings — the prefix in `FOUNDRY_URL` and
+again in the socket path:
 
 ```env
-FOUNDRY_SOCKET_PATH=/custom/socket/path/
+FOUNDRY_URL=https://example.com/foundry
+FOUNDRY_SOCKET_PATH=/foundry/socket.io/
 ```
+
+The `/join` login requests use the full `FOUNDRY_URL`. The Socket.IO connection
+goes to the URL's origin (`https://example.com`) with `FOUNDRY_SOCKET_PATH` as
+its path, because socket.io-client would read a path in the URL as a namespace.
+The socket path is not derived from `FOUNDRY_URL`: leaving it at the default
+behind a prefix makes the connection time out without a `connect_error`.
 
 ### Timeout Settings
 
