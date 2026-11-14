@@ -8,11 +8,10 @@ name: Integration Tests
 #   - FOUNDRY_USERNAME
 #   - FOUNDRY_PASSWORD
 #
-# Without these the felddy/foundryvtt container tries to log in to
-# foundryvtt.com with the placeholder values in docker-compose.test.yml
-# (test-user/test-password), gets rejected, and never installs Foundry — so the
-# healthcheck never becomes healthy. Evidence (from the run-25735243106
-# container.log artifact):
+# Without valid credentials the felddy/foundryvtt container cannot log in to
+# foundryvtt.com, so it never installs Foundry and the healthcheck never
+# becomes healthy. Evidence (from the run-25735243106 container.log artifact,
+# when docker-compose.test.yml still defaulted to test-user/test-password):
 #
 #   Authenticate | [error] Unable to log in as test-user, verify your credentials...
 #   Entrypoint   | [warn]  Authentication failed with exit code 255.
@@ -31,8 +30,11 @@ name: Integration Tests
 # `workflow_dispatch` is the exception: an explicit manual run means someone
 # expects the tier to execute, so missing secrets fail loudly there.
 #
-# Once the repo owner adds the three secrets, both jobs run end-to-end with no
-# further changes to this file.
+# Adding the three secrets makes both jobs run, and the container receives
+# them: the "Create .env.integration" step writes them to .env.integration,
+# the only place docker-compose.test.yml takes them from (issue #251). That is
+# not yet a green run: the container starts world-less, so the specs that need
+# a live world still need a bootstrapped world first (issue #252).
 # ----------------------------------------------------------------------------
 
 on:
