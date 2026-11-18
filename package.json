@@ -74,7 +74,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "ajv": "8.20.0",
     "axios": "1.21.1",
-    "dotenv": "17.4.2",
+    "dotenv": "18.0.10",
     "socket.io-client": "4.8.4",
     "zod": "4.6.7"
   },
