@@ -79,11 +79,11 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@playwright/test": "1.65.1",
     "@types/node": "25.9.9",
     "husky": "9.1.7",
-    "lint-staged": "17.6.0",
+    "lint-staged": "17.6.1",
     "rimraf": "6.1.4",
     "tsx": "4.23.15",
     "typedoc": "0.28.20",
