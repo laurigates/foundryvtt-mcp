@@ -7,14 +7,16 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 
 ## Features
 
-- **Dice Rolling** — standard RPG notation with any formula
-- **Data Querying** — search and inspect actors, items, scenes, journals
-- **Game State** — combat tracking, chat messages, user presence
-- **Content Generation** — NPCs, loot tables, rule lookups
-- **World Search** — full-text search across all game entities
-- **Live Connection** — Socket.IO loads complete world state on connect
-- **MCP Resources** — `foundry://` URIs for direct data access
-- **Diagnostics** — optional server health monitoring (requires REST API module)
+- **Dice Rolling** — dice terms and integer modifiers with `+`/`-`; advanced modifier syntax is not supported across all transports.
+- **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
+- **Game State Mutations** — 11 opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
+- **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
+- **World Search** — case-insensitive **name** search for actors, world items, scenes and journals (not full-text page search).
+- **Live Connection** — Socket.IO loads the active world and follows document updates; refresh is available after disconnection.
+- **MCP Resources** — nine `foundry://` URIs for direct reads.
+- **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
+
+See the **[source-verified MCP capability matrix](docs/guides/capabilities.md)** for all 33 tools, mode-specific behavior, safety notes, and features not exposed through MCP.
 
 ## Quick Start
 
@@ -119,7 +121,7 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 | `FOUNDRY_USERNAME` | Yes | FoundryVTT user account |
 | `FOUNDRY_PASSWORD` | Yes | FoundryVTT user password |
 | `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | REST API module key (enables diagnostics tools) |
+| `FOUNDRY_API_KEY` | No | Selects **Foundry Local REST API mode** (not combined with Socket.IO), used for compendium search and REST diagnostics; writes require Socket.IO |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
@@ -141,6 +143,7 @@ Ask your AI assistant things like:
 - `search_actors` — find characters, NPCs, monsters
 - `get_actor_details` — detailed character information
 - `search_items` — find equipment, spells, consumables
+- `search_compendium` — search enabled compendium packs by name/metadata (**requires REST mode with `FOUNDRY_API_KEY`**)
 - `get_scene_info` — current scene details
 - `search_journals` — search notes and handouts
 - `get_journal` — retrieve a specific journal entry
