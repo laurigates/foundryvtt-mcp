@@ -5,7 +5,7 @@
  * or fallback mechanisms when the API is unavailable.
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { logger } from '../../utils/logger.js';
 // import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { BaseTool, type ToolContext, type ToolResult } from '../base.js';
@@ -39,7 +39,7 @@ export class RollDiceTool extends BaseTool {
     const { formula, reason } = args as { formula: string; reason?: string };
 
     logger.info(`Rolling dice: ${formula}${reason ? ` (${reason})` : ''}`);
-    const result = await context.foundryClient.rollDice(formula, reason);
+    const result = await context.provider.rollDice(formula, reason);
 
     return this.createTextResponse(`🎲 **Dice Roll Result**
 **Formula:** ${result.formula}
@@ -60,11 +60,11 @@ export async function handleRollDice(
     formula: string;
     reason?: string;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ): Promise<ToolResult> {
   const tool = new RollDiceTool();
   const context: ToolContext = {
-    foundryClient,
+    provider,
   };
   return tool.execute(args, context);
 }

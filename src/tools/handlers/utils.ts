@@ -3,6 +3,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ProviderError } from '../../providers/errors.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -15,7 +16,7 @@ export async function withToolError<T>(toolName: string, fn: () => Promise<T>): 
   try {
     return await fn();
   } catch (error) {
-    if (error instanceof McpError) {
+    if (error instanceof McpError || error instanceof ProviderError) {
       throw error;
     }
     logger.error(`Failed to ${toolName}:`, error);

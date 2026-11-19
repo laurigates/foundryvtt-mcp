@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
-import type { FoundryClient } from '../foundry/client.js';
 import type { FoundryActor } from '../foundry/types.js';
+import type { FoundryCore } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 
 export interface CharacterAdvancement {
@@ -52,14 +52,14 @@ export interface PartyComposition {
 }
 
 export class CharacterManager extends EventEmitter {
-  private foundryClient: FoundryClient;
+  private provider: FoundryCore;
   private advancementHistory: CharacterAdvancement[] = [];
   private equipmentHistory: EquipmentTransaction[] = [];
   private resourceTracking: Map<string, ResourceManagement[]> = new Map();
 
-  constructor(foundryClient: FoundryClient) {
+  constructor(provider: FoundryCore) {
     super();
-    this.foundryClient = foundryClient;
+    this.provider = provider;
   }
 
   // Character Advancement
@@ -75,7 +75,7 @@ export class CharacterManager extends EventEmitter {
   ): Promise<CharacterAdvancement> {
     logger.info(`Starting level up process for actor ${actorId}`);
 
-    const actor = await this.foundryClient.getActor(actorId);
+    const actor = await this.provider.getActor(actorId);
     const currentLevel = actor.level || 1;
     const newLevel = currentLevel + 1;
 

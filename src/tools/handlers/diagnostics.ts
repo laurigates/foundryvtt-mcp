@@ -8,7 +8,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { LogEntry } from '../../diagnostics/types.js';
 import { LogEntrySchema } from '../../diagnostics/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { withToolError } from './utils.js';
 
@@ -22,7 +22,7 @@ const MAX_LOG_LIMIT = 1000;
 const DEFAULT_SEARCH_LIMIT = 50;
 
 /**
- * Shown whenever `FoundryClient.isWorldDataStale()` is set (#217): the cached
+ * Shown whenever `FoundryCore.isWorldDataStale()` is set (#217): the cached
  * world snapshot is still being served, but it stopped following live document
  * changes when the socket dropped and nothing replays the gap.
  */
@@ -355,12 +355,12 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
  */
 export async function handleGetHealthStatus(
   _args: Record<string, unknown>,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
 ) {
   return withToolError('get health status', async () => {
     const [worldInfo, systemHealth] = await Promise.all([
-      foundryClient.getWorldInfo().catch(() => null),
+      provider.getWorldInfo().catch(() => null),
       diagnosticsClient.getSystemHealth().catch(() => null),
     ]);
 
@@ -371,7 +371,7 @@ export async function handleGetHealthStatus(
           `- **Core Version:** ${worldInfo.coreVersion}`,
         ]
       : ['ℹ️ Not available'];
-    if (foundryClient.isWorldDataStale()) {
+    if (provider.isWorldDataStale()) {
       worldLines.unshift(STALE_WORLD_DATA_NOTICE);
     }
 
@@ -402,7 +402,7 @@ export async function handleGetHealthStatus(
           text: `\u{1FA7A} **Comprehensive Health Status**
 
 **FoundryVTT Connection:**
-${foundryClient.isConnected() ? '✅ Connected' : '❌ Disconnected'}
+${provider.isConnected() ? '✅ Connected' : '❌ Disconnected'}
 
 **World Information:**
 ${worldLines.join('\n')}

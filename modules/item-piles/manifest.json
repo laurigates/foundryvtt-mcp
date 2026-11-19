@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": 1,
+  "kind": "module",
+  "id": "item-piles",
+  "adapterVersion": "0.1.0",
+  "updatedAt": "2026-11-19",
+  "entrypoint": "adapter.py",
+  "status": "experimental",
+  "upstream": {
+    "repository": "https://github.com/fantasycalendar/FoundryVTT-ItemPiles",
+    "reference": null,
+    "updatedAt": null,
+    "verifiedAt": null
+  },
+  "compatibility": {
+    "foundryVersions": [],
+    "integrationVersions": [],
+    "tested": []
+  },
+  "operations": [
+    {
+      "id": "get_items",
+      "description": "Read an Actor inventory through the Item Piles public API, returning plain item summaries and module-defined quantities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "description": "Actor UUID in the selected target world."
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "uuid",
+            "name",
+            "type",
+            "quantity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "binding": "get_items.js",
+      "probe": "probe.js",
+      "readOnly": true
+    }
+  ]
+}

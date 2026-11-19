@@ -38,7 +38,9 @@
     "docs:serve": "npm run docs && npx http-server build/docs",
     "setup": "npm run clean && npm run build && npm run test-connection",
     "prepare": "husky",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "test:python": "python3 -B -m unittest discover -s python/tests -v",
+    "smoke:integrations": "node scripts/smoke-integrations.js"
   },
   "keywords": [
     "foundry",
@@ -68,7 +70,19 @@
     "dist/**/*.d.ts.map",
     "!dist/index-old.*",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "python/foundry_mcp_modules/",
+    "modules/",
+    "systems/",
+    "!**/__pycache__/**",
+    "!**/*.pyc",
+    "!modules/**/tests/**",
+    "!systems/**/tests/**",
+    "docs/adrs/0011-provider-session-integration-overhaul.md",
+    "docs/prps/provider-session-integration-overhaul.md",
+    "docs/guides/providers-and-targets.md",
+    "docs/guides/writing-integrations.md",
+    "examples/targets.example.json"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

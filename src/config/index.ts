@@ -9,6 +9,12 @@
  */
 
 import { z } from 'zod';
+import {
+  legacyConfigForTarget,
+  loadTargetConfiguration,
+  normalizeLegacyTarget,
+  type TargetConfig,
+} from './targets.js';
 
 /**
  * Zod schema for validating server configuration
@@ -73,7 +79,7 @@ const ConfigSchema = z.object({
  * This type provides compile-time type checking for configuration objects
  * and ensures consistency between the schema and type definitions.
  */
-type Config = z.infer<typeof ConfigSchema>;
+type Config = z.infer<typeof ConfigSchema> & { targets: TargetConfig[] };
 
 /**
  * Loads and validates configuration from environment variables
@@ -99,7 +105,11 @@ function loadConfig(): Config {
     nodeEnv: process.env.NODE_ENV,
 
     foundry: {
-      url: process.env.FOUNDRY_URL,
+      url:
+        process.env.FOUNDRY_URL ??
+        (process.env.FOUNDRY_PROVIDER === 'rest-api'
+          ? process.env.FOUNDRY_REST_RELAY_URL
+          : undefined),
       apiKey: process.env.FOUNDRY_API_KEY,
       username: process.env.FOUNDRY_USERNAME,
       password: process.env.FOUNDRY_PASSWORD,
@@ -129,7 +139,16 @@ function loadConfig(): Config {
   };
 
   try {
-    return ConfigSchema.parse(rawConfig);
+    const configuredTargets = loadTargetConfiguration();
+    const firstTarget = configuredTargets?.[0];
+    const parsed = ConfigSchema.parse({
+      ...rawConfig,
+      foundry: firstTarget ? legacyConfigForTarget(firstTarget) : rawConfig.foundry,
+    });
+    return {
+      ...parsed,
+      targets: configuredTargets ?? [normalizeLegacyTarget(parsed.foundry)],
+    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Configuration validation failed:');
@@ -150,6 +169,11 @@ function loadConfig(): Config {
       console.error('  • Ensure FOUNDRY_URL includes protocol (http:// or https://)');
       console.error('  • For setup guidance, see: SETUP_GUIDE.md');
       console.error('  • Run the setup wizard: npm run setup');
+    } else {
+      console.error(
+        'Configuration validation failed:',
+        error instanceof Error ? error.message : 'Unknown configuration error',
+      );
     }
 
     // In test environment, throw error instead of exiting process

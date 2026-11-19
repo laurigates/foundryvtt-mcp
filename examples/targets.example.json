@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "id": "campaign-a",
+      "label": "Campaign A with module execution",
+      "expectedWorldId": "replace-with-world-a-id",
+      "expectedOrigin": "https://foundry-a.example.invalid",
+      "writeEnabled": false,
+      "provider": {
+        "kind": "composite",
+        "core": {
+          "kind": "socketio",
+          "baseUrl": "https://foundry-a.example.invalid",
+          "usernameEnv": "FOUNDRY_A_USERNAME",
+          "passwordEnv": "FOUNDRY_A_PASSWORD"
+        },
+        "execution": {
+          "kind": "rest-api",
+          "relayUrl": "https://relay.example.invalid",
+          "apiKeyEnv": "FOUNDRY_RELAY_API_KEY",
+          "clientId": "replace-with-paired-client-a"
+        }
+      }
+    },
+    {
+      "id": "campaign-b",
+      "label": "Campaign B core access",
+      "expectedWorldId": "replace-with-world-b-id",
+      "writeEnabled": false,
+      "provider": {
+        "kind": "socketio",
+        "baseUrl": "https://foundry-b.example.invalid",
+        "usernameEnv": "FOUNDRY_B_USERNAME",
+        "passwordEnv": "FOUNDRY_B_PASSWORD"
+      }
+    }
+  ]
+}

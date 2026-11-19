@@ -45,6 +45,45 @@ describe('Config', () => {
   });
 
   describe('valid configuration', () => {
+    it('loads explicit targets without requiring a legacy FOUNDRY_URL', async () => {
+      process.env = {
+        NODE_ENV: 'test',
+        FOUNDRY_TARGETS_JSON: JSON.stringify({
+          version: 1,
+          targets: [
+            { id: 'a', provider: { kind: 'socketio', baseUrl: 'http://a.test' } },
+            {
+              id: 'b',
+              provider: {
+                kind: 'rest-api',
+                relayUrl: 'http://relay.test',
+                apiKey: 'relay-key',
+                clientId: 'client-b',
+              },
+            },
+          ],
+        }),
+      };
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+      expect(config.targets.map((target) => target.id)).toEqual(['a', 'b']);
+      expect(config.targets.map((target) => target.writeEnabled)).toEqual([false, false]);
+    });
+
+    it('supports the relay environment configuration with its separate credentials', async () => {
+      process.env = {
+        NODE_ENV: 'test',
+        FOUNDRY_PROVIDER: 'rest-api',
+        FOUNDRY_REST_RELAY_URL: 'http://relay.test',
+        FOUNDRY_REST_API_KEY: 'relay-key',
+        FOUNDRY_REST_CLIENT_ID: 'client-b',
+      };
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+      expect(config.targets).toHaveLength(1);
+      expect(config.targets[0]?.provider).toMatchObject({ kind: 'rest-api', apiKey: 'relay-key' });
+    });
+
     it('should load configuration from environment variables', async () => {
       process.env = { ...mockEnv };
 

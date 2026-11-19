@@ -7,7 +7,7 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
-import type { FoundryClient } from '../foundry/client.js';
+import type { FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 import type { ToolContext } from './base.js';
@@ -32,14 +32,14 @@ import { toolRegistry } from './registry.js';
 export async function routeToolRequest(
   name: string,
   args: Record<string, unknown>,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
   diagnosticSystem: DiagnosticSystem,
 ) {
   logger.debug(`Routing tool request: ${name}`, { args });
 
   const context: ToolContext = {
-    foundryClient,
+    provider,
     diagnosticsClient,
     diagnosticSystem,
   };
@@ -60,7 +60,7 @@ export async function routeToolRequest(
   }
 
   // Fallback to legacy handlers for tools not yet converted
-  return await routeLegacyTool(name, args, foundryClient, diagnosticsClient, diagnosticSystem);
+  return await routeLegacyTool(name, args, provider, diagnosticsClient, diagnosticSystem);
 }
 
 /**
@@ -70,44 +70,41 @@ export async function routeToolRequest(
 async function routeLegacyTool(
   name: string,
   args: Record<string, unknown>,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
   diagnosticSystem: DiagnosticSystem,
 ) {
   switch (name) {
     // Actor tools
     case 'search_actors':
-      return handleSearchActors(args, foundryClient);
+      return handleSearchActors(args, provider);
     case 'get_actor_details':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');
       }
-      return handleGetActorDetails(args as { actorId: string }, foundryClient);
+      return handleGetActorDetails(args as { actorId: string }, provider);
 
     // Item tools
     case 'search_items':
-      return handleSearchItems(args, foundryClient);
+      return handleSearchItems(args, provider);
 
     // Scene tools
     case 'get_scene_info':
-      return handleGetSceneInfo(args, foundryClient);
+      return handleGetSceneInfo(args, provider);
 
     // Generation tools
     case 'generate_npc':
-      return handleGenerateNPC(
-        args as { level?: number; race?: string; class?: string },
-        foundryClient,
-      );
+      return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, provider);
     case 'generate_loot':
       return handleGenerateLoot(
         args as { challengeRating?: number; treasureType?: string },
-        foundryClient,
+        provider,
       );
     case 'lookup_rule':
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleLookupRule(args as { query: string; system?: string }, foundryClient);
+      return handleLookupRule(args as { query: string; system?: string }, provider);
 
     // Diagnostics tools
     case 'get_recent_logs':
@@ -125,7 +122,7 @@ async function routeLegacyTool(
     case 'diagnose_errors':
       return handleDiagnoseErrors(args as { category?: string }, diagnosticSystem);
     case 'get_health_status':
-      return handleGetHealthStatus(args, foundryClient, diagnosticsClient);
+      return handleGetHealthStatus(args, provider, diagnosticsClient);
 
     default:
       throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
@@ -137,9 +134,9 @@ async function routeLegacyTool(
  */
 export async function routeResourceRequest(
   uri: string,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
 ) {
   logger.debug(`Routing resource request: ${uri}`);
-  return handleReadResource(uri, foundryClient, diagnosticsClient);
+  return handleReadResource(uri, provider, diagnosticsClient);
 }

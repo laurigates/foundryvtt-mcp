@@ -1,5 +1,24 @@
 # FoundryVTT MCP Server
 
+## Provider and integration overhaul
+
+This branch introduces target-scoped providers for all MCP access, independent
+connections to multiple Foundry worlds, and Python integrations in separate
+`systems/` and `modules/` directories. Exact upstream IDs are preserved in tool
+names, including `module_item-piles_get_items`. Existing environment configuration
+is converted into one target; explicit multi-target calls use `target_id`.
+
+- [Providers and target configuration](docs/guides/providers-and-targets.md)
+- [Writing system and module integrations](docs/guides/writing-integrations.md)
+- [Architecture decisions and rationale](docs/adrs/0011-provider-session-integration-overhaul.md)
+- [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
+- [Example target configuration](examples/targets.example.json)
+
+The initial D&D 5e, PF2e, and Item Piles adapters provide experimental read
+operations. Their READMEs distinguish runtime probes and local tests from live
+compatibility verification. Python 3.10+ is optional for the core and required for
+active Python integrations.
+
 [![npm version](https://img.shields.io/npm/v/foundryvtt-mcp)](https://www.npmjs.com/package/foundryvtt-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -113,13 +132,20 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 
 ## Environment Variables
 
+The following credentials configure the legacy single-target mode. For explicit
+providers, relay credentials, and several worlds, use the
+[target configuration guide](docs/guides/providers-and-targets.md).
+
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FOUNDRY_URL` | Yes | FoundryVTT server URL (e.g., `http://localhost:30000`) |
-| `FOUNDRY_USERNAME` | Yes | FoundryVTT user account |
-| `FOUNDRY_PASSWORD` | Yes | FoundryVTT user password |
+| `FOUNDRY_URL` | Single native/legacy target | FoundryVTT server URL (e.g., `http://localhost:30000`) |
+| `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user account |
+| `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT user password |
 | `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | REST API module key (enables diagnostics tools) |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; selects `legacy-rest` by default |
+| `FOUNDRY_PROVIDER` | No | Explicit `socketio`, `legacy-rest`, `rest-api`, or `composite` |
+| `FOUNDRY_TARGETS_FILE` | No | JSON configuration for one or several explicit targets |
+| `FOUNDRY_TARGETS_JSON` | No | Inline alternative to `FOUNDRY_TARGETS_FILE` |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
@@ -136,6 +162,11 @@ Ask your AI assistant things like:
 
 ## Available Tools
 
+The catalog exposes operations supported by at least one connected target.
+Calls with multiple configured targets must specify `target_id`. Use
+`list_targets`, `get_target_status`, `list_modules`, and `list_systems` to inspect
+availability; `reconnect_target` recovers an individual configured connection.
+
 ### Data Access
 
 - `search_actors` — find characters, NPCs, monsters
@@ -148,11 +179,13 @@ Ask your AI assistant things like:
 - `get_combat_state` — combat state and initiative order
 - `get_chat_messages` — recent chat history
 
-### Write Operations (require `FOUNDRY_WRITE_ENABLED=true`)
+### Write Operations (require target-local write enablement)
 
-Game-state mutations are **disabled by default**. They use the Socket.IO
-`modifyDocument` protocol over an authenticated session, and the connected user
-needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
+Game-state mutations are **disabled by default**. Native operations use Socket.IO
+`modifyDocument`; the relay backend uses fixed bindings to Foundry document APIs.
+The selected connection/runtime user needs the appropriate permissions. Set
+`FOUNDRY_WRITE_ENABLED=true` in legacy single-target configuration, or
+`writeEnabled: true` on the individual explicit target.
 
 - `start_combat` — begin a new encounter, seeding combatants from tokens (does
   not check for an existing combat — calling it during an active one creates a
@@ -181,11 +214,14 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 - `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
   unsupported notation (`4d6kh3`, `1d20r1`, `*`) rejected rather than dropped.
-  Parentheses are the one transport difference: FoundryVTT evaluates them when
-  `FOUNDRY_API_KEY` is set, the local roller rejects them otherwise
+  Additional notation depends on the provider: native local rolling is limited,
+  while the relay executes a Foundry Roll in its paired runtime
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
+
+These existing demonstration helpers are advertised for D&D 5e targets only.
+They do not implement the system's rules API.
 
 - `generate_npc` — generate NPC text (not written to the world)
 - `generate_loot` — generate treasure text for a level (not written to the world)
@@ -201,6 +237,11 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
   the cache has stopped following live changes
 
 ## Available Resources
+
+With multiple targets, use `foundry://targets/<target_id>/<path>`, for example
+`foundry://targets/campaign-a/actors`. The aliases below are accepted only when
+exactly one target is configured. Resource availability follows provider
+capabilities.
 
 - `foundry://actors` — all actors in the world
 - `foundry://items` — all items in the world

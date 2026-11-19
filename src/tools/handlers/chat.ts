@@ -2,16 +2,13 @@
  * Chat message tool handler
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
-export async function handleGetChatMessages(
-  args: { limit?: number },
-  foundryClient: FoundryClient,
-) {
+export async function handleGetChatMessages(args: { limit?: number }, provider: FoundryCore) {
   return withToolError('get chat messages', async () => {
     const limit = Math.min(args.limit ?? 20, 100);
-    const messages = foundryClient.getChatMessages(limit);
+    const messages = provider.getChatMessages(limit);
 
     if (messages.length === 0) {
       return {
@@ -20,7 +17,7 @@ export async function handleGetChatMessages(
     }
 
     // Resolve user names from worldData
-    const { users } = foundryClient.getUsers();
+    const { users } = provider.getUsers();
     const userMap = new Map(users.map((u) => [u._id, u.name]));
 
     const formatted = messages

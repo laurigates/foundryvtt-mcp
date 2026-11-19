@@ -1,0 +1,218 @@
+/** System-owned display/validation descriptors; unknown systems keep their raw data. */
+import { readFileSync } from 'node:fs';
+import { z } from 'zod';
+import type { FoundryActor, FoundryItem, WorldActor, WorldItem } from '../foundry/types.js';
+import type { AttributePatch } from './types.js';
+
+const BoundSchema = z.object({
+  path: z.string().optional(),
+  pattern: z.string().optional(),
+  label: z.string().default('attribute'),
+  minimum: z.number().optional(),
+  maximum: z.number().optional(),
+  maximumPath: z.string().optional(),
+  addPath: z.string().optional(),
+  fallbackMaximum: z.string().optional(),
+  fallbackAdd: z.string().optional(),
+  maximumLabel: z.string().default('max'),
+  overrides: z
+    .array(
+      z.object({ paths: z.array(z.string()), values: z.array(z.string()), maximum: z.number() }),
+    )
+    .default([]),
+});
+const ProjectionSchema = z.object({
+  version: z.literal(1),
+  fields: z.record(z.string(), z.string()).default({}),
+  itemFields: z.record(z.string(), z.string()).default({}),
+  abilities: z.string().optional(),
+  bounds: z.array(BoundSchema).default([]),
+});
+type Projection = z.infer<typeof ProjectionSchema>;
+const descriptors = new Map<string, Projection | null>();
+
+function descriptor(systemId: string): Projection | null {
+  if (!/^[a-zA-Z0-9_-]+$/.test(systemId)) {
+    return null;
+  }
+  const cached = descriptors.get(systemId);
+  if (cached !== undefined) {
+    return cached;
+  }
+  try {
+    const url = new URL(`../../systems/${systemId}/actor-projection.json`, import.meta.url);
+    const parsed = ProjectionSchema.parse(JSON.parse(readFileSync(url, 'utf8')));
+    descriptors.set(systemId, parsed);
+    return parsed;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+      descriptors.set(systemId, null);
+      return null;
+    }
+    throw new Error(`Invalid actor projection for system '${systemId}'`, { cause: error });
+  }
+}
+
+export function readPath(object: unknown, path: string | undefined): unknown {
+  if (!path) {
+    return undefined;
+  }
+  let value: unknown = object;
+  for (const key of path.split('.')) {
+    if (value === null || typeof value !== 'object' || !Object.hasOwn(value, key)) {
+      return undefined;
+    }
+    value = Reflect.get(value, key);
+  }
+  return value;
+}
+
+export function projectActor(raw: WorldActor, systemId: string): FoundryActor {
+  const actor: FoundryActor = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
+  if (raw.img) {
+    actor.img = raw.img;
+  }
+  const config = descriptor(systemId);
+  if (!config) {
+    return actor;
+  }
+  const value = (field: string) => readPath(raw.system, config.fields[field]);
+  const hpValue = value('hpValue');
+  const hpMax = value('hpMax');
+  const hpTemp = value('hpTemp');
+  if (typeof hpValue === 'number' && typeof hpMax === 'number') {
+    actor.hp = { value: hpValue, max: hpMax };
+    if (typeof hpTemp === 'number') {
+      actor.hp.temp = hpTemp;
+    }
+  }
+  const ac = value('ac');
+  if (typeof ac === 'number') {
+    actor.ac = { value: ac };
+  }
+  const level = value('level');
+  if (typeof level === 'number') {
+    actor.level = level;
+  }
+  const bio = value('biography');
+  if (typeof bio === 'string') {
+    actor.biography = bio;
+  }
+  const abilities = readPath(raw.system, config.abilities);
+  if (abilities !== null && typeof abilities === 'object' && !Array.isArray(abilities)) {
+    actor.abilities = {};
+    for (const [key, entry] of Object.entries(abilities)) {
+      const score = readPath(entry, 'value');
+      const modifier = readPath(entry, 'mod');
+      const save = readPath(entry, 'save');
+      if (typeof score !== 'number' || typeof modifier !== 'number') {
+        continue;
+      }
+      actor.abilities[key] = { value: score, mod: modifier };
+      if (typeof save === 'number') {
+        actor.abilities[key].save = save;
+      }
+    }
+  }
+  return actor;
+}
+
+export function projectItem(raw: WorldItem, systemId: string): FoundryItem {
+  const item: FoundryItem = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
+  if (raw.img) {
+    item.img = raw.img;
+  }
+  const config = descriptor(systemId);
+  if (!config) {
+    return item;
+  }
+  const description = readPath(raw.system, config.itemFields.description);
+  const rarity = readPath(raw.system, config.itemFields.rarity);
+  if (typeof description === 'string') {
+    item.description = description;
+  }
+  if (typeof rarity === 'string') {
+    item.rarity = rarity;
+  }
+  return item;
+}
+
+export function validateSystemPatch(
+  patch: AttributePatch,
+  actor: FoundryActor,
+  rawSystem: Record<string, unknown> | undefined,
+  systemId: string,
+): void {
+  const config = descriptor(systemId);
+  for (const [path, value] of Object.entries(patch)) {
+    const parts = path.split('.');
+    if (
+      parts.some(
+        (part) =>
+          !/^[a-zA-Z0-9_-]+$/.test(part) ||
+          ['__proto__', 'constructor', 'prototype'].includes(part),
+      )
+    ) {
+      throw new Error(`Invalid attribute path: ${path}`);
+    }
+    if (
+      !['string', 'boolean', 'number'].includes(typeof value) ||
+      (typeof value === 'number' && !Number.isFinite(value))
+    ) {
+      throw new Error(`Attribute '${path}' must be a finite scalar value`);
+    }
+    for (const rule of config?.bounds ?? []) {
+      const match = rule.pattern ? new RegExp(rule.pattern).exec(path) : null;
+      if (rule.path !== path && !match) {
+        continue;
+      }
+      if (typeof value !== 'number') {
+        continue;
+      }
+      const expand = (template: string | undefined) =>
+        template?.replace(/\$(\d+)/g, (_all, index: string) => match?.[Number(index)] ?? '');
+      let maximum = rule.maximum;
+      const limit =
+        readPath(rawSystem, expand(rule.maximumPath)) ?? readPath(actor, rule.fallbackMaximum);
+      if (typeof limit === 'number') {
+        maximum = limit;
+      }
+      const addPath = expand(rule.addPath);
+      const add =
+        (addPath ? patch[addPath] : undefined) ??
+        readPath(rawSystem, addPath) ??
+        readPath(actor, rule.fallbackAdd) ??
+        0;
+      if (maximum !== undefined && typeof add === 'number') {
+        maximum += add;
+      }
+      for (const override of rule.overrides) {
+        if (
+          override.paths.some((candidate) =>
+            override.values.includes(String(readPath(rawSystem, candidate))),
+          )
+        ) {
+          maximum = override.maximum;
+        }
+      }
+      if (
+        (rule.minimum !== undefined && value < rule.minimum) ||
+        (maximum !== undefined && value > maximum)
+      ) {
+        if (rule.minimum !== undefined && maximum !== undefined) {
+          throw new Error(
+            `Invalid ${rule.label} ${value}: must be between ${rule.minimum} and ${maximum}`,
+          );
+        }
+        throw new Error(
+          `Invalid ${rule.label} ${value}: exceeds ${rule.maximumLabel} (${maximum})`,
+        );
+      }
+    }
+    // A real snapshot can validate the field; synthetic compatibility callers
+    // with no system data remain shape-validated only.
+    if (rawSystem && Object.keys(rawSystem).length > 0 && readPath(rawSystem, path) === undefined) {
+      throw new Error(`Unknown attribute path: ${path}`);
+    }
+  }
+}

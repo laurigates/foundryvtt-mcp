@@ -8,7 +8,8 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
-import type { FoundryClient } from '../foundry/client.js';
+import { ProviderError } from '../providers/errors.js';
+import type { FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 
@@ -16,7 +17,7 @@ import { logger } from '../utils/logger.js';
  * Tool execution context containing all necessary dependencies
  */
 export interface ToolContext {
-  foundryClient: FoundryClient;
+  provider: FoundryCore;
   diagnosticsClient?: DiagnosticsClient;
   diagnosticSystem?: DiagnosticSystem;
 }
@@ -27,6 +28,8 @@ export interface ToolContext {
  * while still enforcing the required content array structure.
  */
 export interface ToolResult {
+  structuredContent?: Record<string, unknown>;
+  _meta?: Record<string, unknown>;
   content: Array<{
     type: string;
     text?: string;
@@ -87,7 +90,7 @@ export abstract class BaseTool implements Tool {
     } catch (error) {
       logger.error(`Tool execution failed: ${this.name}`, error);
 
-      if (error instanceof McpError) {
+      if (error instanceof McpError || error instanceof ProviderError) {
         throw error;
       }
 

@@ -4,7 +4,7 @@
  * Handles searching for items and retrieving detailed item information.
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -17,7 +17,7 @@ export async function handleSearchItems(
     rarity?: string;
     limit?: number;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { query, type, rarity, limit = 10 } = args;
 
@@ -32,7 +32,7 @@ export async function handleSearchItems(
     if (rarity) {
       searchParams.rarity = rarity;
     }
-    const result = await foundryClient.searchItems(searchParams);
+    const result = await provider.searchItems(searchParams);
 
     const itemList = result.items
       .map((item) => {

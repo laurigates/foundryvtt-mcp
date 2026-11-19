@@ -4,41 +4,41 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { logger } from '../../utils/logger.js';
 import { getTurnOrder } from './combat-order.js';
 import { withToolError } from './utils.js';
 
 export async function handleReadResource(
   uri: string,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
 ) {
   return withToolError('read resource', async () => {
     switch (uri) {
       case 'foundry://actors':
-        return await getActorsResource(foundryClient);
+        return await getActorsResource(provider);
 
       case 'foundry://items':
-        return await getItemsResource(foundryClient);
+        return await getItemsResource(provider);
 
       case 'foundry://scenes':
-        return await getScenesResource(foundryClient);
+        return await getScenesResource(provider);
 
       case 'foundry://scenes/current':
-        return await getCurrentSceneResource(foundryClient);
+        return await getCurrentSceneResource(provider);
 
       case 'foundry://world/settings':
-        return await getWorldSettingsResource(foundryClient);
+        return await getWorldSettingsResource(provider);
 
       case 'foundry://journals':
-        return await getJournalsResource(foundryClient);
+        return await getJournalsResource(provider);
 
       case 'foundry://users':
-        return await getUsersResource(foundryClient);
+        return await getUsersResource(provider);
 
       case 'foundry://combat':
-        return await getCombatResource(foundryClient);
+        return await getCombatResource(provider);
 
       case 'foundry://system/diagnostics':
         return await getSystemDiagnosticsResource(diagnosticsClient);
@@ -49,8 +49,8 @@ export async function handleReadResource(
   });
 }
 
-async function getActorsResource(foundryClient: FoundryClient) {
-  const result = await foundryClient.searchActors({ limit: 100 });
+async function getActorsResource(provider: FoundryCore) {
+  const result = await provider.searchActors({ limit: 100 });
   return {
     contents: [
       {
@@ -66,8 +66,8 @@ async function getActorsResource(foundryClient: FoundryClient) {
   };
 }
 
-async function getItemsResource(foundryClient: FoundryClient) {
-  const result = await foundryClient.searchItems({ limit: 100 });
+async function getItemsResource(provider: FoundryCore) {
+  const result = await provider.searchItems({ limit: 100 });
   return {
     contents: [
       {
@@ -83,8 +83,8 @@ async function getItemsResource(foundryClient: FoundryClient) {
   };
 }
 
-async function getScenesResource(foundryClient: FoundryClient) {
-  const scenes = foundryClient.getScenes();
+async function getScenesResource(provider: FoundryCore) {
+  const scenes = provider.getScenes();
   return {
     contents: [
       {
@@ -104,9 +104,9 @@ async function getScenesResource(foundryClient: FoundryClient) {
   };
 }
 
-async function getCurrentSceneResource(foundryClient: FoundryClient) {
+async function getCurrentSceneResource(provider: FoundryCore) {
   try {
-    const scene = await foundryClient.getCurrentScene();
+    const scene = await provider.getCurrentScene();
     return {
       contents: [
         {
@@ -142,8 +142,8 @@ async function getCurrentSceneResource(foundryClient: FoundryClient) {
   }
 }
 
-async function getWorldSettingsResource(foundryClient: FoundryClient) {
-  const world = await foundryClient.getWorldInfo();
+async function getWorldSettingsResource(provider: FoundryCore) {
+  const world = await provider.getWorldInfo();
   return {
     contents: [
       {
@@ -155,8 +155,8 @@ async function getWorldSettingsResource(foundryClient: FoundryClient) {
   };
 }
 
-async function getJournalsResource(foundryClient: FoundryClient) {
-  const journals = foundryClient.getJournals();
+async function getJournalsResource(provider: FoundryCore) {
+  const journals = provider.getJournals();
   return {
     contents: [
       {
@@ -180,8 +180,8 @@ async function getJournalsResource(foundryClient: FoundryClient) {
   };
 }
 
-async function getUsersResource(foundryClient: FoundryClient) {
-  const { users, activeUsers } = foundryClient.getUsers();
+async function getUsersResource(provider: FoundryCore) {
+  const { users, activeUsers } = provider.getUsers();
   return {
     contents: [
       {
@@ -210,8 +210,8 @@ async function getUsersResource(foundryClient: FoundryClient) {
  * `getTurnOrder()` sorts a copy: the cached array is a live reference into
  * worldData and must not be reordered as a side effect of a read.
  */
-async function getCombatResource(foundryClient: FoundryClient) {
-  const cached = foundryClient.getCombatState();
+async function getCombatResource(provider: FoundryCore) {
+  const cached = provider.getCombatState();
   const combat = cached ? { ...cached, combatants: getTurnOrder(cached) } : cached;
   return {
     contents: [

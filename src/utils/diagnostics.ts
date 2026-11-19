@@ -6,7 +6,8 @@
  */
 
 import { config } from '../config/index.js';
-import { type FoundryClient, probeRestModule } from '../foundry/client.js';
+import { probeRestModule } from '../foundry/rest-probe.js';
+import type { FoundryCore, FoundryProvider } from '../providers/types.js';
 import { logger } from './logger.js';
 
 /**
@@ -54,7 +55,15 @@ export interface HealthReport {
  * Enhanced diagnostic system for FoundryVTT MCP integration
  */
 export class DiagnosticSystem {
-  constructor(private foundryClient: FoundryClient) {}
+  constructor(
+    private provider: FoundryCore & Partial<Pick<FoundryProvider, 'kind' | 'capabilities'>>,
+    private connection: {
+      url: string;
+      apiKey?: string | undefined;
+      username?: string | undefined;
+      password?: string | undefined;
+    } = config.foundry,
+  ) {}
 
   /**
    * Diagnose why a specific feature isn't working
@@ -66,7 +75,7 @@ export class DiagnosticSystem {
 
     try {
       // Test basic connectivity
-      const isConnected = await this.foundryClient.testConnection();
+      const isConnected = await this.provider.testConnection();
 
       if (!isConnected) {
         return this.createConnectivityDiagnostic();
@@ -116,18 +125,18 @@ export class DiagnosticSystem {
 
     try {
       // Test connectivity
-      const isConnected = await this.foundryClient.testConnection();
+      const isConnected = await this.provider.testConnection();
       if (isConnected) {
         report.connectivity = {
           status: 'connected',
           emoji: '✅',
-          details: `Connected to ${config.foundry.url}`,
+          details: `Connected to ${this.connection.url}`,
         };
       } else {
         report.connectivity = {
           status: 'offline',
           emoji: '❌',
-          details: `Cannot reach ${config.foundry.url}`,
+          details: `Cannot reach ${this.connection.url}`,
         };
         return report; // Early return if not connected
       }
@@ -138,7 +147,7 @@ export class DiagnosticSystem {
       // Test authentication
       const authResult = await this.testAuthentication();
       report.authentication = {
-        method: config.foundry.apiKey ? 'api-key' : 'credentials',
+        method: this.connection.apiKey ? 'api-key' : 'credentials',
         status: authResult.valid ? 'valid' : 'invalid',
         emoji: authResult.valid ? '✅' : '❌',
       };
@@ -150,10 +159,14 @@ export class DiagnosticSystem {
       report.features.sceneData = await this.testSceneData();
       report.features.diagnostics = report.restApiAvailable;
 
+      report.websocketAvailable =
+        (this.provider.kind === 'socketio' || this.provider.kind === 'composite') &&
+        this.provider.isConnected();
+
       // Update connectivity status based on feature availability
       if (report.restApiAvailable) {
         report.connectivity.status = 'connected';
-      } else if (report.features.diceRolling) {
+      } else if (!this.provider.capabilities && report.features.diceRolling) {
         report.connectivity.status = 'limited';
         report.connectivity.emoji = '⚠️';
         report.connectivity.details += ' (Limited functionality - REST API not available)';
@@ -218,7 +231,7 @@ export class DiagnosticSystem {
       explanation: 'Unable to connect to FoundryVTT server.',
       suggestions:
         "• **Check if FoundryVTT is running** - Start FoundryVTT and ensure it's accessible\n" +
-        `• **Verify server URL** - Check that \`${config.foundry.url}\` is correct\n` +
+        `• **Verify server URL** - Check that \`${this.connection.url}\` is correct\n` +
         '• **Test connectivity** - Run `npm run test-connection` for detailed diagnostics\n' +
         '• **Check firewall** - Ensure no firewall is blocking the connection',
       severity: 'critical',
@@ -254,7 +267,7 @@ export class DiagnosticSystem {
     valid: boolean;
     error?: string;
   }): DiagnosticResult {
-    const isApiKey = !!config.foundry.apiKey;
+    const isApiKey = !!this.connection.apiKey;
 
     return {
       explanation: `Authentication failed using ${isApiKey ? 'API key' : 'username/password'}.`,
@@ -313,16 +326,19 @@ export class DiagnosticSystem {
    * Test if feature requires REST API
    */
   private requiresRestApi(feature: string): boolean {
-    return ['actors', 'items', 'diagnostics'].includes(feature);
+    return feature === 'diagnostics';
   }
 
   /**
    * Test REST API availability: the module answers its authenticated
-   * /api/world route with JSON (#230). Same probe as `FoundryClient.connect()`.
+   * /api/world route with JSON (#230). Same probe as `FoundryCore.connect()`.
    */
   private async testRestApiAvailability(): Promise<boolean> {
+    if (this.provider.capabilities && !this.provider.capabilities.has('diagnostics.read')) {
+      return false;
+    }
     try {
-      await probeRestModule((url) => this.foundryClient.get(url));
+      await probeRestModule((url) => this.provider.get(url));
       return true;
     } catch (error) {
       logger.debug('REST API not available:', error);
@@ -335,16 +351,21 @@ export class DiagnosticSystem {
    */
   private async testAuthentication(): Promise<{ valid: boolean; error?: string }> {
     try {
-      if (config.foundry.apiKey) {
+      if (this.provider.kind === 'rest-api' || this.provider.kind === 'composite') {
+        return { valid: this.provider.isConnected() };
+      }
+      if (this.connection.apiKey) {
         // Test API key authentication: only a JSON-object /api/world body
         // proves the module accepted the key (#230); probeRestModule throws
         // otherwise, and the catch below reports it as invalid.
-        await probeRestModule((url) => this.foundryClient.get(url));
+        await probeRestModule((url) => this.provider.get(url));
         return { valid: true };
       } else {
         // Test credential authentication (via WebSocket)
-        await this.foundryClient.connect();
-        return { valid: this.foundryClient.isConnected() };
+        if (!this.provider.isConnected()) {
+          await this.provider.connect();
+        }
+        return { valid: this.provider.isConnected() };
       }
     } catch (error) {
       return {
@@ -359,7 +380,7 @@ export class DiagnosticSystem {
    */
   private async testDiceRolling(): Promise<boolean> {
     try {
-      const result = await this.foundryClient.rollDice('1d20', 'Health check test');
+      const result = await this.provider.rollDice('1d20', 'Health check test');
       return typeof result.total === 'number';
     } catch (error) {
       logger.debug('Dice rolling test failed:', error);
@@ -372,7 +393,7 @@ export class DiagnosticSystem {
    */
   private async testActorSearch(): Promise<boolean> {
     try {
-      const result = await this.foundryClient.searchActors({ limit: 1 });
+      const result = await this.provider.searchActors({ limit: 1 });
       return Array.isArray(result.actors);
     } catch (error) {
       logger.debug('Actor search test failed:', error);
@@ -385,7 +406,7 @@ export class DiagnosticSystem {
    */
   private async testItemSearch(): Promise<boolean> {
     try {
-      const result = await this.foundryClient.searchItems({ limit: 1 });
+      const result = await this.provider.searchItems({ limit: 1 });
       return Array.isArray(result.items);
     } catch (error) {
       logger.debug('Item search test failed:', error);
@@ -398,7 +419,7 @@ export class DiagnosticSystem {
    */
   private async testSceneData(): Promise<boolean> {
     try {
-      const result = await this.foundryClient.getCurrentScene();
+      const result = await this.provider.getCurrentScene();
       return !!result && typeof result.name === 'string';
     } catch (error) {
       logger.debug('Scene data test failed:', error);

@@ -16,7 +16,7 @@ describe('Tool Registry', () => {
 
   beforeEach(() => {
     mockContext = {
-      foundryClient: {
+      provider: {
         rollDice: vi.fn().mockResolvedValue({
           formula: '1d20+5',
           total: 15,

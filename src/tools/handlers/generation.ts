@@ -5,7 +5,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -17,7 +17,7 @@ export async function handleGenerateNPC(
     race?: string;
     class?: string;
   },
-  _foundryClient: FoundryClient,
+  _provider: FoundryCore,
 ) {
   const { level = 1, race, class: characterClass } = args;
 
@@ -59,7 +59,7 @@ export async function handleGenerateLoot(
     challengeRating?: number;
     treasureType?: string;
   },
-  _foundryClient: FoundryClient,
+  _provider: FoundryCore,
 ) {
   const { challengeRating = 1, treasureType = 'individual' } = args;
 
@@ -95,7 +95,7 @@ export async function handleLookupRule(
     query: string;
     system?: string;
   },
-  _foundryClient: FoundryClient,
+  _provider: FoundryCore,
 ) {
   const { query, system = 'D&D 5e' } = args;
 

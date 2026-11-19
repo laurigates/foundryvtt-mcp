@@ -8,9 +8,9 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
 import type { DocumentVisibility, JournalPageCreateSource } from '../../foundry/types.js';
 import { VISIBILITY_LEVELS } from '../../foundry/types.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /** Human-readable summary of who can see the entry, for the tool response. */
@@ -30,7 +30,7 @@ export async function handleCreateJournalEntry(
     folder?: string;
     visibility?: DocumentVisibility;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { name, pages, folder, visibility } = args;
 
@@ -61,7 +61,7 @@ export async function handleCreateJournalEntry(
   }
 
   return withToolError('create journal entry', async () => {
-    const journal = await foundryClient.createJournalEntry(name, pages, folder, visibility);
+    const journal = await provider.createJournalEntry(name, pages, folder, visibility);
 
     return {
       content: [

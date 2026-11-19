@@ -196,6 +196,15 @@ function installInConsumer(tarball) {
   if (!existsSync(serverPath)) {
     fail(`server entrypoint missing in installed package: ${serverPath}`);
   }
+  const integrationSmoke = spawnSync(process.execPath, [join(repoRoot, 'scripts', 'smoke-integrations.js'), installedRoot], {
+    cwd: consumer,
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  if (integrationSmoke.status !== 0) {
+    fail('Installed Python integration smoke failed', integrationSmoke.stderr || integrationSmoke.stdout);
+  }
+  process.stdout.write(integrationSmoke.stdout);
   console.log(`📥 Installed at: ${installedRoot}`);
   return { consumer, serverPath };
 }

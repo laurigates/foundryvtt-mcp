@@ -5,7 +5,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -17,7 +17,7 @@ export async function handleSearchActors(
     type?: string;
     limit?: number;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { query, type, limit = 10 } = args;
 
@@ -29,7 +29,7 @@ export async function handleSearchActors(
     if (type) {
       searchParams.type = type;
     }
-    const result = await foundryClient.searchActors(searchParams);
+    const result = await provider.searchActors(searchParams);
 
     const actorList = result.actors
       .map(
@@ -63,7 +63,7 @@ export async function handleGetActorDetails(
   args: {
     actorId: string;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { actorId } = args;
 
@@ -72,7 +72,7 @@ export async function handleGetActorDetails(
   }
 
   return withToolError('get actor details', async () => {
-    const actor = await foundryClient.getActor(actorId);
+    const actor = await provider.getActor(actorId);
 
     const abilities = actor.abilities
       ? Object.entries(actor.abilities)

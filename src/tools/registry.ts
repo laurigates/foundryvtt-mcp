@@ -24,7 +24,7 @@ export class ToolRegistry {
    */
   register(tool: Tool): void {
     if (this.tools.has(tool.name)) {
-      logger.warn(`Tool '${tool.name}' is already registered, replacing...`);
+      throw new Error(`Duplicate tool registration: ${tool.name}`);
     }
 
     this.tools.set(tool.name, tool);

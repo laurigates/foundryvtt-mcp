@@ -4,12 +4,13 @@
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
-import type { AttributePatch, FoundryClient } from '../foundry/client.js';
 import type {
   ActorItemCreateSource,
   DocumentVisibility,
   JournalPageCreateSource,
 } from '../foundry/types.js';
+import { ProviderError } from '../providers/errors.js';
+import type { AttributePatch, FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 import type { ToolContext, ToolResult } from './base.js';
@@ -59,7 +60,7 @@ import { toolRegistry } from './registry.js';
 export async function routeToolRequest(
   name: string,
   args: Record<string, unknown>,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
   diagnosticSystem: DiagnosticSystem,
 ): Promise<ToolResult> {
@@ -68,7 +69,7 @@ export async function routeToolRequest(
   // Try the new registry system first
   if (toolRegistry.has(name)) {
     const context: ToolContext = {
-      foundryClient,
+      provider,
       diagnosticsClient,
       diagnosticSystem,
     };
@@ -76,7 +77,7 @@ export async function routeToolRequest(
     try {
       return await toolRegistry.execute(name, args, context);
     } catch (error) {
-      if (error instanceof McpError) {
+      if (error instanceof McpError || error instanceof ProviderError) {
         throw error;
       }
       throw new McpError(
@@ -92,19 +93,19 @@ export async function routeToolRequest(
       if (!('formula' in args) || typeof args.formula !== 'string') {
         throw new Error('Missing required parameter: formula');
       }
-      return handleRollDice(args as { formula: string; reason?: string }, foundryClient);
+      return handleRollDice(args as { formula: string; reason?: string }, provider);
 
     // Actor tools
     case 'search_actors':
-      return handleSearchActors(args, foundryClient);
+      return handleSearchActors(args, provider);
     case 'get_actor_details':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');
       }
-      return handleGetActorDetails(args as { actorId: string }, foundryClient);
+      return handleGetActorDetails(args as { actorId: string }, provider);
 
     // Actor mutation tools (#143) — WRITE via the Socket.IO modifyDocument
-    // protocol (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
+    // protocol (provider); require FOUNDRY_WRITE_ENABLED=true + a GM user.
     case 'update_actor_attributes':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');
@@ -114,12 +115,12 @@ export async function routeToolRequest(
       }
       return handleUpdateActorAttribute(
         args as { actorId: string; patch: AttributePatch },
-        foundryClient,
+        provider,
       );
 
     // Item tools
     case 'search_items':
-      return handleSearchItems(args, foundryClient);
+      return handleSearchItems(args, provider);
 
     // Compendium tools (#144)
     case 'search_compendium':
@@ -139,11 +140,11 @@ export async function routeToolRequest(
           limit?: number;
           cursor?: string;
         },
-        foundryClient,
+        provider,
       );
 
     // Item mutation tools (WRITE) — Socket.IO modifyDocument protocol
-    // (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
+    // (provider); require FOUNDRY_WRITE_ENABLED=true + a GM user.
     case 'create_actor_item':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
         throw new Error('Missing required parameter: actorId');
@@ -153,7 +154,7 @@ export async function routeToolRequest(
       }
       return handleCreateActorItem(
         args as { actorId: string; source: ActorItemCreateSource },
-        foundryClient,
+        provider,
       );
     case 'update_actor_item':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
@@ -167,7 +168,7 @@ export async function routeToolRequest(
       }
       return handleUpdateActorItem(
         args as { actorId: string; itemId: string; patch: Record<string, unknown> },
-        foundryClient,
+        provider,
       );
     case 'delete_actor_item':
       if (!('actorId' in args) || typeof args.actorId !== 'string') {
@@ -176,21 +177,21 @@ export async function routeToolRequest(
       if (!('itemId' in args) || typeof args.itemId !== 'string') {
         throw new Error('Missing required parameter: itemId');
       }
-      return handleDeleteActorItem(args as { actorId: string; itemId: string }, foundryClient);
+      return handleDeleteActorItem(args as { actorId: string; itemId: string }, provider);
 
     // Scene tools
     case 'get_scene_info':
-      return handleGetSceneInfo(args, foundryClient);
+      return handleGetSceneInfo(args, provider);
 
     // Combat tools
     case 'get_combat_state':
-      return handleGetCombatState(args, foundryClient);
+      return handleGetCombatState(args, provider);
 
     // Combat mutation tools (FR-018, WRITE — require FOUNDRY_WRITE_ENABLED)
     case 'next_turn':
-      return handleNextTurn(args as { skipDefeated?: boolean }, foundryClient);
+      return handleNextTurn(args as { skipDefeated?: boolean }, provider);
     case 'end_combat':
-      return handleEndCombat(args, foundryClient);
+      return handleEndCombat(args, provider);
     case 'set_initiative':
       if (!('combatantId' in args) || typeof args.combatantId !== 'string') {
         throw new Error('Missing required parameter: combatantId');
@@ -200,10 +201,10 @@ export async function routeToolRequest(
       }
       return handleSetInitiative(
         args as { combatantId: string; initiative: number; combatId?: string },
-        foundryClient,
+        provider,
       );
     case 'start_combat':
-      return handleStartCombat(args as { tokenIds?: string[]; sceneId?: string }, foundryClient);
+      return handleStartCombat(args as { tokenIds?: string[]; sceneId?: string }, provider);
 
     // Token mutation tools (FR-019, WRITE — require FOUNDRY_WRITE_ENABLED)
     case 'move_token':
@@ -218,7 +219,7 @@ export async function routeToolRequest(
       }
       return handleMoveToken(
         args as { tokenId: string; x: number; y: number; sceneId?: string },
-        foundryClient,
+        provider,
       );
     case 'apply_status_effect':
       if (!('tokenId' in args) || typeof args.tokenId !== 'string') {
@@ -229,31 +230,31 @@ export async function routeToolRequest(
       }
       return handleApplyStatusEffect(
         args as { tokenId: string; statusId: string; active?: boolean; sceneId?: string },
-        foundryClient,
+        provider,
       );
 
     // Chat tools
     case 'get_chat_messages':
-      return handleGetChatMessages(args as { limit?: number }, foundryClient);
+      return handleGetChatMessages(args as { limit?: number }, provider);
 
     // User tools
     case 'get_users':
-      return handleGetUsers(args, foundryClient);
+      return handleGetUsers(args, provider);
 
     // Journal tools
     case 'search_journals':
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleSearchJournals(args as { query: string; limit?: number }, foundryClient);
+      return handleSearchJournals(args as { query: string; limit?: number }, provider);
     case 'get_journal':
       if (!('journalId' in args) || typeof args.journalId !== 'string') {
         throw new Error('Missing required parameter: journalId');
       }
-      return handleGetJournal(args as { journalId: string }, foundryClient);
+      return handleGetJournal(args as { journalId: string }, provider);
 
     // Journal mutation tools (WRITE) — Socket.IO modifyDocument protocol
-    // (foundryClient); require FOUNDRY_WRITE_ENABLED=true + a GM user.
+    // (provider); require FOUNDRY_WRITE_ENABLED=true + a GM user.
     case 'create_journal_entry':
       if (!('name' in args) || typeof args.name !== 'string') {
         throw new Error('Missing required parameter: name');
@@ -268,7 +269,7 @@ export async function routeToolRequest(
           folder?: string;
           visibility?: DocumentVisibility;
         },
-        foundryClient,
+        provider,
       );
 
     // World tools
@@ -276,28 +277,25 @@ export async function routeToolRequest(
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleSearchWorld(args as { query: string; limit?: number }, foundryClient);
+      return handleSearchWorld(args as { query: string; limit?: number }, provider);
     case 'get_world_summary':
-      return handleGetWorldSummary(args, foundryClient);
+      return handleGetWorldSummary(args, provider);
     case 'refresh_world_data':
-      return handleRefreshWorldData(args, foundryClient);
+      return handleRefreshWorldData(args, provider);
 
     // Generation tools
     case 'generate_npc':
-      return handleGenerateNPC(
-        args as { level?: number; race?: string; class?: string },
-        foundryClient,
-      );
+      return handleGenerateNPC(args as { level?: number; race?: string; class?: string }, provider);
     case 'generate_loot':
       return handleGenerateLoot(
         args as { challengeRating?: number; treasureType?: string },
-        foundryClient,
+        provider,
       );
     case 'lookup_rule':
       if (!('query' in args) || typeof args.query !== 'string') {
         throw new Error('Missing required parameter: query');
       }
-      return handleLookupRule(args as { query: string; system?: string }, foundryClient);
+      return handleLookupRule(args as { query: string; system?: string }, provider);
 
     // Diagnostics tools (require REST API module)
     case 'get_recent_logs':
@@ -315,7 +313,7 @@ export async function routeToolRequest(
     case 'diagnose_errors':
       return handleDiagnoseErrors(args as { category?: string }, diagnosticSystem);
     case 'get_health_status':
-      return handleGetHealthStatus(args, foundryClient, diagnosticsClient);
+      return handleGetHealthStatus(args, provider, diagnosticsClient);
 
     default:
       throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
@@ -327,9 +325,9 @@ export async function routeToolRequest(
  */
 export async function routeResourceRequest(
   uri: string,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
   diagnosticsClient: DiagnosticsClient,
 ) {
   logger.debug(`Routing resource request: ${uri}`);
-  return handleReadResource(uri, foundryClient, diagnosticsClient);
+  return handleReadResource(uri, provider, diagnosticsClient);
 }

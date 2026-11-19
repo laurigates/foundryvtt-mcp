@@ -116,3 +116,10 @@ test-results/
 playwright-report/
 .env.integration
 tests/integration/logs/
+
+# Python integration runtime
+__pycache__/
+*.pyc
+.venv/
+# Local target configurations may contain credentials
+foundry-targets.local.json

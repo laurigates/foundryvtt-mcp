@@ -2,7 +2,7 @@
  * User management tool handler
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 const ROLE_NAMES: Record<number, string> = {
@@ -13,9 +13,9 @@ const ROLE_NAMES: Record<number, string> = {
   4: 'Game Master',
 };
 
-export async function handleGetUsers(_args: Record<string, unknown>, foundryClient: FoundryClient) {
+export async function handleGetUsers(_args: Record<string, unknown>, provider: FoundryCore) {
   return withToolError('get users', async () => {
-    const { users, activeUsers } = foundryClient.getUsers();
+    const { users, activeUsers } = provider.getUsers();
     const activeSet = new Set(activeUsers);
 
     const formatted = users
