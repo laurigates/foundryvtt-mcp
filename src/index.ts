@@ -34,10 +34,12 @@ import { DiagnosticsClient } from './diagnostics/client.js';
 import { FoundryClient, type FoundryClientConfig } from './foundry/client.js';
 import {
   getAllResources,
-  getAllTools,
+  getAvailableTools,
+  isToolAvailable,
   routeResourceRequest,
   routeToolRequest,
 } from './tools/index.js';
+import type { ToolAvailability } from './tools/index.js';
 import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
 
@@ -50,6 +52,7 @@ class FoundryMCPServer {
   private foundryClient: FoundryClient;
   private diagnosticsClient: DiagnosticsClient;
   private diagnosticSystem: DiagnosticSystem;
+  private toolAvailability: ToolAvailability;
 
   /**
    * Creates a new FoundryMCPServer instance.
@@ -91,6 +94,10 @@ class FoundryMCPServer {
       clientConfig.userId = config.foundry.userId;
     }
     this.foundryClient = new FoundryClient(clientConfig);
+    this.toolAvailability = {
+      transport: clientConfig.apiKey ? 'rest' : 'socket',
+      writeEnabled: clientConfig.writeEnabled ?? false,
+    };
 
     // Initialize DiagnosticsClient
     this.diagnosticsClient = new DiagnosticsClient(this.foundryClient);
@@ -108,10 +115,13 @@ class FoundryMCPServer {
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      logger.info('Listing available tools');
-      return {
-        tools: getAllTools(),
-      };
+      const availableTools = getAvailableTools(this.toolAvailability);
+      logger.info('Listing available tools', {
+        transport: this.toolAvailability.transport,
+        writeEnabled: this.toolAvailability.writeEnabled,
+        count: availableTools.length,
+      });
+      return { tools: availableTools };
     });
 
     // List available resources
@@ -128,6 +138,14 @@ class FoundryMCPServer {
       logger.info('Executing tool', { name, args });
 
       try {
+        // Discovery and execution use the same availability rules.
+        if (!isToolAvailable(name, this.toolAvailability)) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Tool "${name}" is unavailable with the current ${this.toolAvailability.transport} transport and write settings.`,
+          );
+        }
+
         return (await routeToolRequest(
           name,
           args || {},

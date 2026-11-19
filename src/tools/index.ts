@@ -4,6 +4,8 @@
 
 // Export tool and resource definitions
 export { getAllTools } from './definitions.js';
+export { getAvailableTools, isToolAvailable } from './availability.js';
+export type { ToolAvailability } from './availability.js';
 export * from './handlers/actors.js';
 export * from './handlers/chat.js';
 export * from './handlers/combat.js';
