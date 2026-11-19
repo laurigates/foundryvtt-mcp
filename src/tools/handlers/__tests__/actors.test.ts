@@ -56,6 +56,25 @@ describe('handleSearchActors', () => {
     expect(text).toContain('**Results:** 2/2');
   });
 
+  it('preserves zero current and maximum HP and level in actor search results', async () => {
+    const actors: FoundryActor[] = [
+      buildActor({ name: 'Fallen Hero', hp: { value: 0, max: 25 } }),
+      buildActor({ name: 'Zero HP Creature', level: 0, hp: { value: 0, max: 0 } }),
+    ];
+    const client = {
+      searchActors: vi.fn().mockResolvedValue({
+        actors, total: 2, page: 1, limit: 10,
+      } satisfies ActorSearchResult),
+    } as unknown as FoundryClient;
+
+    const result = await handleSearchActors({ query: '' }, client);
+    const text = getText(result);
+
+    expect(text).toContain('**Fallen Hero** (character) - Level 3 - HP: 0/25');
+    expect(text).toContain('**Zero HP Creature** (character) - Level 0 - HP: 0/0');
+    expect(text).not.toContain('HP: Unknown');
+  });
+
   it('passes through type filter when supplied', async () => {
     const searchResult: ActorSearchResult = { actors: [], total: 0, page: 1, limit: 5 };
     const client = {
@@ -136,6 +155,44 @@ describe('handleGetActorDetails', () => {
     expect(text).toContain('**Armor Class:** 15');
     expect(text).toContain('**STR:** 16 (+3)');
     expect(text).toContain('**DEX:** 14 (+2)');
+  });
+
+  it('preserves zero HP, maximum HP, armor class and level in actor details', async () => {
+    const actor = buildActor({
+      name: 'Unconscious Hero',
+      level: 0,
+      hp: { value: 0, max: 0 },
+      ac: { value: 0 },
+    });
+    const client = {
+      getActor: vi.fn().mockResolvedValue(actor),
+    } as unknown as FoundryClient;
+
+    const result = await handleGetActorDetails({ actorId: actor._id }, client);
+    const text = getText(result);
+
+    expect(text).toContain('**Level:** 0');
+    expect(text).toContain('**Hit Points:** 0/0');
+    expect(text).toContain('**Armor Class:** 0');
+    expect(text).not.toContain('**Hit Points:** Unknown');
+  });
+
+  it('uses Unknown for missing numeric stats without masking zero values', async () => {
+    const actor = buildActor({
+      level: undefined,
+      hp: undefined,
+      ac: undefined,
+    });
+    const client = {
+      getActor: vi.fn().mockResolvedValue(actor),
+    } as unknown as FoundryClient;
+
+    const result = await handleGetActorDetails({ actorId: actor._id }, client);
+    const text = getText(result);
+
+    expect(text).toContain('**Level:** Unknown');
+    expect(text).toContain('**Hit Points:** Unknown/Unknown');
+    expect(text).toContain('**Armor Class:** Unknown');
   });
 
   it('throws McpError with InvalidParams when actorId is missing', async () => {
