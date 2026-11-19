@@ -12,6 +12,7 @@ import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
 import { probeRestModule } from './rest-probe.js';
+import { searchWorldDocuments, type WorldSearchResults } from './world-search.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -1536,24 +1537,8 @@ export class FoundryClient {
   // Cross-collection search
   // ==========================================================================
 
-  searchWorld(query: string): {
-    actors: WorldActor[];
-    items: WorldItem[];
-    scenes: WorldScene[];
-    journals: WorldJournal[];
-  } {
-    if (!this.worldData) {
-      return { actors: [], items: [], scenes: [], journals: [] };
-    }
-
-    const q = query.toLowerCase();
-
-    return {
-      actors: this.worldData.actors.filter((a) => a.name.toLowerCase().includes(q)),
-      items: this.worldData.items.filter((i) => i.name.toLowerCase().includes(q)),
-      scenes: this.worldData.scenes.filter((s) => s.name.toLowerCase().includes(q)),
-      journals: this.worldData.journal.filter((j) => j.name.toLowerCase().includes(q)),
-    };
+  searchWorld(query: string): WorldSearchResults {
+    return searchWorldDocuments(this.worldData, query);
   }
 
   // ==========================================================================
