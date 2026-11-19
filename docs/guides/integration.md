@@ -1,34 +1,114 @@
-# Integration Guide
+# MCP Client Integration Guide
 
-## Claude Desktop
+The FoundryVTT MCP server is a **local stdio MCP process**. It connects to a running Foundry VTT world using the URL and authentication details you configure. The Foundry host may be another machine (for example a remote Linux server); the MCP client does not need to keep the Foundry browser UI open.
 
-Add to your Claude Desktop MCP settings:
+The available tools and connection-mode boundaries are described in the [capability matrix](./capabilities.md). For a complete remote-host setup, see [Remote Linux Setup](./remote-linux.md).
+
+## Connect via Socket.IO (default)
+
+Use this mode for supported world-state reads and the opt-in write tools. Keep `FOUNDRY_API_KEY` **unset**. Foundry must have an active world and the account must have the necessary permissions.
+
+### Claude Desktop / MCP clients using `mcpServers`
 
 ```json
 {
   "mcpServers": {
-    "foundry": {
-      "command": "node",
-      "args": ["/path/to/foundry-mcp-server/dist/index.js"],
+    "foundryvtt": {
+      "command": "npx",
+      "args": ["-y", "foundryvtt-mcp"],
       "env": {
-        "FOUNDRY_URL": "http://localhost:30000",
-        "FOUNDRY_USERNAME": "your_username",
-        "FOUNDRY_PASSWORD": "your_password"
+        "FOUNDRY_URL": "https://foundry.example.com",
+        "FOUNDRY_USERNAME": "mcp-api",
+        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET",
+        "FOUNDRY_WRITE_ENABLED": "false"
       }
     }
   }
 }
 ```
 
-To enable optional diagnostics tools, add `FOUNDRY_API_KEY` to the `env` block:
+Substitute your real Foundry URL and an authorized user. A local development server can use `http://localhost:30000`; remote deployments should use HTTPS.
+
+Setting `FOUNDRY_WRITE_ENABLED=true` enables 11 supported mutation tools **only when Socket.IO is connected and Foundry grants the required GM/owner permissions**. Leave it disabled while testing connectivity and read operations.
+
+### VS Code client configuration
+
+VS Code uses `servers` instead of `mcpServers` for its standard MCP configuration:
 
 ```json
 {
-  "FOUNDRY_API_KEY": "your_api_key_here"
+  "servers": {
+    "foundryvtt": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "foundryvtt-mcp"],
+      "env": {
+        "FOUNDRY_URL": "https://foundry.example.com",
+        "FOUNDRY_USERNAME": "mcp-api",
+        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET"
+      }
+    }
+  }
 }
 ```
 
-## Custom MCP Client
+## Optional Foundry Local REST API mode
+
+Setting `FOUNDRY_API_KEY` changes the server connection to **Foundry Local REST API mode**; it is **not** an additional key used alongside the authenticated Socket.IO connection. In the current implementation, the REST mode supports compendium search and the REST-backed diagnostics; **the 11 write tools require Socket.IO**.
+
+For example, to use REST-backed searches and diagnostics, configure a separate MCP entry:
+
+```json
+{
+  "mcpServers": {
+    "foundry-rest": {
+      "command": "npx",
+      "args": ["-y", "foundryvtt-mcp"],
+      "env": {
+        "FOUNDRY_URL": "https://foundry.example.com",
+        "FOUNDRY_API_KEY": "REPLACE_WITH_REST_MODULE_KEY"
+      }
+    }
+  }
+}
+```
+
+The REST mode above expects the **Foundry Local REST API** module's `/api/...` endpoints. It is not a ready-made adapter for **ThreeHats Foundry REST API Relay**. REST-only behavior depends on the endpoints implemented by the installed module.
+
+## Running a fork checkout
+
+The commands above invoke the **published npm package**. To run a local checkout of your own fork/branch, build it and point the MCP client at its absolute `dist/index.js` path instead.
+
+```bash
+git clone https://github.com/p4535992/foundryvtt-mcp.git
+cd foundryvtt-mcp
+git checkout docs/capabilities-audit-2026-11
+bun install
+bun run build
+```
+
+Example for a cloned checkout (replace the path with the absolute path on your computer):
+
+```json
+{
+  "mcpServers": {
+    "foundryvtt-fork": {
+      "command": "node",
+      "args": ["/absolute/path/to/foundryvtt-mcp/dist/index.js"],
+      "env": {
+        "FOUNDRY_URL": "https://foundry.example.com",
+        "FOUNDRY_USERNAME": "mcp-api",
+        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET",
+        "FOUNDRY_WRITE_ENABLED": "false"
+      }
+    }
+  }
+}
+```
+
+`node` must be installed and available to the client. Do not commit real credentials to the repository.
+
+## Using a custom MCP SDK client
 
 ```typescript
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -36,66 +116,54 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const transport = new StdioClientTransport({
   command: "node",
-  args: ["./dist/index.js"],
+  args: ["/absolute/path/to/foundryvtt-mcp/dist/index.js"],
+  env: {
+    ...process.env,
+    FOUNDRY_URL: "https://foundry.example.com",
+    FOUNDRY_USERNAME: "mcp-api",
+    FOUNDRY_PASSWORD: process.env.FOUNDRY_PASSWORD ?? ""
+  }
 });
 
-const client = new Client(
-  {
-    name: "foundry-client",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {},
-  },
-);
-
+const client = new Client({ name: "foundry-client", version: "1.0.0" });
 await client.connect(transport);
 
-// Roll dice
-const result = await client.request({
-  method: "tools/call",
-  params: {
-    name: "roll_dice",
-    arguments: {
-      formula: "1d20+5",
-      reason: "Initiative roll",
-    },
-  },
+const result = await client.callTool({
+  name: "roll_dice",
+  arguments: { formula: "1d20+5", reason: "Initiative check" }
 });
+console.log(result);
+await client.close();
 ```
 
-## Tool Schema Examples
+## Example tool arguments
 
-### roll_dice
+### `roll_dice`
 
 ```json
-{
-  "formula": "1d20+5",
-  "reason": "Attack roll against goblin"
-}
+{ "formula": "1d20+5", "reason": "Attack roll against goblin" }
 ```
 
-### search_world
+### `search_world` (names only)
 
 ```json
-{
-  "query": "dragon",
-  "limit": 10
-}
+{ "query": "dragon", "limit": 10 }
 ```
 
-### get_combat_state
+### `search_actors`
+
+```json
+{ "query": "goblin", "type": "npc", "limit": 10 }
+```
+
+### `get_combat_state`
 
 ```json
 {}
 ```
 
-### search_actors
+### `move_token` (Socket.IO write mode and permissions required)
 
 ```json
-{
-  "query": "goblin",
-  "type": "npc",
-  "limit": 10
-}
+{ "tokenId": "REPLACE_WITH_TOKEN_ID", "sceneId": "REPLACE_WITH_SCENE_ID", "x": 300, "y": 450 }
 ```

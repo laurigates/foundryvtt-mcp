@@ -22,7 +22,7 @@ cp .env.example .env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FOUNDRY_USER_ID` | — | 16-char document `_id` (bypasses username resolution) |
-| `FOUNDRY_API_KEY` | — | Selects the Foundry Local REST API transport, including read-only compendium search and optional diagnostics. Not a ThreeHats REST Relay key. |
+| `FOUNDRY_SOCKET_PATH` | `/socket.io/` | Custom Socket.IO endpoint for reverse-proxy route prefixes. |
 | `FOUNDRY_WRITE_ENABLED` | `false` | Allow 11 mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
 | `LOG_LEVEL` | `info` | Logging verbosity (`debug`, `info`, `warn`, `error`) |
 | `NODE_ENV` | `development` | Environment mode |
@@ -46,9 +46,10 @@ FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
 
 ## Security
 
-- Limit FoundryVTT user permissions to the minimum required
-- Run the server on an internal network only
-- Monitor logs for suspicious activity
+- Limit FoundryVTT user permissions to the minimum required.
+- Use HTTPS for remote Foundry instances; ensure the reverse proxy supports WebSocket upgrades.
+- Keep Foundry passwords and optional REST keys in private environment/client settings, not in source control.
+- Keep `FOUNDRY_WRITE_ENABLED=false` until you intend to use write tools, and monitor logs.
 
 ## FoundryVTT Authentication
 
@@ -62,12 +63,14 @@ By default the MCP server connects through authenticated Socket.IO using a stand
 
 ### Authentication Flow
 
-The server authenticates via a 4-step Socket.IO flow:
+The server authenticates through a four-stage flow:
 
-1. Fetches the `/join` page to obtain a session cookie
-2. Extracts the session cookie from the response
-3. Resolves the username to a user ID (or uses `FOUNDRY_USER_ID` if set)
-4. Emits `joinGame` with credentials to receive the complete world state
+1. Requests `/join` to obtain a session cookie.
+2. Resolves a user name to a document ID via Socket.IO `getJoinData` (unless `FOUNDRY_USER_ID` is supplied).
+3. Submits credentials to `POST /join` to authenticate the session.
+4. Opens an authenticated Socket.IO connection and requests the world snapshot using the `world` event.
+
+This flow runs against the Foundry URL and does not require an open browser tab on the client PC.
 
 ### Required permissions
 
@@ -75,7 +78,7 @@ The Foundry user needs access to the documents the tools will read. Write operat
 
 ### Optional: REST-mode compendium search and diagnostics
 
-The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
+The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints; its key is **not** a ThreeHats REST API Relay key. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
 
 To configure this optional mode:
 

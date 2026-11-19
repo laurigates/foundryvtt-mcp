@@ -12,11 +12,11 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 - **Game State Mutations** — 11 opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
 - **World Search** — case-insensitive **name** search for actors, world items, scenes and journals (not full-text page search).
-- **Live Connection** — Socket.IO loads the active world and follows document updates; refresh is available after disconnection.
+- **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — nine `foundry://` URIs for direct reads.
 - **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
 
-See the **[source-verified MCP capability matrix](docs/guides/capabilities.md)** for all 33 tools, mode-specific behavior, safety notes, and features not exposed through MCP.
+See the **[MCP capability matrix](docs/guides/capabilities.md)** for all 33 tools, mode-specific behavior and usage boundaries. For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ It is recommended to create a separate FoundryVTT user account for the MCP serve
 1. Go to **Configuration** → **User Management**
 2. Click **Create User**
 3. Set a username (e.g., `mcp-api`) and a strong password
-4. Assign the **Assistant GM** role (needed to read world data and roll dice)
+4. Assign the minimum role and document permissions appropriate for the operations you plan to use (Assistant GM is one option for broad read access)
 5. Use this account's credentials in your MCP configuration
 
 **Benefits:**
@@ -100,7 +100,7 @@ Add to your VS Code MCP settings:
 
 ### Development Setup
 
-For local development or contributing:
+For local development or contributing (this example clones the upstream source; see [Running a fork checkout](docs/guides/integration.md#running-a-fork-checkout) to use your own branch):
 
 ```bash
 git clone https://github.com/laurigates/foundryvtt-mcp.git
@@ -118,9 +118,9 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `FOUNDRY_URL` | Yes | FoundryVTT server URL (e.g., `http://localhost:30000`) |
-| `FOUNDRY_USERNAME` | Yes | FoundryVTT user account |
-| `FOUNDRY_PASSWORD` | Yes | FoundryVTT user password |
-| `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
+| `FOUNDRY_USERNAME` | Socket.IO | FoundryVTT user account (or use `FOUNDRY_USER_ID`) |
+| `FOUNDRY_PASSWORD` | Socket.IO | FoundryVTT user password |
+| `FOUNDRY_USER_ID` | Socket.IO alternative | Bypass username-to-ID resolution |
 | `FOUNDRY_API_KEY` | No | Selects **Foundry Local REST API mode** (not combined with Socket.IO), used for compendium search and REST diagnostics; writes require Socket.IO |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
@@ -131,9 +131,9 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 Ask your AI assistant things like:
 
 - "Roll 1d20+5 for an attack roll"
-- "Show me all the NPCs in this scene"
+- "Find actors named goblin"
 - "What's the current combat initiative order?"
-- "Search the world for anything related to dragons"
+- "Find actors, items or scenes with dragon in their name"
 - "Generate a random NPC merchant"
 
 ## Available Tools
@@ -175,7 +175,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 ### World
 
-- `search_world` — full-text search across all game entities
+- `search_world` — case-insensitive **name** search across world actors, items, scenes and journals
 - `get_world_summary` — overview of the current world state
 - `refresh_world_data` — reload world data from FoundryVTT; needed after a dropped
   connection, whose missed updates are never replayed into the cache
@@ -191,7 +191,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 ### Content Generation
 
 - `generate_npc` — generate NPC text (not written to the world)
-- `generate_loot` — generate treasure text for a level (not written to the world)
+- `generate_loot` — generate treasure text from a challenge rating (not written to the world)
 
 ### Diagnostics (requires REST API module)
 
@@ -205,8 +205,8 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 ## Available Resources
 
-- `foundry://actors` — all actors in the world
-- `foundry://items` — all items in the world
+- `foundry://actors` — up to 100 world actor summaries and their IDs, plus the total count
+- `foundry://items` — up to 100 world item summaries and their IDs, plus the total count
 - `foundry://scenes` — all scenes
 - `foundry://scenes/current` — current active scene
 - `foundry://journals` — all journal entries
