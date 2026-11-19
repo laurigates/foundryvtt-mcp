@@ -81,6 +81,102 @@ describe('FoundryClient', () => {
     });
   });
 
+  describe('testConnection authentication', () => {
+    it('probes /api/world for a valid REST key without username/password', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World' },
+      });
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+      expect(client.isConnected()).toBe(true);
+    });
+
+    it.each([401, 403])('rejects REST API key failures (HTTP %i)', async (status) => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'invalid-key' });
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error('Unauthorized'), {
+          response: { status, data: { error: 'Unauthorized' } },
+        }),
+      );
+
+      await expect(client.testConnection()).rejects.toThrow('FOUNDRY_API_KEY was rejected');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('rejects a 200 HTML response instead of treating it as a valid REST API', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: '<html>Foundry Virtual Tabletop</html>',
+      });
+
+      await expect(client.testConnection()).rejects.toThrow(
+        'REST module did not answer /api/world with JSON',
+      );
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('does not fall back to the public root page when the REST route is missing', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        if (url === '/') return { status: 200, data: '<html>Foundry</html>' };
+        throw Object.assign(new Error('HTTP 404'), { response: { status: 404 } });
+      });
+
+      await expect(client.testConnection()).rejects.toThrow('HTTP 404');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('prefers REST authentication when both an API key and credentials are configured', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        username: 'gm',
+        password: 'gm-password',
+      });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('requires credentials in Socket.IO mode instead of testing the public root page', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: '<html>Foundry</html>' });
+
+      await expect(client.testConnection()).rejects.toThrow(
+        'Socket.IO mode requires username/userId and password',
+      );
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
+    });
+
+    it('continues to use the authenticated Socket.IO connect path', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        username: 'gm',
+        password: 'gm-password',
+      });
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(connect).toHaveBeenCalledOnce();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+  });
+
   describe('REST API mode (with apiKey)', () => {
     beforeEach(() => {
       client = new FoundryClient({
