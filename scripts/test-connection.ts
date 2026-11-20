@@ -60,9 +60,10 @@ async function testConnection() {
     // Initialize client
     const client = new FoundryClient({
       baseUrl: config.foundry.url,
-      apiKey: config.foundry.apiKey,
-      username: config.foundry.username,
-      password: config.foundry.password,
+      // Omit unset values: exactOptionalPropertyTypes rejects explicit undefined.
+      ...(config.foundry.apiKey ? { apiKey: config.foundry.apiKey } : {}),
+      ...(config.foundry.username ? { username: config.foundry.username } : {}),
+      ...(config.foundry.password ? { password: config.foundry.password } : {}),
       socketPath: config.foundry.socketPath,
       timeout: config.foundry.timeout,
     });
@@ -98,8 +99,8 @@ async function testConnection() {
     // Test actor search
     console.log('👥 Testing actor search...');
     try {
-      const actors = await client.searchActors({ limit: 3 });
-      console.log(`   Found ${actors.length} actors`);
+      const { actors, total } = await client.searchActors({ limit: 3 });
+      console.log(`   Found ${total} actors (showing ${actors.length})`);
       if (actors.length > 0) {
         actors.forEach(actor => {
           console.log(`   - ${actor.name} (${actor.type})`);
