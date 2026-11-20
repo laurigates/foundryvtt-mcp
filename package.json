@@ -1,6 +1,6 @@
 {
   "name": "foundryvtt-mcp",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Model Context Protocol server for FoundryVTT integration",
   "main": "dist/index.js",
   "bin": {
@@ -74,21 +74,22 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "ajv": "8.20.0",
     "axios": "1.21.1",
-    "dotenv": "17.4.2",
+    "dotenv": "18.0.10",
     "socket.io-client": "4.8.4",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@playwright/test": "1.65.1",
-    "@types/node": "25.9.9",
+    "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "5.1.1",
     "husky": "9.1.7",
-    "lint-staged": "17.6.0",
+    "lint-staged": "17.6.1",
     "rimraf": "6.1.4",
     "tsx": "4.23.15",
     "typedoc": "0.28.20",
     "typescript": "6.0.3",
-    "vitest": "4.1.12"
+    "vitest": "5.1.1"
   },
   "engines": {
     "node": ">=18.0.0"
