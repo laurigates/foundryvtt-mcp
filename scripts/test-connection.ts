@@ -80,10 +80,18 @@ async function testConnection() {
 
     // Test dice rolling
     console.log('🎲 Testing dice rolling...');
+    let diceOk = false;
     try {
       const roll = await client.rollDice('1d20+5', 'Connection test');
       console.log(`   Result: ${roll.total} (${roll.breakdown})`);
-      console.log('✅ Dice rolling works!\n');
+      console.log(`   Source: ${roll.source}`);
+      // In REST mode a local roll means /api/dice/roll failed (#254, #265).
+      if (config.foundry.apiKey && roll.source !== 'server') {
+        console.log('❌ Dice rolling fell back to the local roller: /api/dice/roll failed\n');
+      } else {
+        diceOk = true;
+        console.log('✅ Dice rolling works!\n');
+      }
     } catch (error) {
       console.log(`❌ Dice rolling failed: ${error instanceof Error ? error.message : error}\n`);
     }
@@ -142,7 +150,7 @@ async function testConnection() {
     console.log('🎉 Connection test completed!');
     console.log('\n📝 Summary:');
     console.log('   - Basic connection: ✅');
-    console.log('   - Dice rolling: ✅');
+    console.log(`   - Dice rolling: ${diceOk ? '✅' : '❌'}`);
     console.log(`   - Data access: ${config.foundry.apiKey ? '🌐 REST (coverage depends on the target module; Socket.IO is the full-data path)' : '✅ Full worldData'}`);
     console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
 
