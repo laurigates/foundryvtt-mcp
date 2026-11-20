@@ -209,7 +209,7 @@ setup-dev: install setup-env install-playwright
 [confirm("This will update all dependencies. Continue?")]
 update-deps:
     bun update
-    bun pm audit || true
+    bun audit || true
 
 # Check for outdated dependencies
 [group: "maintenance"]
