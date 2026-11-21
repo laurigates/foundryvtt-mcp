@@ -32,14 +32,14 @@ import {
 import { config } from './config/index.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
 import { FoundryClient, type FoundryClientConfig } from './foundry/client.js';
+import type { ToolAvailability } from './tools/index.js';
 import {
+  checkToolAvailability,
   getAllResources,
   getAvailableTools,
-  isToolAvailable,
   routeResourceRequest,
   routeToolRequest,
 } from './tools/index.js';
-import type { ToolAvailability } from './tools/index.js';
 import { DiagnosticSystem } from './utils/diagnostics.js';
 import { logger } from './utils/logger.js';
 
@@ -138,12 +138,12 @@ class FoundryMCPServer {
       logger.info('Executing tool', { name, args });
 
       try {
-        // Discovery and execution use the same availability rules.
-        if (!isToolAvailable(name, this.toolAvailability)) {
-          throw new McpError(
-            ErrorCode.InvalidRequest,
-            `Tool "${name}" is unavailable with the current ${this.toolAvailability.transport} transport and write settings.`,
-          );
+        // Discovery and execution share the availability rules. A blocked tool
+        // names the actual reason; a name absent from the table falls through
+        // to the router, which reports its own "Unknown tool" error.
+        const gate = checkToolAvailability(name, this.toolAvailability);
+        if (gate.status === 'blocked') {
+          throw new McpError(ErrorCode.InvalidRequest, gate.reason);
         }
 
         return (await routeToolRequest(

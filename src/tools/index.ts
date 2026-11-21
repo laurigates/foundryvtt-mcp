@@ -2,10 +2,10 @@
  * Tools module entry point
  */
 
+export type { ToolAvailability, ToolGateResult } from './availability.js';
+export { checkToolAvailability, getAvailableTools, isToolAvailable } from './availability.js';
 // Export tool and resource definitions
 export { getAllTools } from './definitions.js';
-export { getAvailableTools, isToolAvailable } from './availability.js';
-export type { ToolAvailability } from './availability.js';
 export * from './handlers/actors.js';
 export * from './handlers/chat.js';
 export * from './handlers/combat.js';

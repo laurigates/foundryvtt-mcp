@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import {
+  checkToolAvailability,
+  getAvailableTools,
+  isToolAvailable,
+  type ToolAvailability,
+} from '../availability.js';
 import { getAllTools } from '../definitions.js';
-import { getAvailableTools, isToolAvailable, type ToolAvailability } from '../availability.js';
 
 const socketReadOnly: ToolAvailability = { transport: 'socket', writeEnabled: false };
 const socketWritable: ToolAvailability = { transport: 'socket', writeEnabled: true };
@@ -101,5 +106,45 @@ describe('MCP tool availability by transport', () => {
   it('does not expose unclassified tool names', () => {
     expect(isToolAvailable('future_unreviewed_tool', socketWritable)).toBe(false);
     expect(isToolAvailable('future_unreviewed_tool', restReadOnly)).toBe(false);
+  });
+});
+
+describe('CallTool availability gate', () => {
+  it('allows a shared tool in every mode', () => {
+    expect(checkToolAvailability('roll_dice', socketReadOnly).status).toBe('available');
+    expect(checkToolAvailability('roll_dice', restReadOnly).status).toBe('available');
+  });
+
+  it('returns unknown for a name absent from the table so the router keeps "Unknown tool"', () => {
+    expect(checkToolAvailability('no_such_tool', socketWritable)).toEqual({ status: 'unknown' });
+    expect(checkToolAvailability('no_such_tool', restReadOnly)).toEqual({ status: 'unknown' });
+  });
+
+  it('names writes-disabled as the reason for a write tool with the opt-in off', () => {
+    const result = checkToolAvailability('move_token', socketReadOnly);
+    expect(result.status).toBe('blocked');
+    expect(result.status === 'blocked' && result.reason).toContain('FOUNDRY_WRITE_ENABLED=true');
+  });
+
+  it('names REST mode as the reason for a write tool in REST mode', () => {
+    const result = checkToolAvailability('move_token', restWriteFlag);
+    expect(result.status).toBe('blocked');
+    expect(result.status === 'blocked' && result.reason).toContain('REST mode');
+  });
+
+  it('names Socket.IO mode as the reason for a REST-only tool over Socket.IO', () => {
+    const result = checkToolAvailability('search_compendium', socketWritable);
+    expect(result.status).toBe('blocked');
+    expect(result.status === 'blocked' && result.reason).toContain('Socket.IO mode');
+  });
+
+  it('names REST mode as the reason for a socket-only tool over REST', () => {
+    const result = checkToolAvailability('search_world', restReadOnly);
+    expect(result.status).toBe('blocked');
+    expect(result.status === 'blocked' && result.reason).toContain('REST mode');
+  });
+
+  it('allows a write tool only with Socket.IO transport and the write opt-in', () => {
+    expect(checkToolAvailability('move_token', socketWritable).status).toBe('available');
   });
 });

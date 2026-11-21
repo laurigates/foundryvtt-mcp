@@ -86,6 +86,69 @@ export function isToolAvailable(name: string, availability: ToolAvailability): b
   }
 }
 
+/**
+ * Outcome of the CallTool gate for a single tool name.
+ *
+ * - `available`: the tool may be dispatched in this mode.
+ * - `unknown`: the name is not in the availability table; let the router
+ *   produce its own `MethodNotFound` ("Unknown tool") error.
+ * - `blocked`: the tool exists but is unavailable here; `reason` names the
+ *   actual cause (writes disabled, REST mode, Socket.IO mode).
+ */
+export type ToolGateResult =
+  | { readonly status: 'available' }
+  | { readonly status: 'unknown' }
+  | { readonly status: 'blocked'; readonly reason: string };
+
+/**
+ * Decide whether a CallTool request for `name` may proceed in this mode, and
+ * name the reason when it may not. Names absent from the table return
+ * `unknown` so the router keeps its "Unknown tool" error rather than the gate
+ * masking an unregistered name as "unavailable".
+ */
+export function checkToolAvailability(
+  name: string,
+  availability: ToolAvailability,
+): ToolGateResult {
+  const access = TOOL_ACCESS[name];
+  if (access === undefined) {
+    return { status: 'unknown' };
+  }
+  if (access === 'shared') {
+    return { status: 'available' };
+  }
+  if (access === 'socket') {
+    return availability.transport === 'socket'
+      ? { status: 'available' }
+      : {
+          status: 'blocked',
+          reason: `Tool "${name}" requires the Socket.IO transport and is unavailable in REST mode.`,
+        };
+  }
+  if (access === 'rest') {
+    return availability.transport === 'rest'
+      ? { status: 'available' }
+      : {
+          status: 'blocked',
+          reason: `Tool "${name}" requires the REST API module (FOUNDRY_API_KEY) and is unavailable in Socket.IO mode.`,
+        };
+  }
+  // socket-write: needs the Socket.IO transport, and the write opt-in on top.
+  if (availability.transport !== 'socket') {
+    return {
+      status: 'blocked',
+      reason: `Tool "${name}" is a write tool; write tools require the Socket.IO transport and are unavailable in REST mode.`,
+    };
+  }
+  if (!availability.writeEnabled) {
+    return {
+      status: 'blocked',
+      reason: `Tool "${name}" is a write tool. Set FOUNDRY_WRITE_ENABLED=true to enable game-state mutations.`,
+    };
+  }
+  return { status: 'available' };
+}
+
 /** The tools that the configured MCP server can meaningfully offer. */
 export function getAvailableTools(availability: ToolAvailability): ReturnType<typeof getAllTools> {
   return getAllTools().filter((tool) => isToolAvailable(tool.name, availability));
