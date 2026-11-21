@@ -39,8 +39,8 @@ export interface FoundryActor {
   data?: Record<string, unknown>;
   // Common actor properties
   hp?: {
-    value: number;
-    max: number;
+    value?: number;
+    max?: number;
     temp?: number;
   };
   ac?: {
