@@ -183,6 +183,24 @@ describe('searchWorldDocuments', () => {
     expect(searchWorldDocuments(world, 'οδος').actors.map((a) => a._id)).toEqual(['actor1']);
   });
 
+  it('strips nested markup to a fixpoint so no tag survives in the excerpt', () => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    // A single <[^>]*> pass removes "<a<b>" and leaves "c</a>", so a live tag
+    // survives. The fixpoint loop removes the reassembled "</a>" on the next
+    // pass, so the excerpt (which is rendered) carries no markup.
+    Object.assign(actor, {
+      system: { details: { biography: { value: 'needle <a<b>c</a>tail' } } },
+    });
+    const result = searchWorldDocuments(world, 'needle');
+    expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
+    const excerpt = result.matchDetails.actors.actor1?.excerpt ?? '';
+    expect(excerpt).toContain('needle');
+    expect(excerpt).not.toContain('<');
+    expect(excerpt).not.toContain('</a>');
+  });
+
   it('never mutates the cached world state', () => {
     const world = sampleWorld();
     const original = structuredClone(world);

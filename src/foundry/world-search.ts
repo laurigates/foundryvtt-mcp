@@ -56,12 +56,23 @@ function decodeEntity(entity: string): string {
 
 /** Convert rich-text HTML into readable text while excluding markup. */
 function plainText(value: string): string {
-  return value
+  let text = value
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
     .replace(/<\s*br\s*\/?>/gi, ' ')
-    .replace(/<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote)\b[^>]*>/gi, ' ')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote)\b[^>]*>/gi, ' ');
+  // Strip remaining tags to a fixpoint. A single pass is incomplete
+  // sanitization: removing an inner tag can splice a new one together from the
+  // surrounding text (e.g. "<scr<script>ipt>" leaves "<script>"), so a lone
+  // replace can leave a live "<script" behind. Looping until the string stops
+  // changing guarantees no markup survives, which is what the excerpt is
+  // rendered into.
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, ' ');
+  } while (text !== previous);
+  return text
     .replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (_, entity: string) => decodeEntity(entity))
     .replace(/\s+/g, ' ')
     .trim();
