@@ -8,20 +8,22 @@ Copy `.env.example` and set the required values:
 cp .env.example .env
 ```
 
-### Required
+### Required / conditional authentication
 
-| Variable | Description |
-|----------|-------------|
-| `FOUNDRY_URL` | FoundryVTT server URL (e.g. `http://localhost:30000`) |
-| `FOUNDRY_USERNAME` | FoundryVTT user account |
-| `FOUNDRY_PASSWORD` | FoundryVTT user password |
+| Variable | Required when | Description |
+|----------|---------------|-------------|
+| `FOUNDRY_URL` | Always | Active Foundry world URL (e.g. `https://foundry.example.com` or `http://localhost:30000`). |
+| `FOUNDRY_USERNAME` | Socket.IO mode | Foundry user name. |
+| `FOUNDRY_PASSWORD` | Socket.IO mode | Foundry user password. |
+| `FOUNDRY_API_KEY` | Optional REST mode | Authenticates to the **Foundry Local REST API module** and switches the MCP to REST mode. |
 
 ### Optional
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FOUNDRY_USER_ID` | — | 16-char document `_id` (bypasses username resolution) |
-| `FOUNDRY_API_KEY` | — | REST API module key (enables 5 diagnostics tools) |
+| `FOUNDRY_USER_ID` | — | 16-char user document `_id`; an **alternative to `FOUNDRY_USERNAME`** in Socket.IO mode (bypasses username resolution). |
+| `FOUNDRY_SOCKET_PATH` | `/socket.io/` | Custom Socket.IO endpoint for reverse-proxy route prefixes. |
+| `FOUNDRY_WRITE_ENABLED` | `false` | Allow the mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
 | `LOG_LEVEL` | `info` | Logging verbosity (`debug`, `info`, `warn`, `error`) |
 | `NODE_ENV` | `development` | Environment mode |
 | `FOUNDRY_TIMEOUT` | `10000` | Request timeout in ms |
@@ -44,15 +46,16 @@ FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
 
 ## Security
 
-- Limit FoundryVTT user permissions to the minimum required
-- Run the server on an internal network only
-- Monitor logs for suspicious activity
+- Limit FoundryVTT user permissions to the minimum required.
+- Use HTTPS for remote Foundry instances; ensure the reverse proxy supports WebSocket upgrades.
+- Keep Foundry passwords and optional REST keys in private environment/client settings, not in source control.
+- Keep `FOUNDRY_WRITE_ENABLED=false` until you intend to use write tools, and monitor logs.
 
 ## FoundryVTT Authentication
 
-The MCP server connects to FoundryVTT via Socket.IO using a standard user account. No custom modules are required for full game data access.
+By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. Setting `FOUNDRY_API_KEY` instead selects a different REST transport; it does not add REST capabilities alongside the Socket.IO session. See the [capability matrix — connection modes](./capabilities.md#connection-modes-not-interchangeable) for the canonical, mode-specific tool support.
 
-### Setup
+### Socket.IO setup
 
 1. Ensure FoundryVTT is running with an active world (not on the setup screen)
 2. Create or use an existing FoundryVTT user account with appropriate permissions
@@ -60,24 +63,24 @@ The MCP server connects to FoundryVTT via Socket.IO using a standard user accoun
 
 ### Authentication Flow
 
-The server authenticates via a 4-step Socket.IO flow:
+The server authenticates through a four-stage flow:
 
-1. Fetches the `/join` page to obtain a session cookie
-2. Extracts the session cookie from the response
-3. Resolves the username to a user ID (or uses `FOUNDRY_USER_ID` if set)
-4. Emits `joinGame` with credentials to receive the complete world state
+1. Requests `/join` to obtain a session cookie.
+2. Resolves a user name to a document ID via Socket.IO `getJoinData` (unless `FOUNDRY_USER_ID` is supplied).
+3. Submits credentials to `POST /join` to authenticate the session.
+4. Opens an authenticated Socket.IO connection and requests the world snapshot using the `world` event.
 
-### Required Permissions
+This flow runs against the Foundry URL and does not require an open browser tab on the client PC.
 
-Your FoundryVTT user needs:
+### Required permissions
 
-- View actors, items, scenes, and journals
-- Access compendium data
-- Use dice rolling API
+The Foundry user needs access to the documents the tools will read. Write operations also require appropriate GM/owner permissions and `FOUNDRY_WRITE_ENABLED=true`; an active Socket.IO session is mandatory. Pack search is not part of the default world snapshot and requires the optional REST transport.
 
-### Optional: Diagnostics Tools
+### Optional: REST-mode compendium search and diagnostics
 
-Installing the **Foundry Local REST API** module adds 5 server monitoring tools (`get_recent_logs`, `search_logs`, `get_system_health`, `diagnose_errors`, `get_health_status`):
+The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
+
+To configure this optional mode:
 
 1. In FoundryVTT: **Setup** > **Add-on Modules** > **Install Module**
 2. Paste: `https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json`

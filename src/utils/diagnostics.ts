@@ -293,11 +293,17 @@ export class DiagnosticSystem {
   }
 
   /**
-   * Create generic error diagnostic
+   * Create generic error diagnostic.
+   *
+   * Surfaces the underlying error message so details that `testConnection()`
+   * throws — for example a rejected `FOUNDRY_API_KEY` — are not lost when the
+   * diagnosis falls through to this catch-all (#288).
    */
-  private createGenericErrorDiagnostic(_error: unknown): DiagnosticResult {
+  private createGenericErrorDiagnostic(error: unknown): DiagnosticResult {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+
     return {
-      explanation: 'An unexpected error occurred during diagnosis.',
+      explanation: `An unexpected error occurred during diagnosis: ${message}`,
       suggestions:
         '• **Check logs** - Review server logs for detailed error information\n' +
         '• **Restart services** - Try restarting both FoundryVTT and the MCP server\n' +
@@ -360,7 +366,16 @@ export class DiagnosticSystem {
   private async testDiceRolling(): Promise<boolean> {
     try {
       const result = await this.foundryClient.rollDice('1d20', 'Health check test');
-      return typeof result.total === 'number';
+      if (typeof result.total !== 'number') {
+        return false;
+      }
+      // In REST mode a local roll means /api/dice/roll failed and the client
+      // fell back (#254); in Socket.IO mode every roll is local by design.
+      if (config.foundry.apiKey && result.source !== 'server') {
+        logger.warn('Dice health check: REST dice roll fell back to the local roller');
+        return false;
+      }
+      return true;
     } catch (error) {
       logger.debug('Dice rolling test failed:', error);
       return false;
