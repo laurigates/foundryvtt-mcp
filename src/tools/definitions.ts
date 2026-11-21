@@ -809,13 +809,13 @@ export const worldTools = [
   {
     name: 'search_world',
     description:
-      'Search across all collections (actors, items, scenes, journals) by name, grouped by collection. Use when: you do not know which collection holds what you are looking for. Do not use when: you already know the collection - use search_actors, search_items, or search_journals. Of those, only search_journals prints document ids; for actor and item ids read the foundry://actors and foundry://items resources, each of which lists up to the first 100 documents (not exhaustive in larger worlds).',
+      'Search the world snapshot across actor, item, scene and journal names as well as their available descriptive text: actor biographies, item descriptions, scene notes/drawings/token names and journal page text. Results are grouped by collection; content matches include a short plain-text excerpt and a field path. Case- and accent-insensitive phrase matching. A blank query, or one that reduces to nothing once markup is stripped (e.g. "<b>"), returns no documents (it is not match-all). Requires a loaded Socket.IO world snapshot; does not search compendiums, attached files or arbitrary system fields. This tool does not print document ids - read the foundry://actors, foundry://items and foundry://journals resources, whose JSON lists documents with their _id (not exhaustive in larger worlds). Use when: you do not know where a name or narrative phrase occurs. Do not use when: you already know the collection - use search_actors, search_items or search_journals.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Search query to match against entity names',
+          description: 'Search phrase to match against names and available descriptive content',
         },
         limit: {
           type: 'number',

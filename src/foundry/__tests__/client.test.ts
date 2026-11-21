@@ -1330,4 +1330,14 @@ describe('FoundryClient', () => {
       expect(restClient.isConnected()).toBe(true);
     });
   });
+
+  describe('searchWorld', () => {
+    it('delegates to the world search and returns empty results without a snapshot', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      const results = client.searchWorld('silver key');
+      expect(results.actors).toEqual([]);
+      expect(results.journals).toEqual([]);
+      expect(results.matchDetails.actors).toEqual({});
+    });
+  });
 });
