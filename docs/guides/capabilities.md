@@ -11,9 +11,7 @@ This document distinguishes **MCP tools that are exposed and implemented** from 
 | **Socket.IO** (default) | `FOUNDRY_URL`, `FOUNDRY_USERNAME` or `FOUNDRY_USER_ID`, and `FOUNDRY_PASSWORD`. **Leave `FOUNDRY_API_KEY` unset.** | Authenticated connection to an active Foundry world. Loads world data and observes document changes. The 11 mutation tools require this mode, the write opt-in and Foundry permissions. |
 | **Foundry Local REST API** (optional) | Set `FOUNDRY_API_KEY` | Changes `FoundryClient.connect()` to REST-mode initialization using `/api/world`. Enables REST-only operations such as `search_compendium` and supporting diagnostics. **It does not create the Socket.IO session needed for mutation tools.** Several world-snapshot-dependent tools have reduced or unavailable behavior in this mode. |
 
-**Important:** `FOUNDRY_API_KEY` is a **transport selector**, not a way to add REST features to an existing Socket.IO session. `FOUNDRY_WRITE_ENABLED=true` does not enable mutations in REST mode.
-
-The local REST API module referred to by the current `/api/...` routes is **not** [ThreeHats/foundryvtt-rest-api-relay](https://github.com/ThreeHats/foundryvtt-rest-api-relay). No ThreeHats REST Relay tools are integrated with this MCP server yet.
+**Important:** `FOUNDRY_API_KEY` is a **transport selector**, not a way to add REST features to an existing Socket.IO session. `FOUNDRY_WRITE_ENABLED=true` does not enable mutations in REST mode. This section is the canonical description of the transport switch; other guides link here.
 
 For **remote Foundry on Linux**, the local MCP client can access a reachable `FOUNDRY_URL` over Socket.IO without opening a Foundry browser tab on the client's computer. Foundry must have an active world and an authorized user; actual network and version compatibility should be tested.
 
@@ -26,7 +24,7 @@ For **remote Foundry on Linux**, the local MCP client can access a reachable `FO
 | `search_items` | Find world-level items by name/type. | Not actor-owned items or packs; rarity filtering is REST-mode-only. |
 | `search_compendium` | Search enabled compendium packs with filters and cursors. | **Requires `FOUNDRY_API_KEY` (REST mode)**; otherwise reports no results with a note. Read-only. |
 | `get_scene_info` | Read current or specified scene's metadata. | Does not report walls, token coordinates or grid details; does not switch/edit scenes. |
-| `search_journals` | Find journal entries and their IDs. | Not full-text search of every journal page. |
+| `search_journals` | Match journal **names**, page **names** and page **text** (case-insensitive substring); returns matching entries and their IDs. | Substring matching only (no ranking, no HTML stripping of the matched text); use `get_journal` for page excerpts. |
 | `get_journal` | Return text excerpts of a journal's pages. | HTML stripped; up to 500 characters per page. |
 | `get_users` | Read users and online presence from world data. | Relies on available world state. |
 | `get_combat_state` | Read active encounter and initiative order. | Reads cached Socket.IO world state. |
@@ -88,28 +86,10 @@ This section means **no registered MCP tool currently offers the operation**. It
 - Edit/delete existing journals; manage playlists, roll tables, decks, macro execution, or file operations through dedicated MCP tools.
 - Ask a specific player for a roll; send a new chat message.
 - Write to compendiums or import a compendium entry directly into an actor.
-- Call ThreeHats REST API Relay endpoints.
 
 ## Example: local MCP client -> remote Linux Foundry (read only)
 
-```json
-{
-  "mcpServers": {
-    "foundryvtt": {
-      "command": "npx",
-      "args": ["-y", "foundryvtt-mcp"],
-      "env": {
-        "FOUNDRY_URL": "https://foundry.example.com",
-        "FOUNDRY_USERNAME": "mcp-api",
-        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET",
-        "FOUNDRY_WRITE_ENABLED": "false"
-      }
-    }
-  }
-}
-```
-
-Use an account with the minimum permissions required; put real credentials in private client configuration, not in the repository. Set `FOUNDRY_WRITE_ENABLED=true` only after validating read behavior and backups. This example uses Socket.IO and intentionally **omits** `FOUNDRY_API_KEY`.
+The canonical Socket.IO client configuration (with `FOUNDRY_API_KEY` deliberately **omitted**, since supplying it switches transports) lives in the [integration guide](./integration.md#connect-via-socketio-default). Use an account with the minimum permissions required, put real credentials in private client configuration (not in the repository), and set `FOUNDRY_WRITE_ENABLED=true` only after validating read behavior and backups.
 
 ## Source references
 

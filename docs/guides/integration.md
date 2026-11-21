@@ -29,7 +29,7 @@ Use this mode for supported world-state reads and the opt-in write tools. Keep `
 
 Substitute your real Foundry URL and an authorized user. A local development server can use `http://localhost:30000`; remote deployments should use HTTPS.
 
-Setting `FOUNDRY_WRITE_ENABLED=true` enables 11 supported mutation tools **only when Socket.IO is connected and Foundry grants the required GM/owner permissions**. Leave it disabled while testing connectivity and read operations.
+Setting `FOUNDRY_WRITE_ENABLED=true` enables the mutation tools **only when Socket.IO is connected and Foundry grants the required GM/owner permissions** (see the [capability matrix](./capabilities.md) for the full list). Leave it disabled while testing connectivity and read operations.
 
 ### VS Code client configuration
 
@@ -54,7 +54,7 @@ VS Code uses `servers` instead of `mcpServers` for its standard MCP configuratio
 
 ## Optional Foundry Local REST API mode
 
-Setting `FOUNDRY_API_KEY` changes the server connection to **Foundry Local REST API mode**; it is **not** an additional key used alongside the authenticated Socket.IO connection. In the current implementation, the REST mode supports compendium search and the REST-backed diagnostics; **the 11 write tools require Socket.IO**.
+Setting `FOUNDRY_API_KEY` switches the connection to **Foundry Local REST API mode** — a transport switch, not an extra key on top of Socket.IO. See the [capability matrix](./capabilities.md#connection-modes-not-interchangeable) for the canonical description of what each mode supports; in short, REST mode offers compendium search and REST-backed diagnostics, while the write tools require Socket.IO.
 
 For example, to use REST-backed searches and diagnostics, configure a separate MCP entry:
 
@@ -73,16 +73,17 @@ For example, to use REST-backed searches and diagnostics, configure a separate M
 }
 ```
 
-The REST mode above expects the **Foundry Local REST API** module's `/api/...` endpoints. It is not a ready-made adapter for **ThreeHats Foundry REST API Relay**. REST-only behavior depends on the endpoints implemented by the installed module.
+The REST mode above expects the **Foundry Local REST API** module's `/api/...` endpoints. REST-only behavior depends on the endpoints implemented by the installed module.
 
 ## Running a fork checkout
 
 The commands above invoke the **published npm package**. To run a local checkout of your own fork/branch, build it and point the MCP client at its absolute `dist/index.js` path instead.
 
 ```bash
-git clone https://github.com/p4535992/foundryvtt-mcp.git
+# Clone the upstream repository, or your own fork's URL
+git clone https://github.com/laurigates/foundryvtt-mcp.git
 cd foundryvtt-mcp
-git checkout docs/capabilities-audit-2026-11
+git checkout <your-branch>
 bun install
 bun run build
 ```

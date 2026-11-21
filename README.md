@@ -9,14 +9,14 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 
 - **Dice Rolling** — dice terms and integer modifiers with `+`/`-`; advanced modifier syntax is not supported across all transports.
 - **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
-- **Game State Mutations** — 11 opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
+- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
 - **World Search** — case-insensitive **name** search for actors, world items, scenes and journals (not full-text page search).
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
-- **MCP Resources** — nine `foundry://` URIs for direct reads.
+- **MCP Resources** — `foundry://` URIs for direct reads.
 - **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
 
-See the **[MCP capability matrix](docs/guides/capabilities.md)** for all 33 tools, mode-specific behavior and usage boundaries. For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
+See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ It is recommended to create a separate FoundryVTT user account for the MCP serve
 1. Go to **Configuration** → **User Management**
 2. Click **Create User**
 3. Set a username (e.g., `mcp-api`) and a strong password
-4. Assign the minimum role and document permissions appropriate for the operations you plan to use (Assistant GM is one option for broad read access)
+4. Assign the **Assistant GM** role (needed to read world data and roll dice)
 5. Use this account's credentials in your MCP configuration
 
 **Benefits:**
@@ -118,10 +118,10 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `FOUNDRY_URL` | Yes | FoundryVTT server URL (e.g., `http://localhost:30000`) |
-| `FOUNDRY_USERNAME` | Socket.IO | FoundryVTT user account (or use `FOUNDRY_USER_ID`) |
+| `FOUNDRY_USERNAME` | Socket.IO | FoundryVTT user account |
 | `FOUNDRY_PASSWORD` | Socket.IO | FoundryVTT user password |
-| `FOUNDRY_USER_ID` | Socket.IO alternative | Bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | Selects **Foundry Local REST API mode** (not combined with Socket.IO), used for compendium search and REST diagnostics; writes require Socket.IO |
+| `FOUNDRY_USER_ID` | No | Optional alternative to `FOUNDRY_USERNAME`: bypass username-to-ID resolution |
+| `FOUNDRY_API_KEY` | No | Selects **Foundry Local REST API mode** (a transport switch — see the [capability matrix](docs/guides/capabilities.md#connection-modes-not-interchangeable)) |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |

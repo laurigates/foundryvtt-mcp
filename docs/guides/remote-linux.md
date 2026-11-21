@@ -30,26 +30,7 @@ No extra Foundry module is needed for the supported Socket.IO features.
 
 ## Configure the MCP client (read-only first)
 
-```json
-{
-  "mcpServers": {
-    "foundryvtt": {
-      "command": "npx",
-      "args": ["-y", "foundryvtt-mcp"],
-      "env": {
-        "FOUNDRY_URL": "https://foundry.example.com",
-        "FOUNDRY_USERNAME": "mcp-api",
-        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET",
-        "FOUNDRY_WRITE_ENABLED": "false"
-      }
-    }
-  }
-}
-```
-
-This uses the published npm package. For a checked-out Git branch, follow [Running a fork checkout](./integration.md#running-a-fork-checkout) and point the command to the checkout's built `dist/index.js`.
-
-`FOUNDRY_API_KEY` is deliberately **absent** in the example: supplying it switches the MCP to a separate Foundry Local REST API mode. See [Configuration](./configuration.md) and [Capabilities](./capabilities.md) for transport-specific tool support.
+Use the canonical Socket.IO client configuration from the [integration guide](./integration.md#connect-via-socketio-default) — the published npm package, with `FOUNDRY_WRITE_ENABLED` left `false` and `FOUNDRY_API_KEY` deliberately **omitted** (supplying it switches the MCP to a separate Foundry Local REST API mode; see the [capability matrix](./capabilities.md#connection-modes-not-interchangeable)). For a checked-out Git branch, follow [Running a fork checkout](./integration.md#running-a-fork-checkout) and point the command to the checkout's built `dist/index.js`.
 
 ## Test progressively
 
@@ -90,4 +71,4 @@ The repository's integration test environment targets Foundry **V14.367**. Authe
 
 ## Optional REST functions
 
-The Foundry **Local REST API** configuration (`FOUNDRY_API_KEY`) is a separate transport for features such as `search_compendium` and REST diagnostics. It is not an adapter for [ThreeHats Foundry REST API Relay](https://github.com/ThreeHats/foundryvtt-rest-api-relay), which has a different API and connection model.
+The Foundry **Local REST API** configuration (`FOUNDRY_API_KEY`) is a separate transport for features such as `search_compendium` and REST diagnostics. See the [capability matrix](./capabilities.md#connection-modes-not-interchangeable) for transport-specific tool support.

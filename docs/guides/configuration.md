@@ -13,7 +13,7 @@ cp .env.example .env
 | Variable | Required when | Description |
 |----------|---------------|-------------|
 | `FOUNDRY_URL` | Always | Active Foundry world URL (e.g. `https://foundry.example.com` or `http://localhost:30000`). |
-| `FOUNDRY_USERNAME` (or `FOUNDRY_USER_ID`) | Socket.IO mode | Foundry user name (or its ID). |
+| `FOUNDRY_USERNAME` | Socket.IO mode | Foundry user name. |
 | `FOUNDRY_PASSWORD` | Socket.IO mode | Foundry user password. |
 | `FOUNDRY_API_KEY` | Optional REST mode | Authenticates to the **Foundry Local REST API module** and switches the MCP to REST mode. |
 
@@ -21,9 +21,9 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FOUNDRY_USER_ID` | — | 16-char document `_id` (bypasses username resolution) |
+| `FOUNDRY_USER_ID` | — | 16-char user document `_id`; an **alternative to `FOUNDRY_USERNAME`** in Socket.IO mode (bypasses username resolution). |
 | `FOUNDRY_SOCKET_PATH` | `/socket.io/` | Custom Socket.IO endpoint for reverse-proxy route prefixes. |
-| `FOUNDRY_WRITE_ENABLED` | `false` | Allow 11 mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
+| `FOUNDRY_WRITE_ENABLED` | `false` | Allow the mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
 | `LOG_LEVEL` | `info` | Logging verbosity (`debug`, `info`, `warn`, `error`) |
 | `NODE_ENV` | `development` | Environment mode |
 | `FOUNDRY_TIMEOUT` | `10000` | Request timeout in ms |
@@ -53,7 +53,7 @@ FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
 
 ## FoundryVTT Authentication
 
-By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. Setting `FOUNDRY_API_KEY` instead selects a different REST transport; it does not add REST capabilities alongside the Socket.IO session. See [Capability Matrix](./capabilities.md) for the exact mode-specific tool support.
+By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. Setting `FOUNDRY_API_KEY` instead selects a different REST transport; it does not add REST capabilities alongside the Socket.IO session. See the [capability matrix — connection modes](./capabilities.md#connection-modes-not-interchangeable) for the canonical, mode-specific tool support.
 
 ### Socket.IO setup
 
@@ -78,7 +78,7 @@ The Foundry user needs access to the documents the tools will read. Write operat
 
 ### Optional: REST-mode compendium search and diagnostics
 
-The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints; its key is **not** a ThreeHats REST API Relay key. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
+The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
 
 To configure this optional mode:
 

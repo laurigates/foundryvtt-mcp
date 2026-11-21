@@ -272,8 +272,8 @@ npm run lint                  # Code linting
 
 ### Health Check Checklist
 - [ ] FoundryVTT is running with an active world
-- [ ] `.env` file has `FOUNDRY_URL` and either Socket.IO credentials (`FOUNDRY_USERNAME`/`FOUNDRY_USER_ID` plus `FOUNDRY_PASSWORD`) or a REST API key
-- [ ] Username matches a FoundryVTT user exactly (case-sensitive)
+- [ ] `.env` file has `FOUNDRY_URL` and either Socket.IO credentials (`FOUNDRY_USERNAME` — or the optional `FOUNDRY_USER_ID` — plus `FOUNDRY_PASSWORD`) or a REST API key
+- [ ] When using `FOUNDRY_USERNAME`, it matches a FoundryVTT user exactly (case-sensitive); when using `FOUNDRY_USER_ID`, it is the correct 16-character user `_id`
 - [ ] No firewall blocking connections
 - [ ] MCP server starts without errors
 - [ ] In Socket.IO mode, the world snapshot loads on connect (check startup logs)

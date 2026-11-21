@@ -96,10 +96,10 @@ The optional **Foundry Local REST API** mode is selected by `FOUNDRY_API_KEY`. I
 | Variable           | Required | Description                                  | Default |
 | ------------------ | -------- | -------------------------------------------- | ------- |
 | `FOUNDRY_URL`      | Yes      | FoundryVTT server URL                        | -       |
-| `FOUNDRY_USERNAME` | Socket.IO | Foundry user name (or use `FOUNDRY_USER_ID`) | - |
+| `FOUNDRY_USERNAME` | Socket.IO | Foundry user name | - |
 | `FOUNDRY_PASSWORD` | Socket.IO | Foundry user password | - |
-| `FOUNDRY_USER_ID` | No | 16-character user `_id` (bypasses username resolution) | - |
-| `FOUNDRY_API_KEY` | REST mode | Foundry Local REST API key; selects REST instead of Socket.IO | - |
+| `FOUNDRY_USER_ID` | No | Optional alternative to `FOUNDRY_USERNAME`: 16-character user `_id` (bypasses username resolution) | - |
+| `FOUNDRY_API_KEY` | REST mode | Foundry Local REST API key; selects REST instead of Socket.IO (transport switch — see the [capability matrix](docs/guides/capabilities.md#connection-modes-not-interchangeable)) | - |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable supported mutations in authenticated Socket.IO mode only | `false` |
 | `FOUNDRY_SOCKET_PATH` | No | Socket.IO path (change behind a route prefix) | `/socket.io/` |
 | `LOG_LEVEL` | No | Logging level | `info` |
