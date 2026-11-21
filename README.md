@@ -1,5 +1,7 @@
 # FoundryVTT MCP Server
 
+![FoundryVTT MCP — AI assistants at your virtual tabletop](docs/assets/banner.webp)
+
 [![npm version](https://img.shields.io/npm/v/foundryvtt-mcp)](https://www.npmjs.com/package/foundryvtt-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
