@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.6](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.5...foundryvtt-mcp-v1.5.6) (2026-11-21)
+
+
+### Bug Fixes
+
+* **config:** reject a cache maxSize below 1 ([#272](https://github.com/laurigates/foundryvtt-mcp/issues/272)) ([b640df0](https://github.com/laurigates/foundryvtt-mcp/commit/b640df06935580b074904ec69353b5d99cb7b4a8)), closes [#267](https://github.com/laurigates/foundryvtt-mcp/issues/267)
+* **diagnostics:** fail the REST-mode dice check on a local fallback roll ([#274](https://github.com/laurigates/foundryvtt-mcp/issues/274)) ([22225d9](https://github.com/laurigates/foundryvtt-mcp/commit/22225d96ff7e3b43e0d7a818a774e1f8291141b0)), closes [#265](https://github.com/laurigates/foundryvtt-mcp/issues/265)
+* prevent false positives in REST API connection tests ([#288](https://github.com/laurigates/foundryvtt-mcp/issues/288)) ([fd3dede](https://github.com/laurigates/foundryvtt-mcp/commit/fd3dede9acb1c548086f0ba312f53ce975f566af))
+* **scripts:** read searchActors() result shape and type-check scripts/ ([#273](https://github.com/laurigates/foundryvtt-mcp/issues/273)) ([8238503](https://github.com/laurigates/foundryvtt-mcp/commit/823850309144015f9a2629dec95a89615a2a2071)), closes [#266](https://github.com/laurigates/foundryvtt-mcp/issues/266)
+
 ## [1.5.5](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.4...foundryvtt-mcp-v1.5.5) (2026-11-18)
 
 
