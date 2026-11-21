@@ -28,14 +28,29 @@ const MAX_NESTED_DEPTH = 6;
 function decodeEntity(entity: string): string {
   const key = entity.toLowerCase();
   const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    amp: '&',
+    lt: '<',
+    gt: '>',
+    quot: '"',
+    apos: "'",
+    nbsp: ' ',
   };
-  if (Object.hasOwn(named, key)) return named[key] ?? entity;
-  if (!key.startsWith('#')) return '&' + entity + ';';
+  if (Object.hasOwn(named, key)) {
+    return named[key] ?? entity;
+  }
+  if (!key.startsWith('#')) {
+    return `&${entity};`;
+  }
   const hex = key.startsWith('#x');
   const point = Number.parseInt(key.slice(hex ? 2 : 1), hex ? 16 : 10);
-  if (!Number.isInteger(point) || point < 1 || point > 0x10ffff ||
-      (point >= 0xd800 && point <= 0xdfff)) return '&' + entity + ';';
+  if (
+    !Number.isInteger(point) ||
+    point < 1 ||
+    point > 0x10ffff ||
+    (point >= 0xd800 && point <= 0xdfff)
+  ) {
+    return `&${entity};`;
+  }
   return String.fromCodePoint(point);
 }
 
@@ -59,7 +74,9 @@ function normalized(value: string): string {
 function nestedValue(value: unknown, parts: readonly string[]): unknown {
   let next = value;
   for (const part of parts) {
-    if (typeof next !== 'object' || next === null || Array.isArray(next)) return undefined;
+    if (typeof next !== 'object' || next === null || Array.isArray(next)) {
+      return undefined;
+    }
     next = (next as Record<string, unknown>)[part];
   }
   return next;
@@ -68,31 +85,47 @@ function nestedValue(value: unknown, parts: readonly string[]): unknown {
 /** Traverse selected narrative fields, not all system mechanics or arbitrary metadata. */
 function addNestedText(fields: SearchField[], value: unknown, field: string, depth = 0): void {
   if (typeof value === 'string') {
-    if (value.trim()) fields.push({ name: field, value });
+    if (value.trim()) {
+      fields.push({ name: field, value });
+    }
     return;
   }
-  if (depth >= MAX_NESTED_DEPTH || !value || typeof value !== 'object') return;
+  if (depth >= MAX_NESTED_DEPTH || !value || typeof value !== 'object') {
+    return;
+  }
   if (Array.isArray(value)) {
-    value.forEach((item: unknown, index: number) =>
-      addNestedText(fields, item, field + '[' + index + ']', depth + 1));
+    value.forEach((item: unknown, index: number) => {
+      addNestedText(fields, item, `${field}[${index}]`, depth + 1);
+    });
     return;
   }
   for (const [key, child] of Object.entries(value)) {
-    if (['__proto__', 'constructor', 'prototype', 'src', 'img', 'uuid'].includes(key)) continue;
-    addNestedText(fields, child, field + '.' + key, depth + 1);
+    if (['__proto__', 'constructor', 'prototype', 'src', 'img', 'uuid'].includes(key)) {
+      continue;
+    }
+    addNestedText(fields, child, `${field}.${key}`, depth + 1);
   }
 }
 
 function addPaths(fields: SearchField[], document: unknown, paths: readonly string[]): void {
-  for (const path of paths) addNestedText(fields, nestedValue(document, path.split('.')), path);
+  for (const path of paths) {
+    addNestedText(fields, nestedValue(document, path.split('.')), path);
+  }
 }
 
 function actorFields(actor: WorldActor): SearchField[] {
   const fields: SearchField[] = [{ name: 'name', value: actor.name }];
   addPaths(fields, actor, [
-    'system.details.biography', 'system.details.description', 'system.details.background',
-    'system.details.appearance', 'system.details.notes', 'system.details.publicNotes',
-    'system.description', 'system.biography', 'system.background', 'system.notes',
+    'system.details.biography',
+    'system.details.description',
+    'system.details.background',
+    'system.details.appearance',
+    'system.details.notes',
+    'system.details.publicNotes',
+    'system.description',
+    'system.biography',
+    'system.background',
+    'system.notes',
   ]);
   return fields;
 }
@@ -100,8 +133,12 @@ function actorFields(actor: WorldActor): SearchField[] {
 function itemFields(item: WorldItem): SearchField[] {
   const fields: SearchField[] = [{ name: 'name', value: item.name }];
   addPaths(fields, item, [
-    'system.description', 'system.details.description', 'system.details.notes',
-    'system.details.flavorText', 'system.flavor', 'system.notes',
+    'system.description',
+    'system.details.description',
+    'system.details.notes',
+    'system.details.flavorText',
+    'system.flavor',
+    'system.notes',
   ]);
   return fields;
 }
@@ -110,13 +147,17 @@ function sceneFields(scene: WorldScene): SearchField[] {
   const fields: SearchField[] = [{ name: 'name', value: scene.name }];
   addPaths(fields, scene, ['description']);
   for (const [field, collection] of [
-    ['drawings', scene.drawings], ['notes', scene.notes], ['tokens', scene.tokens],
+    ['drawings', scene.drawings],
+    ['notes', scene.notes],
+    ['tokens', scene.tokens],
   ] as const) {
-    if (!Array.isArray(collection)) continue;
+    if (!Array.isArray(collection)) {
+      continue;
+    }
     collection.forEach((entry, index) => {
       const keys = field === 'tokens' ? ['name'] : ['text', 'label', 'name'];
       for (const key of keys) {
-        addNestedText(fields, nestedValue(entry, [key]), field + '[' + index + '].' + key);
+        addNestedText(fields, nestedValue(entry, [key]), `${field}[${index}].${key}`);
       }
     });
   }
@@ -127,26 +168,52 @@ function journalFields(journal: WorldJournal): SearchField[] {
   const fields: SearchField[] = [{ name: 'name', value: journal.name }];
   addPaths(fields, journal, ['content']); // Legacy world payloads.
   journal.pages?.forEach((page, index) => {
-    addNestedText(fields, page.name, 'pages[' + index + '].name');
-    addNestedText(fields, page.text?.content, 'pages[' + index + '].text.content');
+    addNestedText(fields, page.name, `pages[${index}].name`);
+    addNestedText(fields, page.text?.content, `pages[${index}].text.content`);
   });
   return fields;
 }
 
-function excerpt(value: string, position: number, queryLength: number): string {
-  const from = Math.max(0, position - EXCERPT_BEFORE);
-  const to = Math.min(value.length, position + queryLength + EXCERPT_AFTER);
+/**
+ * Fold a string the same way {@link normalized} does, while recording, for every
+ * folded character, the span it came from in the original string. NFKD and
+ * case-folding change length for characters such as …, ½ and ligatures, so a
+ * position in the folded string cannot be used to slice the original directly.
+ */
+function foldWithMap(value: string): { text: string; starts: number[]; ends: number[] } {
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let text = '';
+  let index = 0;
+  for (const source of value) {
+    const folded = source.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+    for (let k = 0; k < folded.length; k += 1) {
+      starts.push(index);
+      ends.push(index + source.length);
+    }
+    text += folded;
+    index += source.length;
+  }
+  return { text, starts, ends };
+}
+
+function excerpt(value: string, matchStart: number, matchEnd: number): string {
+  const from = Math.max(0, matchStart - EXCERPT_BEFORE);
+  const to = Math.min(value.length, matchEnd + EXCERPT_AFTER);
   return (from ? '…' : '') + value.slice(from, to) + (to < value.length ? '…' : '');
 }
 
 function findMatch(fields: SearchField[], query: string): WorldSearchMatch | null {
   for (const field of fields) {
     const text = plainText(field.value);
-    const at = normalized(text).indexOf(query);
-    if (at >= 0) {
+    const { text: folded, starts, ends } = foldWithMap(text);
+    const at = folded.indexOf(query);
+    const matchStart = starts[at];
+    const matchEnd = ends[at + query.length - 1];
+    if (at >= 0 && matchStart !== undefined && matchEnd !== undefined) {
       return {
         field: field.name,
-        excerpt: field.name === 'name' ? '' : excerpt(text, at, query.length),
+        excerpt: field.name === 'name' ? '' : excerpt(text, matchStart, matchEnd),
       };
     }
   }
@@ -154,7 +221,9 @@ function findMatch(fields: SearchField[], query: string): WorldSearchMatch | nul
 }
 
 function filterDocuments<T extends { _id: string; name: string }>(
-  documents: T[], buildFields: (document: T) => SearchField[], query: string,
+  documents: T[],
+  buildFields: (document: T) => SearchField[],
+  query: string,
 ): { documents: T[]; details: Record<string, WorldSearchMatch> } {
   const matched: T[] = [];
   const details: Record<string, WorldSearchMatch> = {};
@@ -169,13 +238,23 @@ function filterDocuments<T extends { _id: string; name: string }>(
 }
 
 /** Search world names and available narrative text in the Socket.IO snapshot. */
-export function searchWorldDocuments(worldData: WorldData | null, query: string): WorldSearchResults {
+export function searchWorldDocuments(
+  worldData: WorldData | null,
+  query: string,
+): WorldSearchResults {
   const empty: WorldSearchResults = {
-    actors: [], items: [], scenes: [], journals: [],
+    actors: [],
+    items: [],
+    scenes: [],
+    journals: [],
     matchDetails: { actors: {}, items: {}, scenes: {}, journals: {} },
   };
+  // A blank query, or one that folds to nothing once markup is stripped (e.g. "<b>"),
+  // returns no documents by design: it is not treated as match-all.
   const term = normalized(plainText(query)).trim();
-  if (!worldData || !term) return empty;
+  if (!worldData || !term) {
+    return empty;
+  }
 
   const actors = filterDocuments(worldData.actors, actorFields, term);
   const items = filterDocuments(worldData.items, itemFields, term);
@@ -187,8 +266,10 @@ export function searchWorldDocuments(worldData: WorldData | null, query: string)
     scenes: scenes.documents,
     journals: journals.documents,
     matchDetails: {
-      actors: actors.details, items: items.details,
-      scenes: scenes.details, journals: journals.details,
+      actors: actors.details,
+      items: items.details,
+      scenes: scenes.details,
+      journals: journals.details,
     },
   };
 }

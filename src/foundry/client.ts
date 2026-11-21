@@ -12,7 +12,6 @@ import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
 import { probeRestModule } from './rest-probe.js';
-import { searchWorldDocuments, type WorldSearchResults } from './world-search.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -30,7 +29,6 @@ import type {
   WorldCombat,
   WorldData,
   WorldEffect,
-  WorldItem,
   WorldJournal,
   WorldMessage,
   WorldScene,
@@ -43,6 +41,7 @@ import {
   parseDocumentBroadcast,
   parseUserActivity,
 } from './world-cache.js';
+import { searchWorldDocuments, type WorldSearchResults } from './world-search.js';
 
 // Re-exported so existing importers of `client.js` keep working (#255 moved it).
 export { probeRestModule };
