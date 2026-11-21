@@ -206,15 +206,24 @@ function excerpt(value: string, matchStart: number, matchEnd: number): string {
 function findMatch(fields: SearchField[], query: string): WorldSearchMatch | null {
   for (const field of fields) {
     const text = plainText(field.value);
-    const { text: folded, starts, ends } = foldWithMap(text);
-    const at = folded.indexOf(query);
+    // Decide the match with the cheap whole-string fold. This is the same
+    // normalization applied to the query (so case- and accent-insensitive, and it
+    // lowercases the whole string at once, which the per-code-point fold below
+    // cannot do for the Greek final sigma). Only fields that actually contain the
+    // query pay for the index map, so a miss costs one indexOf, not two arrays per
+    // character.
+    const at = normalized(text).indexOf(query);
+    if (at < 0) {
+      continue;
+    }
+    if (field.name === 'name') {
+      return { field: field.name, excerpt: '' };
+    }
+    const { starts, ends } = foldWithMap(text);
     const matchStart = starts[at];
     const matchEnd = ends[at + query.length - 1];
-    if (at >= 0 && matchStart !== undefined && matchEnd !== undefined) {
-      return {
-        field: field.name,
-        excerpt: field.name === 'name' ? '' : excerpt(text, matchStart, matchEnd),
-      };
+    if (matchStart !== undefined && matchEnd !== undefined) {
+      return { field: field.name, excerpt: excerpt(text, matchStart, matchEnd) };
     }
   }
   return null;

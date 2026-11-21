@@ -144,7 +144,9 @@ describe('searchWorldDocuments', () => {
 
   it('searches legacy journal content and produces bounded excerpts', () => {
     const world = sampleWorld();
-    Object.assign(world.journal[0]!, {
+    const journal = world.journal.find((entry) => entry._id === 'journal1');
+    expect(journal).toBeDefined();
+    Object.assign(journal, {
       content: `Story: ${'x'.repeat(300)} hidden-library ${'y'.repeat(300)}`,
     });
     const result = searchWorldDocuments(world, 'hidden-library');
@@ -160,12 +162,25 @@ describe('searchWorldDocuments', () => {
 
   it('keeps the excerpt window aligned when NFKD-changing text precedes the match', () => {
     const world = sampleWorld();
-    Object.assign(world.actors[0]!, {
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    Object.assign(actor, {
       system: { details: { biography: { value: `${'Wait… '.repeat(30)}the dragon sleeps…` } } },
     });
     const result = searchWorldDocuments(world, 'dragon');
     expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
     expect(result.matchDetails.actors.actor1?.excerpt).toContain('dragon');
+  });
+
+  it('matches a Greek word whose final sigma folds only under whole-string lowercasing', () => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    Object.assign(actor, { name: 'ΟΔΟΣ' });
+    // The text ends in a capital sigma that lowercases to the final form ς only
+    // when the whole string is lowercased; a per-code-point fold yields σ and
+    // would miss the query's ς.
+    expect(searchWorldDocuments(world, 'οδος').actors.map((a) => a._id)).toEqual(['actor1']);
   });
 
   it('never mutates the cached world state', () => {
