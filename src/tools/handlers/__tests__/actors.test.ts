@@ -63,7 +63,10 @@ describe('handleSearchActors', () => {
     ];
     const client = {
       searchActors: vi.fn().mockResolvedValue({
-        actors, total: 2, page: 1, limit: 10,
+        actors,
+        total: 2,
+        page: 1,
+        limit: 10,
       } satisfies ActorSearchResult),
     } as unknown as FoundryClient;
 
@@ -73,6 +76,25 @@ describe('handleSearchActors', () => {
     expect(text).toContain('**Fallen Hero** (character) - Level 3 - HP: 0/25');
     expect(text).toContain('**Zero HP Creature** (character) - Level 0 - HP: 0/0');
     expect(text).not.toContain('HP: Unknown');
+  });
+
+  it('renders a present HP value with a missing maximum as Unknown in search results', async () => {
+    const actors: FoundryActor[] = [
+      buildActor({ name: 'Wounded', hp: { value: 20, max: undefined } }),
+    ];
+    const client = {
+      searchActors: vi.fn().mockResolvedValue({
+        actors,
+        total: 1,
+        page: 1,
+        limit: 10,
+      } satisfies ActorSearchResult),
+    } as unknown as FoundryClient;
+
+    const result = await handleSearchActors({ query: '' }, client);
+    const text = getText(result);
+
+    expect(text).toContain('**Wounded** (character) - Level 3 - HP: 20/Unknown');
   });
 
   it('passes through type filter when supplied', async () => {
@@ -193,6 +215,18 @@ describe('handleGetActorDetails', () => {
     expect(text).toContain('**Level:** Unknown');
     expect(text).toContain('**Hit Points:** Unknown/Unknown');
     expect(text).toContain('**Armor Class:** Unknown');
+  });
+
+  it('renders a present HP value with a missing maximum as Unknown in actor details', async () => {
+    const actor = buildActor({ hp: { value: 20, max: undefined } });
+    const client = {
+      getActor: vi.fn().mockResolvedValue(actor),
+    } as unknown as FoundryClient;
+
+    const result = await handleGetActorDetails({ actorId: actor._id }, client);
+    const text = getText(result);
+
+    expect(text).toContain('**Hit Points:** 20/Unknown');
   });
 
   it('throws McpError with InvalidParams when actorId is missing', async () => {

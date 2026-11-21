@@ -1795,9 +1795,13 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
   }
 
   if (hp) {
-    const hpValue = typeof hp.value === 'number' ? hp.value : 0;
-    const hpMax = typeof hp.max === 'number' ? hp.max : 0;
-    const hpObj: { value: number; max: number; temp?: number } = { value: hpValue, max: hpMax };
+    const hpObj: { value?: number; max?: number; temp?: number } = {};
+    if (typeof hp.value === 'number') {
+      hpObj.value = hp.value;
+    }
+    if (typeof hp.max === 'number') {
+      hpObj.max = hp.max;
+    }
     if (typeof hp.temp === 'number') {
       hpObj.temp = hp.temp;
     }

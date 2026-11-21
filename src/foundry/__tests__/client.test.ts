@@ -910,7 +910,10 @@ describe('FoundryClient', () => {
       folders: [],
     };
 
-    async function connectWithMockSocket(existing?: FoundryClient) {
+    async function connectWithMockSocket(
+      existing?: FoundryClient,
+      worldData?: Record<string, unknown>,
+    ) {
       const { io } = await import('socket.io-client');
       const { authenticateFoundry } = await import('../auth.js');
       // afterEach's resetAllMocks() clears the module-factory resolved value.
@@ -918,7 +921,7 @@ describe('FoundryClient', () => {
         session: 'test-session',
         userId: 'test-user-id',
       });
-      const harness = buildHandshakeSocket(structuredClone(WORLD_DATA));
+      const harness = buildHandshakeSocket(structuredClone(worldData ?? WORLD_DATA));
       vi.mocked(io).mockReturnValue(harness.socket as never);
 
       const connected =
@@ -942,6 +945,24 @@ describe('FoundryClient', () => {
     it('reports connected after a successful handshake', async () => {
       const { client: connected } = await connectWithMockSocket();
       expect(connected.isConnected()).toBe(true);
+    });
+
+    it('maps a null HP maximum to an absent max, not 0 (#289)', async () => {
+      const wounded = {
+        _id: 'actor0000000000a',
+        name: 'Wounded',
+        type: 'character',
+        system: { attributes: { hp: { value: 20, max: null } } },
+      };
+      const { client: connected } = await connectWithMockSocket(
+        undefined,
+        structuredClone({ ...WORLD_DATA, actors: [wounded] }),
+      );
+
+      const actor = await connected.getActor('actor0000000000a');
+
+      expect(actor.hp?.value).toBe(20);
+      expect(actor.hp?.max).toBeUndefined();
     });
 
     it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
