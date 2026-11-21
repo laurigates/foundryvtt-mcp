@@ -22,6 +22,10 @@ jobs:
     - name: Build
       run: bun run build
 
+    # tsconfig.json includes only src/; this also type-checks scripts/ (#266).
+    - name: Type-check scripts
+      run: bunx tsc --noEmit -p tsconfig.scripts.json
+
     - name: Run tests
       run: bun run test
       env:

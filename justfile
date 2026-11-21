@@ -140,9 +140,14 @@ lint-fix:
 check-types:
     bunx tsc --noEmit
 
+# Type-check scripts/ too: tsconfig.json includes only src/ (#266)
+[group: "quality"]
+check-types-scripts:
+    bunx tsc --noEmit -p tsconfig.scripts.json
+
 # Run all quality checks (lint, types, tests)
 [group: "quality"]
-qa: lint check-types test
+qa: lint check-types check-types-scripts test
 
 ########## Documentation ##########
 
