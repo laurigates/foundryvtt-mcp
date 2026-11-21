@@ -79,34 +79,34 @@ FOUNDRY_PASSWORD=your_password
 
 ### Features Available
 
-All features work out of the box with username/password authentication:
+With `FOUNDRY_URL`, a Foundry username (or user ID) and a password, the MCP client uses authenticated **Socket.IO**:
 
-- Search actors, items, scenes, and journals
-- Get detailed actor/item information
-- Dice rolling (evaluated locally in this mode; FoundryVTT's own `Roll` engine — and
-  with it parenthesised formulas — is used only when `FOUNDRY_API_KEY` is set)
-- Combat state and initiative tracking
-- Chat message history
-- User list and online status
-- Full-text world search
-- World summary and scene information
-- NPC and loot generation
-- Rule lookups
+- Search world actors, world items, scenes and journals by name/type as exposed by each tool.
+- Read actor attributes, current scene metadata, combat state, recent chat and user presence.
+- Search actor, item, scene and journal **names** with `search_world` (not document-body full-text search).
+- Roll basic dice notation locally (terms and integer modifiers joined by `+` or `-`); REST mode can delegate supported rolls to Foundry's Roll engine.
+- Read world statistics and synchronize the world snapshot through `refresh_world_data`.
+- Generate **text** NPCs and loot suggestions (these do not create documents).
+- With `FOUNDRY_WRITE_ENABLED=true` and GM/owner permissions, perform supported actor, token, journal and combat changes via Socket.IO.
+
+The optional **Foundry Local REST API** mode is selected by `FOUNDRY_API_KEY`. It offers REST-backed reads such as `search_compendium` and diagnostics, but the current mutation tools require Socket.IO. `lookup_rule` is a placeholder, not a rules database. See the [capability matrix](docs/guides/capabilities.md) for tool-specific details.
 
 ### Environment Variables
 
 | Variable           | Required | Description                                  | Default |
 | ------------------ | -------- | -------------------------------------------- | ------- |
 | `FOUNDRY_URL`      | Yes      | FoundryVTT server URL                        | -       |
-| `FOUNDRY_USERNAME` | Yes      | FoundryVTT username                          | -       |
-| `FOUNDRY_PASSWORD` | Yes      | FoundryVTT password                          | -       |
-| `FOUNDRY_USER_ID`  | No       | 16-char document `_id` (bypasses username resolution) | - |
-| `FOUNDRY_API_KEY`  | No       | REST API module key (enables diagnostics)    | -       |
-| `LOG_LEVEL`        | No       | Logging level                                | `info`  |
+| `FOUNDRY_USERNAME` | Socket.IO | Foundry user name | - |
+| `FOUNDRY_PASSWORD` | Socket.IO | Foundry user password | - |
+| `FOUNDRY_USER_ID` | No | Optional alternative to `FOUNDRY_USERNAME`: 16-character user `_id` (bypasses username resolution) | - |
+| `FOUNDRY_API_KEY` | REST mode | Foundry Local REST API key; selects REST instead of Socket.IO (transport switch — see the [capability matrix](docs/guides/capabilities.md#connection-modes-not-interchangeable)) | - |
+| `FOUNDRY_WRITE_ENABLED` | No | Enable supported mutations in authenticated Socket.IO mode only | `false` |
+| `FOUNDRY_SOCKET_PATH` | No | Socket.IO path (change behind a route prefix) | `/socket.io/` |
+| `LOG_LEVEL` | No | Logging level | `info` |
 
 ### Optional: Diagnostics Tools
 
-Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` enables 5 server monitoring tools:
+Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` selects REST mode, which provides compendium search and optional diagnostic endpoints. Five diagnostic tools are registered (including a `diagnose_errors` placeholder and a local `get_health_status` summary):
 
 - `get_recent_logs` - Retrieve filtered FoundryVTT logs
 - `search_logs` - Search logs by pattern, listing the matching entries
@@ -118,7 +118,7 @@ Installing the **Foundry Local REST API** module and setting `FOUNDRY_API_KEY` e
 To enable:
 1. Install the REST API module in FoundryVTT
 2. Enable it in your world and copy the generated API key
-3. Add `FOUNDRY_API_KEY=your_key` to your `.env` file
+3. Add `FOUNDRY_API_KEY=your_key` to your `.env` file (this selects REST mode; Socket.IO mutation tools are unavailable in that mode)
 
 ## Testing Your Setup
 
@@ -142,7 +142,7 @@ Once the server is running, test these commands with your AI assistant:
 **Dice Rolling**:
 
 - "Roll 1d20+5 for an attack roll"
-- "Roll 4d6 drop lowest for ability scores"
+- "Roll 2d6 + 1d4 + 3"
 
 **Data Queries**:
 
@@ -272,11 +272,11 @@ Once you have a working connection:
 3. **Add more features**: The server is extensible - add your own tools and resources
 4. **Contribute**: Found bugs or want new features? Contributions welcome!
 
-## Supported FoundryVTT Versions
+## FoundryVTT Version Compatibility
 
-- **FoundryVTT v11+**: Fully supported
-- **FoundryVTT v10**: Basic support
-- **Earlier versions**: Not tested, may work with limitations
+The integration test environment is configured for **Foundry V14.367**. The authentication code handles v13/v14 session conventions; actual behavior also depends on the Foundry core build, system, permissions, reverse proxy and enabled modules. Test the connection and required operations against your own version and world before using write tools.
+
+For a remote Linux server that does not require a browser open on the MCP client machine, see [Remote Linux Setup](docs/guides/remote-linux.md).
 
 ---
 

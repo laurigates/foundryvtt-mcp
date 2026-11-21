@@ -1678,15 +1678,18 @@ export class FoundryClient {
   // Connection test
   // ==========================================================================
 
+  /**
+   * Verifies that the configured transport can authenticate to the Foundry world.
+   * connect() uses the authenticated /api/world probe in REST mode and the
+   * authenticated Socket.IO handshake otherwise. A public '/' response is
+   * not sufficient to establish that either connection is usable.
+   */
   async testConnection(): Promise<boolean> {
     try {
-      if (this.config.username && this.config.password) {
-        await this.connect();
-        return true;
-      }
-
-      const response = await this.http.get('/');
-      logger.debug('Connection test successful', { status: response.status });
+      await this.connect();
+      logger.debug('Authenticated connection test successful', {
+        transport: this.config.apiKey ? 'REST API' : 'Socket.IO',
+      });
       return true;
     } catch (error) {
       logger.error('Failed to connect to FoundryVTT:', error);
