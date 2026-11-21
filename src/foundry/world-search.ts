@@ -54,25 +54,91 @@ function decodeEntity(entity: string): string {
   return String.fromCodePoint(point);
 }
 
+/**
+ * Remove HTML markup in a single linear pass. Comments, script/style elements
+ * and block-level tags collapse to a space; inline tags are removed with no
+ * space so words split by mid-word formatting (fire<em>ball</em>) stay intact;
+ * an unmatched '<' is treated as literal text. A regex like <[^>]*> is
+ * quadratic on text full of '<' with no '>', and this text is recomputed on
+ * every query, so a scanner is required. The result is plain text that is
+ * returned in an MCP type: 'text' field for the model to read; it is never
+ * rendered as HTML.
+ */
+function stripMarkup(value: string): string {
+  const n = value.length;
+  let out = '';
+  let i = 0;
+  let textStart = 0;
+  // Once a scan for '>' reaches the end with no match, no '>' exists in that
+  // suffix, so record the floor and skip rescanning it for later '<'. This
+  // keeps the pass linear on crafted input such as '<a'.repeat(n).
+  let gtFloor = -1;
+  while (i < n) {
+    if (value[i] !== '<') {
+      i += 1;
+      continue;
+    }
+    if (i > textStart) {
+      out += value.slice(textStart, i);
+    }
+    if (value.startsWith('<!--', i)) {
+      let j = i + 4;
+      while (j + 2 < n && !(value[j] === '-' && value[j + 1] === '-' && value[j + 2] === '>')) {
+        j += 1;
+      }
+      out += ' ';
+      i = j + 2 < n ? j + 3 : n;
+      textStart = i;
+      continue;
+    }
+    const start = i + 1;
+    let gt: number;
+    if (gtFloor >= 0 && start >= gtFloor) {
+      gt = n;
+    } else {
+      gt = start;
+      while (gt < n && value[gt] !== '>') {
+        gt += 1;
+      }
+      if (gt === n) {
+        gtFloor = start;
+      }
+    }
+    if (gt === n) {
+      // Unmatched '<' is literal text; advance one char and keep scanning.
+      out += '<';
+      i += 1;
+      textStart = i;
+      continue;
+    }
+    const tag = value.slice(i, gt + 1);
+    const media = /^<(script|style)\b/i.exec(tag);
+    if (media) {
+      // Sticky search on the full string so the close-tag scan advances the
+      // cursor forward instead of slicing (and rescanning) the remainder.
+      const closeRe = new RegExp(`</${media[1]}\\s*>`, 'i');
+      closeRe.lastIndex = gt + 1;
+      const close = closeRe.exec(value);
+      out += ' ';
+      i = close ? close.index + close[0].length : n;
+      textStart = i;
+      continue;
+    }
+    out += /^<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote|br)\b/i.test(tag)
+      ? ' '
+      : '';
+    i = gt + 1;
+    textStart = i;
+  }
+  if (textStart < n) {
+    out += value.slice(textStart, n);
+  }
+  return out;
+}
+
 /** Convert rich-text HTML into readable text while excluding markup. */
 function plainText(value: string): string {
-  let text = value
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<\s*br\s*\/?>/gi, ' ')
-    .replace(/<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote)\b[^>]*>/gi, ' ');
-  // Strip remaining tags to a fixpoint. A single pass is incomplete
-  // sanitization: removing an inner tag can splice a new one together from the
-  // surrounding text (e.g. "<scr<script>ipt>" leaves "<script>"), so a lone
-  // replace can leave a live "<script" behind. Looping until the string stops
-  // changing guarantees no markup survives, which is what the excerpt is
-  // rendered into.
-  let previous: string;
-  do {
-    previous = text;
-    text = text.replace(/<[^>]*>/g, ' ');
-  } while (text !== previous);
-  return text
+  return stripMarkup(value)
     .replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (_, entity: string) => decodeEntity(entity))
     .replace(/\s+/g, ' ')
     .trim();
@@ -191,7 +257,10 @@ function journalFields(journal: WorldJournal): SearchField[] {
  * case-folding change length for characters such as …, ½ and ligatures, so a
  * position in the folded string cannot be used to slice the original directly.
  */
-function foldWithMap(value: string): { text: string; starts: number[]; ends: number[] } {
+function foldWithMap(
+  value: string,
+  limit: number,
+): { text: string; starts: number[]; ends: number[] } {
   const starts: number[] = [];
   const ends: number[] = [];
   let text = '';
@@ -204,6 +273,11 @@ function foldWithMap(value: string): { text: string; starts: number[]; ends: num
     }
     text += folded;
     index += source.length;
+    // The excerpt only needs the span up to the end of the match, so stop
+    // folding once that folded index is covered instead of the whole field.
+    if (starts.length > limit) {
+      break;
+    }
   }
   return { text, starts, ends };
 }
@@ -230,7 +304,7 @@ function findMatch(fields: SearchField[], query: string): WorldSearchMatch | nul
     if (field.name === 'name') {
       return { field: field.name, excerpt: '' };
     }
-    const { starts, ends } = foldWithMap(text);
+    const { starts, ends } = foldWithMap(text, at + query.length - 1);
     const matchStart = starts[at];
     const matchEnd = ends[at + query.length - 1];
     if (matchStart !== undefined && matchEnd !== undefined) {

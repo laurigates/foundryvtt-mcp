@@ -183,13 +183,12 @@ describe('searchWorldDocuments', () => {
     expect(searchWorldDocuments(world, 'οδος').actors.map((a) => a._id)).toEqual(['actor1']);
   });
 
-  it('strips nested markup to a fixpoint so no tag survives in the excerpt', () => {
+  it('strips nested markup so no tag survives in the excerpt', () => {
     const world = sampleWorld();
     const actor = world.actors.find((entry) => entry._id === 'actor1');
     expect(actor).toBeDefined();
-    // A single <[^>]*> pass removes "<a<b>" and leaves "c</a>", so a live tag
-    // survives. The fixpoint loop removes the reassembled "</a>" on the next
-    // pass, so the excerpt (which is rendered) carries no markup.
+    // The scanner consumes "<a<b>" in one go (the inner '<' is inside the tag),
+    // then removes the reassembled "</a>", so no markup survives.
     Object.assign(actor, {
       system: { details: { biography: { value: 'needle <a<b>c</a>tail' } } },
     });
@@ -199,6 +198,50 @@ describe('searchWorldDocuments', () => {
     expect(excerpt).toContain('needle');
     expect(excerpt).not.toContain('<');
     expect(excerpt).not.toContain('</a>');
+  });
+
+  it('joins words split by inline formatting so mid-word tags still match', () => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    Object.assign(actor, {
+      system: {
+        details: { biography: { value: 'Cast a fire<em>ball</em> at <strong>Gan</strong>dalf.' } },
+      },
+    });
+    expect(searchWorldDocuments(world, 'fireball').actors.map((a) => a._id)).toEqual(['actor1']);
+    expect(searchWorldDocuments(world, 'gandalf').actors.map((a) => a._id)).toEqual(['actor1']);
+    const excerpt =
+      searchWorldDocuments(world, 'fireball').matchDetails.actors.actor1?.excerpt ?? '';
+    expect(excerpt).toContain('fireball');
+  });
+
+  it('treats an unmatched "<" as literal text', () => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    Object.assign(actor, {
+      system: { details: { biography: { value: 'needle <a' } } },
+    });
+    const result = searchWorldDocuments(world, 'needle');
+    expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
+    expect(result.matchDetails.actors.actor1?.excerpt).toContain('needle');
+  });
+
+  it('strips 100 KB of crafted "<a" markup in linear time', () => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    // A regex like <[^>]*> is quadratic on text with many '<' and no '>';
+    // the scanner must stay linear so one crafted page cannot stall searches.
+    Object.assign(actor, {
+      system: { details: { biography: { value: '<a'.repeat(50_000) } } },
+    });
+    const started = performance.now();
+    const result = searchWorldDocuments(world, 'needle');
+    const elapsed = performance.now() - started;
+    expect(result.actors).toEqual([]);
+    expect(elapsed).toBeLessThan(500);
   });
 
   it('never mutates the cached world state', () => {
