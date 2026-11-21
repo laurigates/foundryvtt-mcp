@@ -293,11 +293,17 @@ export class DiagnosticSystem {
   }
 
   /**
-   * Create generic error diagnostic
+   * Create generic error diagnostic.
+   *
+   * Surfaces the underlying error message so details that `testConnection()`
+   * throws — for example a rejected `FOUNDRY_API_KEY` — are not lost when the
+   * diagnosis falls through to this catch-all (#288).
    */
-  private createGenericErrorDiagnostic(_error: unknown): DiagnosticResult {
+  private createGenericErrorDiagnostic(error: unknown): DiagnosticResult {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+
     return {
-      explanation: 'An unexpected error occurred during diagnosis.',
+      explanation: `An unexpected error occurred during diagnosis: ${message}`,
       suggestions:
         '• **Check logs** - Review server logs for detailed error information\n' +
         '• **Restart services** - Try restarting both FoundryVTT and the MCP server\n' +
