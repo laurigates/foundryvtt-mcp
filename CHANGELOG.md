@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.5](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.4...foundryvtt-mcp-v1.5.5) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** declare @vitest/coverage-v8 so test-coverage runs ([#285](https://github.com/laurigates/foundryvtt-mcp/issues/285)) ([1b59ec4](https://github.com/laurigates/foundryvtt-mcp/commit/1b59ec4c710de9dff868e83b3474caa3d40f1632))
+* **justfile:** call bun audit instead of removed bun pm audit ([#277](https://github.com/laurigates/foundryvtt-mcp/issues/277)) ([75a22de](https://github.com/laurigates/foundryvtt-mcp/commit/75a22de422d18cbba1da046336884829e88b722a))
+
 ## [1.5.4](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.3...foundryvtt-mcp-v1.5.4) (2026-11-14)
 
 

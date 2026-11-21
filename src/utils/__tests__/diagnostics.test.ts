@@ -88,3 +88,45 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
     expect(result.error).toMatch(/FOUNDRY_API_KEY was rejected.*HTTP 401/);
   });
 });
+
+/** `testDiceRolling` is private; reach it reflectively. */
+function rollCheck(system: InstanceType<typeof DiagnosticSystem>): Promise<boolean> {
+  const fn = Reflect.get(system, 'testDiceRolling') as () => Promise<boolean>;
+  return fn.call(system);
+}
+
+/** A REST-mode client whose `rollDice` answers with the given source. */
+function clientRolling(source: 'server' | 'local') {
+  const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+  vi.spyOn(client, 'rollDice').mockResolvedValue({
+    formula: '1d20',
+    total: 11,
+    breakdown: '1d20: [11]',
+    timestamp: new Date().toISOString(),
+    source,
+  });
+  return client;
+}
+
+describe('DiagnosticSystem.testDiceRolling, REST mode (#265)', () => {
+  it('passes on a server roll', async () => {
+    await expect(rollCheck(new DiagnosticSystem(clientRolling('server')))).resolves.toBe(true);
+  });
+
+  it('fails on a local fallback roll', async () => {
+    await expect(rollCheck(new DiagnosticSystem(clientRolling('local')))).resolves.toBe(false);
+  });
+});
+
+describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
+  it('passes on a local roll, which is the only kind this mode makes', async () => {
+    const { config } = await import('../../config/index.js');
+    const saved = config.foundry.apiKey;
+    Reflect.deleteProperty(config.foundry, 'apiKey');
+    try {
+      await expect(rollCheck(new DiagnosticSystem(clientRolling('local')))).resolves.toBe(true);
+    } finally {
+      Reflect.set(config.foundry, 'apiKey', saved);
+    }
+  });
+});
