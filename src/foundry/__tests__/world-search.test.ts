@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import type { WorldData } from '../types.js';
 import { searchWorldDocuments } from '../world-search.js';
@@ -228,21 +229,99 @@ describe('searchWorldDocuments', () => {
     expect(result.matchDetails.actors.actor1?.excerpt).toContain('needle');
   });
 
-  it('strips 100 KB of crafted "<a" markup in linear time', () => {
+  it.each([
+    ['two style blocks', '<style>a</style> needle <style>b</style> tail'],
+    ['two script blocks', '<script>a</script> needle <script>b</script> tail'],
+    ['an earlier script close', '</script> needle <script>x</script> tail'],
+    ['an earlier style close', '</style> needle <style>x</style> tail'],
+    ['mixed-case tags', '<STYLE>a</style> needle <style>b</STYLE> tail'],
+  ])('terminates and preserves visible journal text with %s', (_label, content) => {
+    const world = sampleWorld();
+    const journal = world.journal.find((entry) => entry._id === 'journal1');
+    expect(journal).toBeDefined();
+    Object.assign(journal, {
+      pages: [{ _id: 'page1', name: 'Chapter One', type: 'text', text: { content, format: 1 } }],
+    });
+    // A synchronous loop blocks Vitest's own timeout. Run the real search in
+    // a child process that the parent can kill if the cursor moves backwards.
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        '--input-type=module',
+        '--eval',
+        `import { searchWorldDocuments } from ${JSON.stringify(new URL('../world-search.ts', import.meta.url).href)};
+         const result = searchWorldDocuments(${JSON.stringify(world)}, 'needle');
+         process.stdout.write(JSON.stringify({
+           ids: result.journals.map(journal => journal._id),
+           match: result.matchDetails.journals.journal1,
+         }));`,
+      ],
+      { encoding: 'utf8', timeout: 5_000 },
+    );
+    expect(JSON.parse(output)).toEqual({
+      ids: ['journal1'],
+      match: { field: 'pages[0].text.content', excerpt: 'needle tail' },
+    });
+  });
+
+  it.each(['script', 'style'])('excludes %s contents from search results', (tag) => {
     const world = sampleWorld();
     const actor = world.actors.find((entry) => entry._id === 'actor1');
     expect(actor).toBeDefined();
-    // A regex like <[^>]*> is quadratic on text with many '<' and no '>';
-    // the scanner must stay linear so one crafted page cannot stall searches.
     Object.assign(actor, {
-      system: { details: { biography: { value: '<a'.repeat(50_000) } } },
+      system: { details: { biography: { value: `before <${tag}>needle</${tag}> after` } } },
     });
-    const started = performance.now();
-    const result = searchWorldDocuments(world, 'needle');
-    const elapsed = performance.now() - started;
-    expect(result.actors).toEqual([]);
-    expect(elapsed).toBeLessThan(500);
+    expect(searchWorldDocuments(world, 'needle').actors).toEqual([]);
+    expect(searchWorldDocuments(world, 'before after').matchDetails.actors.actor1?.excerpt).toBe(
+      'before after',
+    );
   });
+
+  it.each(['hr', 'table', 'thead', 'tbody', 'tfoot', 'pre', 'dt', 'dd', 'figcaption'])(
+    'separates words across block-level %s tags',
+    (tag) => {
+      const world = sampleWorld();
+      const actor = world.actors.find((entry) => entry._id === 'actor1');
+      expect(actor).toBeDefined();
+      Object.assign(actor, {
+        system: {
+          details: {
+            biography: {
+              value: tag === 'hr' ? 'alpha<hr>beta' : `alpha<${tag}>beta</${tag}>gamma`,
+            },
+          },
+        },
+      });
+      expect(searchWorldDocuments(world, 'alphabeta').actors).toEqual([]);
+      const visible = tag === 'hr' ? 'alpha beta' : 'alpha beta gamma';
+      const result = searchWorldDocuments(world, visible);
+      expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
+      expect(result.matchDetails.actors.actor1?.excerpt).toBe(visible);
+    },
+  );
+
+  it.each(['<', '<a', '<p'])(
+    'strips 100 KB of crafted "%s" markup within the time bound',
+    (chunk) => {
+      const world = sampleWorld();
+      const actor = world.actors.find((entry) => entry._id === 'actor1');
+      expect(actor).toBeDefined();
+      // A regex like <[^>]*> is quadratic on text with many '<' and no '>';
+      // the scanner must stay linear so one crafted page cannot stall searches.
+      // Include bare '<' for a wider margin against the quadratic stripper,
+      // alongside inline- and block-tag prefixes.
+      Object.assign(actor, {
+        system: { details: { biography: { value: chunk.repeat(100_000 / chunk.length) } } },
+      });
+      const started = performance.now();
+      const result = searchWorldDocuments(world, 'needle');
+      const elapsed = performance.now() - started;
+      expect(result.actors).toEqual([]);
+      expect(elapsed).toBeLessThan(500);
+    },
+  );
 
   it('never mutates the cached world state', () => {
     const world = sampleWorld();

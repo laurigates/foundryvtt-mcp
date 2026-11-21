@@ -1060,6 +1060,40 @@ describe('FoundryClient', () => {
       expect(connected.isConnected()).toBe(true);
     });
 
+    it('searchWorld returns a content match from a loaded snapshot', async () => {
+      const journal = {
+        _id: 'journal1',
+        name: 'Campaign Timeline',
+        pages: [
+          {
+            _id: 'page1',
+            name: 'Chapter One',
+            type: 'text',
+            text: { content: '<p>Ask about the <strong>silver key</strong>.</p>', format: 1 },
+          },
+        ],
+      };
+      const { client: connected } = await connectWithMockSocket(undefined, {
+        ...WORLD_DATA,
+        journal: [journal],
+      });
+      expect(connected.hasWorldData()).toBe(true);
+      const snapshot = structuredClone(connected.getWorldData());
+
+      const result = connected.searchWorld('SILVER KEY');
+
+      expect(result.journals).toEqual([journal]);
+      expect(result.actors).toEqual([]);
+      expect(result.items).toEqual([]);
+      expect(result.scenes).toEqual([]);
+      expect(result.matchDetails.journals.journal1).toEqual({
+        field: 'pages[0].text.content',
+        excerpt: 'Ask about the silver key.',
+      });
+      expect(connected.getWorldData()).toEqual(snapshot);
+      await connected.disconnect();
+    });
+
     it('maps a null HP maximum to an absent max, not 0 (#289)', async () => {
       const wounded = {
         _id: 'actor0000000000a',

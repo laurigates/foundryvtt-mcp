@@ -114,9 +114,9 @@ function stripMarkup(value: string): string {
     const tag = value.slice(i, gt + 1);
     const media = /^<(script|style)\b/i.exec(tag);
     if (media) {
-      // Sticky search on the full string so the close-tag scan advances the
-      // cursor forward instead of slicing (and rescanning) the remainder.
-      const closeRe = new RegExp(`</${media[1]}\\s*>`, 'i');
+      // Global search honors lastIndex and finds the next close tag anywhere
+      // after this opening tag, so an earlier close cannot move i backwards.
+      const closeRe = new RegExp(`</${media[1]}\\s*>`, 'gi');
       closeRe.lastIndex = gt + 1;
       const close = closeRe.exec(value);
       out += ' ';
@@ -124,9 +124,12 @@ function stripMarkup(value: string): string {
       textStart = i;
       continue;
     }
-    out += /^<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote|br)\b/i.test(tag)
-      ? ' '
-      : '';
+    out +=
+      /^<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote|br|hr|table|thead|tbody|tfoot|pre|dt|dd|figcaption)\b/i.test(
+        tag,
+      )
+        ? ' '
+        : '';
     i = gt + 1;
     textStart = i;
   }
