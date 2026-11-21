@@ -129,7 +129,9 @@ describe('FoundryClient', () => {
     it('does not fall back to the public root page when the REST route is missing', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockImplementation(async (url: string) => {
-        if (url === '/') return { status: 200, data: '<html>Foundry</html>' };
+        if (url === '/') {
+          return { status: 200, data: '<html>Foundry</html>' };
+        }
         throw Object.assign(new Error('HTTP 404'), { response: { status: 404 } });
       });
 
@@ -167,6 +169,21 @@ describe('FoundryClient', () => {
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         username: 'gm',
+        password: 'gm-password',
+      });
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(connect).toHaveBeenCalledOnce();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('authenticates via connect() for the userId + password path instead of GET /', async () => {
+      // This config used to fall through to the unauthenticated GET /; it now
+      // routes through the authenticated connect() path (#288).
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        userId: 'gm-user-id',
         password: 'gm-password',
       });
       const connect = vi.spyOn(client, 'connect').mockResolvedValue();
