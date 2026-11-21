@@ -103,6 +103,11 @@ first, then smoke-test one round-trip against a live world.
 
 Compendium reads (`search_compendium`, compendium-source item create) use
 `CompendiumCollection.getDocuments` / the pack index — a separate socket path,
-not `modifyDocument`. Currently `search_compendium` stays on the REST path
-(graceful-empty without `apiKey`) and compendium-source create is rejected over
+not `modifyDocument`. `search_compendium` is a **REST-only** tool: in Socket.IO
+mode it is hidden from `tools/list` and a direct call is rejected by the
+availability gate (see `src/tools/availability.ts`), so the old "graceful-empty
+without `apiKey`" behaviour no longer applies. The same mode-based hiding now
+covers the other REST-only diagnostics (`get_recent_logs`, `search_logs`,
+`get_system_health`), and the write tools are hidden outside Socket.IO +
+`FOUNDRY_WRITE_ENABLED=true`. Compendium-source create stays rejected over
 Socket.IO. Design a pack-read path before adding compendium writes.
