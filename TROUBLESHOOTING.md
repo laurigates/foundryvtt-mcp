@@ -15,7 +15,7 @@ The interactive setup wizard will detect your FoundryVTT installation and guide 
 # Test connection directly:
 npm run test-connection
 
-# Or use the MCP tool for comprehensive diagnostics (requires REST API module):
+# Or ask the MCP client for a summary (REST module adds backend health details):
 # In your AI client, run: get_health_status
 ```
 
@@ -120,17 +120,17 @@ The server provides detailed diagnostics on startup. Look for:
 #### Dice Rolling Not Working
 **Symptoms**: Dice roll commands fail
 **Solutions**:
-1. **Check formula**: Ensure dice notation is valid (e.g., "1d20+5", "3d6")
-2. **FoundryVTT version**: Ensure FoundryVTT version 11+ for best compatibility
+1. **Check formula**: The portable local notation accepts dice terms and whole numbers joined by `+` or `-` (e.g., `1d20+5`, `2d6 + 1d4`).
+2. **Choose the evaluator**: Socket.IO mode rolls locally; REST mode may use Foundry's Roll engine, then fall back to the local roller if REST rolling is unavailable. Foundry modifiers such as `4d6kh3` are not supported by this tool.
 
 #### Diagnostics Tools Not Working
 **Symptoms**: Health monitoring and log tools fail
 **Solutions**:
-1. **REST API module required**: These 5 tools require the optional Foundry Local REST API module
-2. **Install module**: Download from FoundryVTT's module browser
-3. **Enable module**: Activate it in your world's module settings
-4. **Set API key**: Add `FOUNDRY_API_KEY` to your `.env` file
-5. **Update module**: Ensure you have the latest version (v0.8.1+)
+1. **Transport mode**: `FOUNDRY_API_KEY` selects the optional Foundry Local REST API connection rather than Socket.IO.
+2. **Module**: Install and enable the REST API module in your Foundry world and use its API key.
+3. **Probe**: Check that `GET /api/world` responds with a JSON object using the `x-api-key` header.
+4. **Scope**: `get_recent_logs`, `search_logs` and `get_system_health` use backend endpoints; `diagnose_errors` is a placeholder and `get_health_status` can return a partial summary.
+5. **Writes**: The existing mutation tools require an authenticated Socket.IO connection instead of REST mode.
 
 ## Environment Configuration
 
@@ -144,8 +144,12 @@ FOUNDRY_PASSWORD=your_password
 # Optional: Direct user ID bypass
 # FOUNDRY_USER_ID=abc123def456ghij
 
-# Optional: Diagnostics (requires REST API module)
+# Optional alternative transport: Foundry Local REST API (compendium search/diagnostics)
+# Setting this key switches away from Socket.IO and disables Socket.IO writes
 # FOUNDRY_API_KEY=your_api_key_here
+
+# Optional Socket.IO writes (require GM/owner permissions)
+# FOUNDRY_WRITE_ENABLED=false
 
 # Optional Settings
 FOUNDRY_TIMEOUT=10000
@@ -204,7 +208,7 @@ Use the MCP tools to test specific functionality:
 - `get_combat_state` - Test combat tracking
 - `get_users` - Test user awareness
 - `search_world` - Test world-wide search
-- `get_health_status` - Comprehensive diagnostics (requires REST API module)
+- `get_health_status` - Connection/world status, with backend details when the optional REST diagnostic endpoints are available
 
 ## Platform-Specific Issues
 
@@ -225,6 +229,8 @@ Use the MCP tools to test specific functionality:
 ### Documentation
 - **Setup Guide**: [SETUP_GUIDE.md](SETUP_GUIDE.md)
 - **README**: [README.md](README.md)
+- **Capability Matrix**: [docs/guides/capabilities.md](docs/guides/capabilities.md)
+- **Remote Linux Setup**: [docs/guides/remote-linux.md](docs/guides/remote-linux.md)
 - **FoundryVTT Docs**: [https://foundryvtt.com/api/](https://foundryvtt.com/api/)
 
 ### Reporting Issues
@@ -266,11 +272,11 @@ npm run lint                  # Code linting
 
 ### Health Check Checklist
 - [ ] FoundryVTT is running with an active world
-- [ ] `.env` file exists with `FOUNDRY_URL`, `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD`
-- [ ] Username matches a FoundryVTT user exactly (case-sensitive)
+- [ ] `.env` file has `FOUNDRY_URL` and either Socket.IO credentials (`FOUNDRY_USERNAME` — or the optional `FOUNDRY_USER_ID` — plus `FOUNDRY_PASSWORD`) or a REST API key
+- [ ] When using `FOUNDRY_USERNAME`, it matches a FoundryVTT user exactly (case-sensitive); when using `FOUNDRY_USER_ID`, it is the correct 16-character user `_id`
 - [ ] No firewall blocking connections
 - [ ] MCP server starts without errors
-- [ ] World data loads on connect (check startup logs)
+- [ ] In Socket.IO mode, the world snapshot loads on connect (check startup logs)
 - [ ] Basic tools (dice rolling) work
 - [ ] Search tools return expected results
 
