@@ -32,9 +32,11 @@ import {
 import { config } from './config/index.js';
 import { DiagnosticsClient } from './diagnostics/client.js';
 import { FoundryClient, type FoundryClientConfig } from './foundry/client.js';
+import type { ToolAvailability } from './tools/index.js';
 import {
+  checkToolAvailability,
   getAllResources,
-  getAllTools,
+  getAvailableTools,
   routeResourceRequest,
   routeToolRequest,
 } from './tools/index.js';
@@ -50,6 +52,7 @@ class FoundryMCPServer {
   private foundryClient: FoundryClient;
   private diagnosticsClient: DiagnosticsClient;
   private diagnosticSystem: DiagnosticSystem;
+  private toolAvailability: ToolAvailability;
 
   /**
    * Creates a new FoundryMCPServer instance.
@@ -91,6 +94,10 @@ class FoundryMCPServer {
       clientConfig.userId = config.foundry.userId;
     }
     this.foundryClient = new FoundryClient(clientConfig);
+    this.toolAvailability = {
+      transport: clientConfig.apiKey ? 'rest' : 'socket',
+      writeEnabled: clientConfig.writeEnabled ?? false,
+    };
 
     // Initialize DiagnosticsClient
     this.diagnosticsClient = new DiagnosticsClient(this.foundryClient);
@@ -108,10 +115,13 @@ class FoundryMCPServer {
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      logger.info('Listing available tools');
-      return {
-        tools: getAllTools(),
-      };
+      const availableTools = getAvailableTools(this.toolAvailability);
+      logger.info('Listing available tools', {
+        transport: this.toolAvailability.transport,
+        writeEnabled: this.toolAvailability.writeEnabled,
+        count: availableTools.length,
+      });
+      return { tools: availableTools };
     });
 
     // List available resources
@@ -128,6 +138,14 @@ class FoundryMCPServer {
       logger.info('Executing tool', { name, args });
 
       try {
+        // Discovery and execution share the availability rules. A blocked tool
+        // names the actual reason; a name absent from the table falls through
+        // to the router, which reports its own "Unknown tool" error.
+        const gate = checkToolAvailability(name, this.toolAvailability);
+        if (gate.status === 'blocked') {
+          throw new McpError(ErrorCode.InvalidRequest, gate.reason);
+        }
+
         return (await routeToolRequest(
           name,
           args || {},
