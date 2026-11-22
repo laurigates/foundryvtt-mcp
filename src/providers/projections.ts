@@ -1,7 +1,10 @@
 /** System-owned display/validation descriptors; unknown systems keep their raw data. */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { FoundryActor, FoundryItem, WorldActor, WorldItem } from '../foundry/types.js';
+import { defaultPackageRoot, IntegrationManifestSchema } from '../integrations/manifest.js';
+import { parseFoundryGeneration } from '../integrations/types.js';
 import type { AttributePatch } from './types.js';
 
 const BoundSchema = z.object({
@@ -29,24 +32,97 @@ const ProjectionSchema = z.object({
   bounds: z.array(BoundSchema).default([]),
 });
 type Projection = z.infer<typeof ProjectionSchema>;
-const descriptors = new Map<string, Projection | null>();
+const descriptors = new Map<string, { stamp: string; projection: Projection }>();
 
-function descriptor(systemId: string): Projection | null {
-  if (!/^[a-zA-Z0-9_-]+$/.test(systemId)) {
+function descriptor(
+  systemId: string,
+  foundryVersion: string | undefined,
+  packageRoot = defaultPackageRoot(),
+): Projection | null {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(systemId)) {
     return null;
   }
-  const cached = descriptors.get(systemId);
-  if (cached !== undefined) {
-    return cached;
-  }
   try {
-    const url = new URL(`../../systems/${systemId}/actor-projection.json`, import.meta.url);
-    const parsed = ProjectionSchema.parse(JSON.parse(readFileSync(url, 'utf8')));
-    descriptors.set(systemId, parsed);
+    const familyPath = resolve(realpathSync(packageRoot), 'systems');
+    const family = realpathSync(familyPath);
+    const systemPath = resolve(family, systemId);
+    const systemRoot = realpathSync(systemPath);
+    const inside = (root: string, path: string) => {
+      const suffix = relative(root, path);
+      return suffix !== '..' && !suffix.startsWith(`..${sep}`) && !isAbsolute(suffix);
+    };
+    if (family !== resolve(familyPath) || systemRoot !== systemPath || !inside(family, systemRoot)) {
+      throw new Error('System projection directory escapes the systems directory');
+    }
+    const entries = readdirSync(systemRoot, { withFileTypes: true });
+    const versioned = entries.some(
+      (entry) => /^\d+$/.test(entry.name) && (entry.isDirectory() || entry.isSymbolicLink()),
+    );
+    const generation =
+      foundryVersion === undefined ? undefined : parseFoundryGeneration(foundryVersion);
+    // A versioned family never falls back to another generation or a flat descriptor.
+    // Unknown generations retain raw document data; legacy flat packages still work.
+    if (
+      versioned &&
+      (generation === undefined ||
+        generation < 13 ||
+        entries.some((entry) => entry.name === 'manifest.json'))
+    ) {
+      return null;
+    }
+    if (
+      versioned &&
+      !entries.some(
+        (entry) =>
+          entry.name === String(generation) && (entry.isDirectory() || entry.isSymbolicLink()),
+      )
+    ) {
+      return null;
+    }
+    const expectedRoot = versioned ? resolve(systemRoot, String(generation)) : systemRoot;
+    const root = realpathSync(expectedRoot);
+    if (root !== expectedRoot) {
+      throw new Error('A generation projection cannot alias a different directory');
+    }
+    const path = realpathSync(resolve(root, 'actor-projection.json'));
+    const manifestPath = realpathSync(resolve(root, 'manifest.json'));
+    if (!inside(systemRoot, root) || !inside(root, path) || !inside(root, manifestPath)) {
+      throw new Error('System projection escapes its generation directory');
+    }
+    const stat = statSync(path, { bigint: true });
+    const manifestStat = statSync(manifestPath, { bigint: true });
+    const stamp = `${stat.ino}:${stat.mtimeNs}:${stat.size}:${manifestStat.ino}:${manifestStat.mtimeNs}:${manifestStat.size}`;
+    const cached = descriptors.get(path);
+    if (cached?.stamp === stamp) {
+      return cached.projection;
+    }
+    // A missing or misidentified manifest cannot contribute system-specific fields
+    // or validation bounds to a different generation.
+    let source: unknown;
+    try {
+      source = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    } catch {
+      return null;
+    }
+    const manifest = IntegrationManifestSchema.safeParse(source);
+    if (
+      !manifest.success ||
+      manifest.data.kind !== 'system' ||
+      manifest.data.id !== systemId ||
+      manifest.data.foundryGeneration !== (versioned ? generation : undefined)
+    ) {
+      return null;
+    }
+    const parsed = ProjectionSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+    descriptors.set(path, { stamp, projection: parsed });
     return parsed;
   } catch (error) {
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
-      descriptors.set(systemId, null);
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
       return null;
     }
     throw new Error(`Invalid actor projection for system '${systemId}'`, { cause: error });
@@ -67,12 +143,17 @@ export function readPath(object: unknown, path: string | undefined): unknown {
   return value;
 }
 
-export function projectActor(raw: WorldActor, systemId: string): FoundryActor {
+export function projectActor(
+  raw: WorldActor,
+  systemId: string,
+  foundryVersion?: string,
+  packageRoot?: string,
+): FoundryActor {
   const actor: FoundryActor = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
   if (raw.img) {
     actor.img = raw.img;
   }
-  const config = descriptor(systemId);
+  const config = descriptor(systemId, foundryVersion, packageRoot);
   if (!config) {
     return actor;
   }
@@ -125,12 +206,17 @@ export function projectActor(raw: WorldActor, systemId: string): FoundryActor {
   return actor;
 }
 
-export function projectItem(raw: WorldItem, systemId: string): FoundryItem {
+export function projectItem(
+  raw: WorldItem,
+  systemId: string,
+  foundryVersion?: string,
+  packageRoot?: string,
+): FoundryItem {
   const item: FoundryItem = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
   if (raw.img) {
     item.img = raw.img;
   }
-  const config = descriptor(systemId);
+  const config = descriptor(systemId, foundryVersion, packageRoot);
   if (!config) {
     return item;
   }
@@ -150,8 +236,10 @@ export function validateSystemPatch(
   actor: FoundryActor,
   rawSystem: Record<string, unknown> | undefined,
   systemId: string,
+  foundryVersion?: string,
+  packageRoot?: string,
 ): void {
-  const config = descriptor(systemId);
+  const config = descriptor(systemId, foundryVersion, packageRoot);
   for (const [path, value] of Object.entries(patch)) {
     const parts = path.split('.');
     if (

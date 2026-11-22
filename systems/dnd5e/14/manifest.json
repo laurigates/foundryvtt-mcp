@@ -1,0 +1,3407 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": 1,
+  "kind": "system",
+  "foundryGeneration": 14,
+  "id": "dnd5e",
+  "adapterVersion": "0.2.0",
+  "updatedAt": "2026-11-22",
+  "entrypoint": "adapter.py",
+  "status": "experimental",
+  "upstream": {
+    "repository": "https://github.com/foundryvtt/dnd5e",
+    "reference": "release-6.1.1@bc1b2c921e2f306dc5079f8de883ad64607118a6",
+    "updatedAt": "2026-11-16",
+    "verifiedAt": null
+  },
+  "compatibility": {
+    "foundryVersions": [],
+    "integrationVersions": [],
+    "tested": []
+  },
+  "operations": [
+    {
+      "id": "get_actor_data",
+      "description": "Read an Actor document and its unmodified dnd5e system data. Does not calculate game rules or roll dice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "description": "Actor UUID in the selected target world."
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "system": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "name",
+          "type",
+          "system"
+        ],
+        "additionalProperties": true
+      },
+      "binding": "get_actor_data.js",
+      "probe": "probe.js",
+      "readOnly": true
+    },
+    {
+      "id": "activate_activity",
+      "description": "Activate a built-in attack/check/save/damage/heal/utility activity and its configured resource consumption without dialogs, templates or subsequent actions. Does not perform attack/damage or apply target effects. Slot-consuming spells require an explicit available slot at exactly their base level; upcasting, concentration and specialized/custom activity types are excluded. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "activity_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "spell_slot": {
+            "type": "string",
+            "pattern": "^(?:spell[1-9]|pact)$"
+          }
+        },
+        "required": [
+          "item_uuid",
+          "activity_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": "string"
+          },
+          "activity_id": {
+            "type": "string"
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "reported_updates": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "observed_actor",
+          "reported_updates",
+          "message_uuid",
+          "effects",
+          "templates"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/activate_activity.js",
+      "probe": "probes/activate_activity.js",
+      "readOnly": false
+    },
+    {
+      "id": "apply_damage",
+      "description": "Apply typed damage/healing through Actor.applyDamage, preserving system rules and module hooks. Reports before/after HP and whether HP changed; a hook veto or immunity can legitimately leave it unchanged. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "damages": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                },
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "properties": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                  }
+                }
+              },
+              "required": [
+                "type",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "multiplier": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "damages"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "hp_changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "before",
+          "after",
+          "hp_changed"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/apply_damage.js",
+      "probe": "probes/apply_damage.js",
+      "readOnly": false
+    },
+    {
+      "id": "calculate_damage",
+      "description": "Calculate typed damage/healing using the actor system resistances, immunities, vulnerabilities and modifiers. A preview, not a reservation or HP update; calculation hooks run.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "damages": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                },
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "properties": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                  }
+                }
+              },
+              "required": [
+                "type",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "multiplier": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "damages"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          },
+          "amount": {
+            "type": "number"
+          },
+          "temporary_hp": {
+            "type": "number"
+          },
+          "temporary_max_hp": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "entries",
+          "amount",
+          "temporary_hp",
+          "temporary_max_hp"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/calculate_damage.js",
+      "probe": "probes/calculate_damage.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_activities",
+      "description": "List an owned or readable Item activities, exact IDs, types, resource consumption and use eligibility. Activity IDs select fixed operations; no function name is accepted.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "item_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "can_use": {
+              "type": "boolean"
+            },
+            "hidden": {
+              "type": "boolean"
+            },
+            "requires_concentration": {
+              "type": "boolean"
+            },
+            "activation": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            },
+            "consumption": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            },
+            "uses": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            },
+            "target": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            },
+            "range": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "uuid",
+            "name",
+            "type",
+            "can_use",
+            "hidden",
+            "requires_concentration",
+            "activation",
+            "consumption",
+            "uses",
+            "target",
+            "range"
+          ],
+          "additionalProperties": false
+        },
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_activities.js",
+      "probe": "probes/get_activities.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_activity",
+      "description": "Read one activity source and prepared targeting/consumption metadata without activating it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "activity_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "item_uuid",
+          "activity_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "uuid",
+              "name",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "activity": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "can_use": {
+                "type": "boolean"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "requires_concentration": {
+                "type": "boolean"
+              },
+              "activation": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              "consumption": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              "uses": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              "target": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              "range": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "uuid",
+              "name",
+              "type",
+              "can_use",
+              "hidden",
+              "requires_concentration",
+              "activation",
+              "consumption",
+              "uses",
+              "target",
+              "range"
+            ],
+            "additionalProperties": false
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "item",
+          "activity",
+          "source"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_activity.js",
+      "probe": "probes/get_activity.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_actor_items",
+      "description": "Read the selected actor inventory and spell items, their prepared system data and activity IDs. No Item Piles transaction semantics are implied.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "item_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            },
+            "system": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            },
+            "activity_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "item",
+            "system",
+            "activity_ids"
+          ],
+          "additionalProperties": false
+        },
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_actor_items.js",
+      "probe": "probes/get_actor_items.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_actor_summary",
+      "description": "Read prepared D&D5e actor statistics, abilities, skills, spells, currencies and traits after system/module preparation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "uuid",
+              "name",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "prepared": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "actor",
+          "prepared",
+          "statuses"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_actor_summary.js",
+      "probe": "probes/get_actor_summary.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_effects",
+      "description": "Read actor and embedded-item ActiveEffects with suppression, disabled state and statuses; does not alter effect definitions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "effect": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            },
+            "parent_uuid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "disabled": {
+              "type": "boolean"
+            },
+            "suppressed": {
+              "type": "boolean"
+            },
+            "statuses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          },
+          "required": [
+            "effect",
+            "parent_uuid",
+            "disabled",
+            "suppressed",
+            "statuses",
+            "data"
+          ],
+          "additionalProperties": false
+        },
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_effects.js",
+      "probe": "probes/get_effects.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_item_data",
+      "description": "Read a D&D5e Item source plus prepared system data without opening its sheet or triggering use.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "item_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "uuid",
+              "name",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "prepared": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "item",
+          "source",
+          "prepared"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_item_data.js",
+      "probe": "probes/get_item_data.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_roll_data",
+      "description": "Read the actor system roll data through its actual getRollData method. Document references become summaries; no formula is evaluated.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_roll_data.js",
+      "probe": "probes/get_roll_data.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_system_config",
+      "description": "Read selected runtime D&D5e ability, skill, tool, currency, damage and condition definitions, plus active module IDs and versions. Not the complete system configuration.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "system_id": {
+            "const": "dnd5e"
+          },
+          "system_version": {
+            "type": "string"
+          },
+          "foundry_version": {
+            "type": "string"
+          },
+          "definitions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "active_modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "system_id",
+          "system_version",
+          "foundry_version",
+          "definitions",
+          "active_modules"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/get_system_config.js",
+      "probe": "probes/get_system_config.js",
+      "readOnly": true
+    },
+    {
+      "id": "long_rest",
+      "description": "Perform a system long rest without dialogs, world-time advancement or bastion turns. The system decides recovery; new_day is explicit and observed planned actor/item updates are checked. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "new_day": {
+            "type": "boolean"
+          },
+          "chat_message": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "new_day"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "rest_type": {
+            "enum": [
+              "short",
+              "long"
+            ]
+          },
+          "new_day": {
+            "type": "boolean"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "reported_deltas": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "observed_planned_updates": {
+            "type": "boolean"
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "rest_type",
+          "new_day",
+          "before",
+          "after",
+          "reported_deltas",
+          "observed_planned_updates",
+          "message_uuid"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/long_rest.js",
+      "probe": "probes/long_rest.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_ability_check",
+      "description": "Roll a system ability check with prepared bonuses and hooks, with the configuration dialog disabled. Chat is opt-in. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "ability"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_ability_check.js",
+      "probe": "probes/roll_ability_check.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_activity_attack",
+      "description": "Roll a built-in attack activity with explicit attack mode. May consume ammunition/thrown items and update last-used flags; does not activate other resources or apply damage. Runtime token targets must be empty. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "activity_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "attack_mode": {
+            "type": "string",
+            "enum": [
+              "oneHanded",
+              "twoHanded",
+              "offhand",
+              "thrown",
+              "thrown-offhand",
+              "ranged"
+            ]
+          },
+          "ammunition_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "item_uuid",
+          "activity_id",
+          "attack_mode",
+          "ammunition_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_activity_attack.js",
+      "probe": "probes/roll_activity_attack.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_activity_damage",
+      "description": "Roll standalone base-context damage/healing without applying it or consuming activation resources. Attack activities require explicit ability, attack_mode and ammunition_id (null for none); no prior UI/activation context is inferred. Upcasting or consumed-hit-die scaling is excluded. Chat and last damage-type flags may change. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "activity_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "attack_mode": {
+            "type": "string",
+            "enum": [
+              "oneHanded",
+              "twoHanded",
+              "offhand",
+              "thrown",
+              "thrown-offhand",
+              "ranged"
+            ]
+          },
+          "ammunition_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "item_uuid",
+          "activity_id",
+          "critical"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_activity_damage.js",
+      "probe": "probes/roll_activity_damage.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_activity_formula",
+      "description": "Roll the formula already stored on a built-in utility activity without a dialog. No caller-supplied formula or JavaScript is accepted; activation resources are not consumed. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "activity_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          }
+        },
+        "required": [
+          "item_uuid",
+          "activity_id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_activity_formula.js",
+      "probe": "probes/roll_activity_formula.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_concentration",
+      "description": "Roll a system concentration saving throw at an explicit DC. The API and installed hooks determine effects; the bridge does not independently end concentration. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "dc"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_concentration.js",
+      "probe": "probes/roll_concentration.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_death_save",
+      "description": "Roll a death saving throw; D&D5e can update death counters and HP. Returns the roll and observed actor state, including hook-dependent changes. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_death_save.js",
+      "probe": "probes/roll_death_save.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_hit_die",
+      "description": "Spend one hit die of an explicit denomination and apply system healing. Returns observed HP/hit-die state because hooks can prevent individual updates. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "denomination": {
+            "type": "string",
+            "enum": [
+              "d4",
+              "d6",
+              "d8",
+              "d10",
+              "d12",
+              "d20"
+            ]
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "denomination"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_hit_die.js",
+      "probe": "probes/roll_hit_die.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_saving_throw",
+      "description": "Roll a system saving throw through Actor.rollSavingThrow. Does not guess a saving throw from a generic d20 roll. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "ability"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_saving_throw.js",
+      "probe": "probes/roll_saving_throw.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_skill",
+      "description": "Roll a configured D&D5e skill using its actual actor method, including installed wrappers. Unknown skills are rejected instead of falling back to an ability check. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "skill": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "skill"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_skill.js",
+      "probe": "probes/roll_skill.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_tool_check",
+      "description": "Roll a configured actor tool proficiency through the D&D5e tool-check API without opening a dialog. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "chat_message": {
+            "type": "boolean"
+          },
+          "roll_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ]
+          },
+          "advantage": {
+            "type": "boolean"
+          },
+          "disadvantage": {
+            "type": "boolean"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "ability": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "item_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rolls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formula": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "is_critical": {
+                  "type": "boolean"
+                },
+                "is_fumble": {
+                  "type": "boolean"
+                },
+                "message_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "required": [
+                "formula",
+                "total",
+                "result",
+                "is_critical",
+                "is_fumble",
+                "message_uuid",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rolls_redacted": {
+            "type": "boolean"
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_actor": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "item_uuid",
+          "activity_id",
+          "rolls",
+          "rolls_redacted",
+          "message_uuids",
+          "observed_actor"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/roll_tool_check.js",
+      "probe": "probes/roll_tool_check.js",
+      "readOnly": false
+    },
+    {
+      "id": "set_condition",
+      "description": "Set an explicit non-levelled D&D5e condition active/inactive through the actual system override and verify observed status. Levelled conditions such as exhaustion are rejected. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "condition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "condition",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "condition",
+          "active",
+          "changed"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/set_condition.js",
+      "probe": "probes/set_condition.js",
+      "readOnly": false
+    },
+    {
+      "id": "short_rest",
+      "description": "Perform a system short rest without dialogs, automatic hit-die spending, world-time advancement or bastion turns. new_day is explicit; planned actor/item updates are checked against observed state. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the actor in the execution runtime (or GM). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^\\S+$"
+          },
+          "new_day": {
+            "type": "boolean"
+          },
+          "chat_message": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "new_day"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "rest_type": {
+            "enum": [
+              "short",
+              "long"
+            ]
+          },
+          "new_day": {
+            "type": "boolean"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "reported_deltas": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "observed_planned_updates": {
+            "type": "boolean"
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "rest_type",
+          "new_day",
+          "before",
+          "after",
+          "reported_deltas",
+          "observed_planned_updates",
+          "message_uuid"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "JsonValue": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/JsonValue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "binding": "bindings/short_rest.js",
+      "probe": "probes/short_rest.js",
+      "readOnly": false
+    }
+  ]
+}

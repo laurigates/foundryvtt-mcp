@@ -2,7 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CompositeProvider } from '../composite.js';
 import { createProvider } from '../factory.js';
-import { projectActor, validateSystemPatch } from '../projections.js';
+import { projectActor, projectItem, validateSystemPatch } from '../projections.js';
 import { RestApiProvider } from '../rest-api.js';
 import { SocketIOProvider } from '../socketio.js';
 
@@ -499,7 +499,7 @@ describe('Provider execution boundary', () => {
     };
     expect(projectActor(actor, 'unknown-system').hp).toBeUndefined();
     expect(projectActor(actor, 'unknown-system').data).toEqual(actor.system);
-    expect(projectActor(actor, 'dnd5e').hp).toEqual({ value: 10, max: 20 });
+    expect(projectActor(actor, 'dnd5e', '14.370').hp).toEqual({ value: 10, max: 20 });
     expect(() =>
       validateSystemPatch(
         { 'attributes.hp.value': 25 },
@@ -511,10 +511,82 @@ describe('Provider execution boundary', () => {
     expect(() =>
       validateSystemPatch(
         { 'attributes.hp.value': 25 },
-        projectActor(actor, 'dnd5e'),
+        projectActor(actor, 'dnd5e', '14.370'),
         actor.system,
         'dnd5e',
+        '14.370',
       ),
     ).toThrow(/exceeds max/);
+  });
+
+  it('selects projections by Foundry generation without borrowing another variant', () => {
+    const actor = {
+      _id: 'actor',
+      name: 'Hero',
+      type: 'character',
+      system: { attributes: { hp: { value: 10, max: 20 } } },
+    };
+    const item = {
+      _id: 'item',
+      name: 'Sword',
+      type: 'weapon',
+      system: { description: { value: 'Description' }, rarity: 'rare' },
+    };
+    for (const version of ['13.350', '14.370']) {
+      expect(projectActor(actor, 'dnd5e', version).hp).toEqual({ value: 10, max: 20 });
+      expect(projectItem(item, 'dnd5e', version).rarity).toBe('rare');
+    }
+    for (const version of ['12.331', '15.400', 'unknown', undefined]) {
+      const projected = projectActor(actor, 'dnd5e', version);
+      expect(projected.hp).toBeUndefined();
+      expect(projected.data).toEqual(actor.system);
+      expect(projectItem(item, 'dnd5e', version).rarity).toBeUndefined();
+      expect(() =>
+        validateSystemPatch(
+          { 'attributes.hp.value': 25 },
+          projected,
+          actor.system,
+          'dnd5e',
+          version,
+        ),
+      ).not.toThrow();
+      expect(() =>
+        validateSystemPatch(
+          { 'attributes.hp.value': Number.NaN },
+          projected,
+          actor.system,
+          'dnd5e',
+          version,
+        ),
+      ).toThrow(/finite scalar/);
+    }
+    // A cached descriptor for 13/14 must not change the decision for another target.
+    expect(projectActor(actor, 'dnd5e', '13.350').hp).toEqual({ value: 10, max: 20 });
+  });
+
+  it.each([
+    [{ generation: 14 }, '14', true],
+    [{ generation: '13' }, '13', true],
+    [{ version: '14.370', generation: 13 }, '14.370', true],
+    [{ version: 'unknown', generation: 14 }, 'unknown', false],
+    [{ generation: 15 }, '15', false],
+    [{ generation: Number.NaN }, 'unknown', false],
+  ])('uses the same release identity for discovery and projections: %j', async (release, expected, projected) => {
+    const provider = new SocketIOProvider({
+      kind: 'socketio',
+      baseUrl: 'https://foundry.example',
+    });
+    const actor = {
+      _id: 'aaaaaaaaaaaaaaaa',
+      name: 'Hero',
+      type: 'character',
+      system: { attributes: { hp: { value: 10, max: 20 } } },
+    };
+    Reflect.set(provider, 'worldData', { ...snapshot(), release, actors: [actor] });
+    vi.spyOn(provider, 'isConnected').mockReturnValue(true);
+    expect((await provider.getWorldInfo()).coreVersion).toBe(expected);
+    expect((await provider.inspect()).foundryVersion).toBe(expected);
+    const result = await provider.getActor(actor._id);
+    expect(result.hp).toEqual(projected ? { value: 10, max: 20 } : undefined);
   });
 });

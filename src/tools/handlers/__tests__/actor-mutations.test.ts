@@ -143,7 +143,10 @@ describe('Actor mutation handlers', () => {
         writeEnabled: opts.writeEnabled ?? true,
       });
       // These cases exercise the dnd5e descriptor, rather than generic core rules.
-      (client as unknown as { worldData: unknown }).worldData = { system: { id: 'dnd5e' } };
+      (client as unknown as { worldData: unknown }).worldData = {
+        system: { id: 'dnd5e' },
+        release: { version: '14.370' },
+      };
       if (opts.actor) {
         vi.spyOn(client, 'getActor').mockResolvedValue(
           opts.actor as unknown as Awaited<ReturnType<FoundryClient['getActor']>>,

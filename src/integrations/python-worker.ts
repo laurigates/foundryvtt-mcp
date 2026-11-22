@@ -109,8 +109,24 @@ export class PythonWorker {
     );
   }
 
-  async load(key: string, root: string, entrypoint: string): Promise<void> {
-    await this.request('load', { integration: key, root, entrypoint });
+  async load(
+    key: string,
+    root: string,
+    entrypoint: string,
+    foundryGeneration?: number,
+  ): Promise<void> {
+    if (
+      foundryGeneration !== undefined &&
+      (!Number.isSafeInteger(foundryGeneration) || foundryGeneration < 13)
+    ) {
+      throw new IntegrationError('invalid_manifest', 'Invalid integration Foundry generation');
+    }
+    await this.request('load', {
+      integration: key,
+      root,
+      entrypoint,
+      ...(foundryGeneration === undefined ? {} : { foundryGeneration }),
+    });
   }
 
   async call(

@@ -321,6 +321,26 @@ export class DocumentProvider implements FoundryProvider {
     return typeof id === 'string' ? id : '';
   }
 
+  protected foundryVersion(): string | undefined {
+    const release = this.worldData?.release;
+    const version = release?.version;
+    if (typeof version === 'string' && version.trim()) {
+      return version.trim();
+    }
+    const generation = release?.generation;
+    if (typeof generation === 'number' && Number.isSafeInteger(generation) && generation > 0) {
+      return String(generation);
+    }
+    if (
+      typeof generation === 'string' &&
+      /^[1-9]\d*$/.test(generation) &&
+      Number.isSafeInteger(Number(generation))
+    ) {
+      return generation;
+    }
+    return undefined;
+  }
+
   async inspect(): Promise<FoundryEnvironment> {
     if (!this.isConnected()) {
       throw new ProviderError('target_offline', 'The target is disconnected');
@@ -874,7 +894,7 @@ export class DocumentProvider implements FoundryProvider {
     const limit = params.limit || 10;
     const actors: FoundryActor[] = results
       .slice(0, limit)
-      .map((actor) => projectActor(actor, this.systemId()));
+      .map((actor) => projectActor(actor, this.systemId(), this.foundryVersion()));
 
     return { actors, total, page: 1, limit };
   }
@@ -899,7 +919,7 @@ export class DocumentProvider implements FoundryProvider {
       throw new Error(`Actor not found: ${actorId}`);
     }
 
-    return projectActor(actor, this.systemId());
+    return projectActor(actor, this.systemId(), this.foundryVersion());
   }
 
   /**
@@ -944,7 +964,7 @@ export class DocumentProvider implements FoundryProvider {
     // raw actor for the system document the validator needs.
     const actor = await this.getActor(actorId);
     const rawSystem = systemOf(actor) ?? systemOf(this.getRawActor(actorId));
-    validateSystemPatch(patch, actor, rawSystem, this.systemId());
+    validateSystemPatch(patch, actor, rawSystem, this.systemId(), this.foundryVersion());
 
     // The patch keys are dot-paths into `actor.system`; prefix each with
     // `system.` for the document update. FoundryVTT accepts dot-notation keys
@@ -1000,7 +1020,9 @@ export class DocumentProvider implements FoundryProvider {
 
     const total = results.length;
     const limit = params.limit || 10;
-    const items = results.slice(0, limit).map((item) => projectItem(item, this.systemId()));
+    const items = results
+      .slice(0, limit)
+      .map((item) => projectItem(item, this.systemId(), this.foundryVersion()));
 
     return { items, total, page: 1, limit };
   }
@@ -1609,14 +1631,13 @@ export class DocumentProvider implements FoundryProvider {
 
     const w = this.worldData.world as Record<string, unknown>;
     const s = this.worldData.system as Record<string, unknown>;
-    const r = this.worldData.release as Record<string, unknown>;
 
     return {
       id: (w.id as string) || 'unknown',
       title: (w.title as string) || 'Unknown World',
       description: (w.description as string) || '',
       system: (s.id as string) || 'unknown',
-      coreVersion: (r.version as string) || (r.generation as string) || 'unknown',
+      coreVersion: this.foundryVersion() ?? 'unknown',
       systemVersion: (s.version as string) || 'unknown',
       playtime: 0,
       created: new Date().toISOString(),

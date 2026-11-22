@@ -9,7 +9,7 @@ describe('integration packages', () => {
   it('preserves upstream IDs and loads both families', async () => {
     expect(toolName('module', 'item-piles', 'get_items')).toBe('module_item-piles_get_items');
     const packages = await loadIntegrations(packageRoot);
-    expect(packages.map((entry) => `${entry.manifest.kind}:${entry.manifest.id}`).sort()).toEqual([
+    expect([...new Set(packages.map((entry) => `${entry.manifest.kind}:${entry.manifest.id}`))].sort()).toEqual([
       'module:item-piles',
       'system:dnd5e',
       'system:pf2e',
@@ -28,20 +28,22 @@ describe('session integration isolation', () => {
     const a = create('one');
     const b = create('two');
     const environment = {
-      foundryVersion: 'test',
+      foundryVersion: '14.370',
       system: { id: 'dnd5e', version: 'test' },
       modules: [],
     };
     try {
       await Promise.all([a.reconcile(environment, 1), b.reconcile(environment, 2)]);
       expect(a.getTools()).toEqual(b.getTools());
-      expect(a.getTools()[0]?.outputSchema).toMatchObject({ type: 'object' });
+      expect(
+        a.getTools().find((tool) => tool.name === 'system_dnd5e_get_actor_data')?.outputSchema,
+      ).toMatchObject({ type: 'object' });
       await a.close();
       expect(a.getTools()).toEqual([]);
-      expect(a.list().find((entry) => entry.id === 'dnd5e')).toMatchObject({
-        state: 'not-ready',
-        operations: [{ available: false }],
-      });
+      const closedStatus = a.list().find((entry) => entry.id === 'dnd5e');
+      expect(closedStatus).toMatchObject({ state: 'not-ready' });
+      expect(closedStatus?.operations.length).toBeGreaterThan(0);
+      expect(closedStatus?.operations.every((operation) => !operation.available)).toBe(true);
       expect(b.has('system_dnd5e_get_actor_data')).toBe(true);
     } finally {
       await Promise.all([a.close(), b.close()]);
@@ -74,11 +76,11 @@ describe('session integration isolation', () => {
     try {
       await Promise.all([
         a.reconcile(
-          { foundryVersion: 'test', system: { id: 'dnd5e', version: 'test' }, modules: [] },
+          { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] },
           1,
         ),
         b.reconcile(
-          { foundryVersion: 'test', system: { id: 'pf2e', version: 'test' }, modules: [] },
+          { foundryVersion: '14.370', system: { id: 'pf2e', version: 'test' }, modules: [] },
           1,
         ),
       ]);
@@ -107,7 +109,7 @@ describe('session integration isolation', () => {
     try {
       await manager.reconcile(
         {
-          foundryVersion: 'test',
+          foundryVersion: '14.370',
           system: { id: 'custom-system', version: 'test' },
           modules: [{ id: 'item-piles', version: 'test', active: true }],
         },
@@ -119,7 +121,7 @@ describe('session integration isolation', () => {
       );
       await manager.reconcile(
         {
-          foundryVersion: 'test',
+          foundryVersion: '14.370',
           system: { id: 'custom-system', version: 'test' },
           modules: [{ id: 'item-piles', version: 'test', active: false }],
         },
@@ -142,7 +144,7 @@ describe('session integration isolation', () => {
       execute: async () => ({ ready: true }),
     });
     try {
-      const env = { foundryVersion: 'test', system: { id: 'dnd5e', version: 'test' }, modules: [] };
+      const env = { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] };
       await manager.reconcile({ ...env, runtimeAvailable: false }, 1);
       expect(manager.getTools()).toEqual([]);
       expect(manager.list().find((entry) => entry.id === 'dnd5e')?.state).toBe('unsupported');
@@ -165,7 +167,7 @@ describe('session integration isolation', () => {
     });
     try {
       await manager.reconcile(
-        { foundryVersion: 'test', system: { id: 'pf2e', version: 'test' }, modules: [] },
+        { foundryVersion: '14.370', system: { id: 'pf2e', version: 'test' }, modules: [] },
         1,
       );
       expect(manager.has('system_pf2e_get_actor_data')).toBe(true);
@@ -174,7 +176,12 @@ describe('session integration isolation', () => {
         manager.call('system_pf2e_get_actor_data', { actor_uuid: 'Actor.x' }),
       ).rejects.toThrow('API removed');
       expect(manager.has('system_pf2e_get_actor_data')).toBe(false);
-      expect(manager.list().find((entry) => entry.id === 'pf2e')?.state).toBe('not-ready');
+      expect(
+        manager
+          .list()
+          .find((entry) => entry.id === 'pf2e')
+          ?.operations.find((operation) => operation.name === 'system_pf2e_get_actor_data'),
+      ).toMatchObject({ available: false, reason: 'API removed' });
     } finally {
       await manager.close();
     }
@@ -195,7 +202,7 @@ describe('session integration isolation', () => {
     });
     try {
       await manager.reconcile(
-        { foundryVersion: 'test', system: { id: 'dnd5e', version: 'test' }, modules: [] },
+        { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] },
         1,
       );
       await expect(

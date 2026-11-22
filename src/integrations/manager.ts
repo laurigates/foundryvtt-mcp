@@ -21,6 +21,7 @@ import {
   IntegrationError,
   type IntegrationStatus,
   type IntegrationTool,
+  parseFoundryGeneration,
 } from './types.js';
 
 const ProbeResult = z.object({ ready: z.boolean(), reason: z.string().optional() });
@@ -42,6 +43,11 @@ interface RegisteredOperation {
   output: ValidateFunction;
   script: string;
   probe: string;
+}
+
+interface PackageVariants {
+  packages: IntegrationPackage[];
+  failures: IntegrationLoadFailure[];
 }
 
 interface IntegrationCall {
@@ -113,27 +119,28 @@ export class IntegrationManager {
     if (revision !== this.revision || this.closed) {
       return;
     }
-    this.statuses = [
-      ...packages.map((entry) => this.status(entry, environment)),
-      ...failures.map(
-        (failure): IntegrationStatus => ({
-          kind: failure.kind,
-          id: failure.id,
-          adapterVersion: failure.adapterVersion,
-          state: 'error',
-          reason: failure.error.message,
-          operations: failure.operations.map((name) => ({
-            name,
-            available: false,
-            reason: failure.error.message,
-          })),
-        }),
-      ),
-    ];
-    const candidates = packages.filter((_, index) => {
-      const status = this.statuses[index];
-      return status?.state === 'not-ready' && status.reason === undefined;
-    });
+    const groups = new Map<string, PackageVariants>();
+    for (const entry of packages) {
+      const key = `${entry.manifest.kind}:${entry.manifest.id}`;
+      const group: PackageVariants = groups.get(key) ?? { packages: [], failures: [] };
+      group.packages.push(entry);
+      groups.set(key, group);
+    }
+    for (const failure of failures) {
+      const key = `${failure.kind}:${failure.id}`;
+      const group: PackageVariants = groups.get(key) ?? { packages: [], failures: [] };
+      group.failures.push(failure);
+      groups.set(key, group);
+    }
+    this.statuses = [];
+    const candidates: Array<{ entry: IntegrationPackage; status: IntegrationStatus }> = [];
+    for (const [, group] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
+      const { entry, status } = this.select(group.packages, group.failures, environment);
+      this.statuses.push(status);
+      if (entry && status.state === 'not-ready' && status.reason === undefined) {
+        candidates.push({ entry, status });
+      }
+    }
     if (candidates.length === 0) {
       this.options.onChange?.();
       return;
@@ -171,20 +178,18 @@ export class IntegrationManager {
       revision === this.revision && !this.closed && this.worker === worker && worker.isRunning();
     try {
       await worker.start();
-      for (const entry of candidates) {
+      for (const { entry, status } of candidates) {
         if (!current()) {
           return;
         }
-        const status = this.statuses.find(
-          (candidate) =>
-            candidate.kind === entry.manifest.kind && candidate.id === entry.manifest.id,
-        );
-        if (!status) {
-          continue;
-        }
         try {
           const key = `${entry.manifest.kind}:${entry.manifest.id}`;
-          await worker.load(key, entry.root, entry.manifest.entrypoint);
+          await worker.load(
+            key,
+            entry.root,
+            entry.manifest.entrypoint,
+            entry.manifest.foundryGeneration,
+          );
           if (!current()) {
             return;
           }
@@ -276,6 +281,12 @@ export class IntegrationManager {
   list(): IntegrationStatus[] {
     return this.statuses.map((status) => ({
       ...status,
+      ...(status.availableGenerations
+        ? { availableGenerations: [...status.availableGenerations] }
+        : {}),
+      ...(status.variantErrors
+        ? { variantErrors: status.variantErrors.map((error) => ({ ...error })) }
+        : {}),
       operations: status.operations.map((operation) => ({ ...operation })),
     }));
   }
@@ -499,6 +510,101 @@ export class IntegrationManager {
         `Invalid integration ${direction}: ${this.ajv.errorsText(validator.errors)}`,
       );
     }
+  }
+
+  /** Choose exactly one package before importing Python or probing any runtime. */
+  private select(
+    packages: IntegrationPackage[],
+    failures: IntegrationLoadFailure[],
+    environment: IntegrationEnvironment,
+  ): { entry?: IntegrationPackage; status: IntegrationStatus } {
+    const identity = packages[0]?.manifest ?? failures[0];
+    if (!identity) {
+      throw new IntegrationError('invalid_manifest', 'An integration group has no identity');
+    }
+    const generation = parseFoundryGeneration(environment.foundryVersion);
+    const availableGenerations = [
+      ...new Set(
+        packages.flatMap((entry) =>
+          entry.manifest.foundryGeneration === undefined ? [] : [entry.manifest.foundryGeneration],
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    const variantErrors = failures.map((failure) => ({
+      ...(failure.foundryGeneration === undefined
+        ? {}
+        : { foundryGeneration: failure.foundryGeneration }),
+      reason: failure.error.message,
+    }));
+    const details = {
+      availableGenerations,
+      ...(variantErrors.length ? { variantErrors } : {}),
+    };
+    const relevantFailures = failures.filter(
+      (failure) =>
+        failure.foundryGeneration === undefined || failure.foundryGeneration === generation,
+    );
+    if (relevantFailures.length) {
+      const reason = relevantFailures.map((failure) => failure.error.message).join('; ');
+      return {
+        status: {
+          kind: identity.kind,
+          id: identity.id,
+          adapterVersion: relevantFailures[0]?.adapterVersion ?? 'unknown',
+          ...details,
+          state: 'error',
+          reason,
+          operations: [...new Set(relevantFailures.flatMap((failure) => failure.operations))].map(
+            (name) => ({ name, available: false, reason }),
+          ),
+        },
+      };
+    }
+    const entry = packages.find(
+      (candidate) =>
+        candidate.manifest.foundryGeneration === undefined ||
+        candidate.manifest.foundryGeneration === generation,
+    );
+    if (entry) {
+      return {
+        entry,
+        status: {
+          ...this.status(entry, environment),
+          ...(entry.manifest.foundryGeneration === undefined
+            ? {}
+            : { foundryGeneration: entry.manifest.foundryGeneration }),
+          ...details,
+        },
+      };
+    }
+    const installed =
+      identity.kind === 'system'
+        ? environment.system.id === identity.id
+          ? { ...environment.system, active: true }
+          : undefined
+        : environment.modules.find((module) => module.id === identity.id);
+    const status: IntegrationStatus = {
+      kind: identity.kind,
+      id: identity.id,
+      adapterVersion: 'unavailable',
+      ...details,
+      state: 'incompatible',
+      operations: [],
+      reason: generation === undefined
+        ? `Cannot select an integration variant from unknown Foundry version ${JSON.stringify(environment.foundryVersion)}`
+        : `No integration variant for Foundry generation ${generation}; available generations: ${availableGenerations.join(', ') || 'none'}`,
+    };
+    if (!installed) {
+      status.state = 'absent';
+      status.reason = `${identity.kind} ${identity.id} is not selected or installed on this target`;
+    } else {
+      status.installedVersion = installed.version;
+      if (!installed.active) {
+        status.state = 'inactive';
+        status.reason = `${identity.id} is inactive on this target`;
+      }
+    }
+    return { status };
   }
 
   private status(

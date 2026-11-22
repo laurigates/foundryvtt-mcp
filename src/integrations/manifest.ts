@@ -1,5 +1,6 @@
+import type { Dirent } from 'node:fs';
 import { readdir, readFile, realpath } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { IntegrationError, type IntegrationKind } from './types.js';
@@ -31,6 +32,7 @@ export const IntegrationManifestSchema = z
     protocolVersion: z.literal(1),
     kind: z.enum(['system', 'module']),
     id: Identifier,
+    foundryGeneration: z.number().int().min(13).max(Number.MAX_SAFE_INTEGER).optional(),
     adapterVersion: z.string().min(1),
     updatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     entrypoint: RelativeFile,
@@ -76,6 +78,8 @@ export interface IntegrationPackage {
 export interface IntegrationLoadFailure {
   kind: IntegrationKind;
   id: string;
+  /** Folder generation, even when that variant's manifest failed validation. */
+  foundryGeneration?: number;
   adapterVersion: string;
   operations: string[];
   error: IntegrationError;
@@ -112,6 +116,18 @@ async function containedFile(root: string, path: string): Promise<string> {
   return file;
 }
 
+async function containedDirectory(root: string, directory: string): Promise<void> {
+  // Structural directory aliases can turn /14 into /13 or one identity into
+  // another. Keep the same canonical paths enforced by the Python worker.
+  const expected = resolve(await realpath(root), basename(directory));
+  if (await realpath(directory) !== expected) {
+    throw new IntegrationError(
+      'invalid_manifest',
+      `Integration directory escapes or aliases its expected path: ${directory}`,
+    );
+  }
+}
+
 export async function loadIntegrations(
   packageRoot = defaultPackageRoot(),
   options: IntegrationLoadOptions = {},
@@ -123,64 +139,53 @@ export async function loadIntegrations(
     ['modules', 'module'],
   ] as const) {
     const family = resolve(packageRoot, directory);
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = await readdir(family);
+      entries = await readdir(family, { withFileTypes: true });
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
         continue;
       }
       throw error;
     }
-    for (const id of entries.sort()) {
-      if (typeof id !== 'string' || id.startsWith('.') || id === 'README.md') {
+    for (const item of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const id = item.name;
+      if (id.startsWith('.') || (!item.isDirectory() && !item.isSymbolicLink())) {
         continue;
       }
-      const root = resolve(family, id);
-      let manifest: IntegrationManifest | undefined;
-      const names: string[] = [];
+      const identityRoot = resolve(family, id);
+      let variants: Array<{ root: string; foundryGeneration?: number }>;
       try {
-        const familyRoot = await realpath(family);
-        const resolvedRoot = await realpath(root);
-        const relativeRoot = relative(familyRoot, resolvedRoot);
-        if (relativeRoot.startsWith('..') || isAbsolute(relativeRoot)) {
+        Identifier.parse(id);
+        await containedDirectory(packageRoot, family);
+        await containedDirectory(family, identityRoot);
+        const contents = await readdir(identityRoot, { withFileTypes: true });
+        const hasFlatManifest = contents.some((entry) => entry.name === 'manifest.json');
+        const generationFolders = contents
+          .filter(
+            (entry) => /^\d+$/.test(entry.name) && (entry.isDirectory() || entry.isSymbolicLink()),
+          )
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (hasFlatManifest && generationFolders.length > 0) {
           throw new IntegrationError(
-            'invalid_manifest',
-            `Integration directory escapes ${directory}: ${id}`,
+            'ambiguous_layout',
+            `Integration ${kind}:${id} contains both a flat manifest and generation directories`,
           );
         }
-        const data: unknown = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
-        manifest = IntegrationManifestSchema.parse(data);
-        if (manifest.kind !== kind || manifest.id !== id) {
-          throw new IntegrationError(
-            'invalid_manifest',
-            `Folder and manifest identity differ: ${directory}/${id}`,
-          );
-        }
-        await containedFile(root, manifest.entrypoint);
-        await containedFile(root, 'README.md');
-        const bindings = new Map<string, { script: string; probe: string }>();
-        for (const operation of manifest.operations) {
-          const name = toolName(kind, id, operation.id);
-          if (bindings.has(operation.id)) {
-            throw new IntegrationError('duplicate_tool', `Duplicate integration tool: ${name}`);
-          }
-          names.push(name);
-          bindings.set(operation.id, {
-            script: await readFile(await containedFile(root, operation.binding), 'utf8'),
-            probe: await readFile(await containedFile(root, operation.probe), 'utf8'),
-          });
-        }
-        packages.push({ root, manifest, bindings });
+        // No numeric folders retains the original flat contract. A missing flat
+        // manifest remains an error rather than silently ignoring an empty package.
+        variants = generationFolders.length
+          ? generationFolders.map((entry) => ({
+              root: resolve(identityRoot, entry.name),
+              foundryGeneration: Number(entry.name),
+            }))
+          : [{ root: identityRoot }];
       } catch (error) {
-        if (!manifest && error instanceof Error && 'code' in error && error.code === 'ENOTDIR') {
-          continue;
-        }
         failures.push({
           kind,
           id,
-          adapterVersion: manifest?.adapterVersion ?? 'unknown',
-          operations: [...new Set(names)],
+          adapterVersion: 'unknown',
+          operations: [],
           error:
             error instanceof IntegrationError
               ? error
@@ -189,12 +194,77 @@ export async function loadIntegrations(
                   `Cannot load ${directory}/${id}: ${error instanceof Error ? error.message : String(error)}`,
                 ),
         });
+        continue;
+      }
+      for (const { root, foundryGeneration } of variants) {
+        let manifest: IntegrationManifest | undefined;
+        const names: string[] = [];
+        try {
+          if (foundryGeneration !== undefined) {
+            if (
+              !Number.isSafeInteger(foundryGeneration) ||
+              foundryGeneration < 13 ||
+              root !== resolve(identityRoot, String(foundryGeneration))
+            ) {
+              throw new IntegrationError(
+                'invalid_manifest',
+                `Invalid Foundry generation directory: ${root}`,
+              );
+            }
+            await containedDirectory(identityRoot, root);
+          }
+          const data: unknown = JSON.parse(
+            await readFile(await containedFile(root, 'manifest.json'), 'utf8'),
+          );
+          manifest = IntegrationManifestSchema.parse(data);
+          if (
+            manifest.kind !== kind ||
+            manifest.id !== id ||
+            manifest.foundryGeneration !== foundryGeneration
+          ) {
+            throw new IntegrationError(
+              'invalid_manifest',
+              `Folder and manifest identity/generation differ: ${root}`,
+            );
+          }
+          await containedFile(root, manifest.entrypoint);
+          await containedFile(root, 'README.md');
+          const bindings = new Map<string, { script: string; probe: string }>();
+          for (const operation of manifest.operations) {
+            const name = toolName(kind, id, operation.id);
+            if (bindings.has(operation.id)) {
+              throw new IntegrationError('duplicate_tool', `Duplicate integration tool: ${name}`);
+            }
+            names.push(name);
+            bindings.set(operation.id, {
+              script: await readFile(await containedFile(root, operation.binding), 'utf8'),
+              probe: await readFile(await containedFile(root, operation.probe), 'utf8'),
+            });
+          }
+          packages.push({ root, manifest, bindings });
+        } catch (error) {
+          failures.push({
+            kind,
+            id,
+            ...(foundryGeneration === undefined ? {} : { foundryGeneration }),
+            adapterVersion: manifest?.adapterVersion ?? 'unknown',
+            operations: [...new Set(names)],
+            error:
+              error instanceof IntegrationError
+                ? error
+                : new IntegrationError(
+                    'invalid_manifest',
+                    `Cannot load ${root}: ${error instanceof Error ? error.message : String(error)}`,
+                  ),
+          });
+        }
       }
     }
   }
 
-  // Only fully validated packages own names. All owners of a collision are withheld,
-  // rather than letting directory order silently choose an implementation.
+  // Different exact generations cannot activate together in one target. Legacy
+  // packages can, so they overlap every generation. All overlapping owners are
+  // withheld; neither directory order nor a preferred layout chooses a winner.
   const owners = new Map<string, IntegrationPackage[]>();
   for (const entry of packages) {
     for (const operation of entry.manifest.operations) {
@@ -206,10 +276,17 @@ export async function loadIntegrations(
   }
   const conflicts = new Map<IntegrationPackage, string[]>();
   for (const [name, entries] of owners) {
-    if (entries.length < 2) {
-      continue;
-    }
     for (const entry of entries) {
+      const overlaps = entries.some(
+        (other) =>
+          other !== entry &&
+          (entry.manifest.foundryGeneration === undefined ||
+            other.manifest.foundryGeneration === undefined ||
+            entry.manifest.foundryGeneration === other.manifest.foundryGeneration),
+      );
+      if (!overlaps) {
+        continue;
+      }
       const names = conflicts.get(entry) ?? [];
       names.push(name);
       conflicts.set(entry, names);
@@ -219,6 +296,9 @@ export async function loadIntegrations(
     failures.push({
       kind: entry.manifest.kind,
       id: entry.manifest.id,
+      ...(entry.manifest.foundryGeneration === undefined
+        ? {}
+        : { foundryGeneration: entry.manifest.foundryGeneration }),
       adapterVersion: entry.manifest.adapterVersion,
       operations: entry.manifest.operations.map((operation) =>
         toolName(entry.manifest.kind, entry.manifest.id, operation.id),

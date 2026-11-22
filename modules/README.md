@@ -4,12 +4,15 @@ For the list of included modules, adapter/upstream versions, Foundry requirement
 and verification status, see the [module bridge catalog](../docs/bridges/modules.md).
 Installation and API details belong in each package's README.
 
-Each directory preserves the exact Foundry module ID and contains a manifest,
-Python adapter, README, fixed runtime bindings, and tests. Tool names follow
-`module_{id}_{operation}`.
+Each module directory preserves the exact Foundry module ID. Its numeric children,
+such as `modules/<id>/13/` and `modules/<id>/14/`, are independent packages with
+their own manifest, Python adapter, README, fixed runtime bindings and tests.
+The manifest's `foundryGeneration` must match the directory. Tool names follow
+`module_{id}_{operation}` and do not change when a target upgrades Foundry.
 
-The session activates integrations only when the remote module is active and its
-operation probes succeed. Module state, installed versions and adapter instances
+The session selects the exact Foundry generation before activating an integration;
+the remote module must be active and its operation probes must succeed. There is
+no fallback to an older or newer generation. Module state, installed versions and adapter instances
 are independent for each target. A module can work without a local system
 adapter when its own API provides the required behavior.
 
@@ -27,14 +30,23 @@ when nonempty; empty lists leave compatibility to runtime probes and must not be
 presented as tested support. Record actual live verification separately.
 
 The support and maintenance scope starts at **Foundry VTT 13, inclusive**.
-Earlier generations remain outside that scope even if an existing runtime probe
-succeeds; this policy does not add a shared version guard. Each package can have
-narrower requirements, and later generations are not automatically verified.
+Versioned adapters enforce that generation boundary. Generic core operations and
+legacy flat third-party packages retain their existing capability policies.
+Each generation package can have narrower upstream-version/build requirements;
+later generations are not automatically verified.
+
+Copy a complete generation directory from an external adapter repository into
+`modules/<id>/<generation>/` and refresh or reconnect the target. It is discovered
+without editing a registry or provider. See the
+[installation and authoring guide](../docs/guides/writing-integrations.md#install-a-third-party-adapter).
+Packages must contain their own runtime resources; sibling generations are not
+shared dependencies.
 
 ## Upstream source references
 
 Keep the adapter version/update separate from the upstream code used. Select the
-latest official release; if there are no releases, select the latest tag; if
+latest official release compatible with this Foundry generation; if the project
+has no releases, select the latest compatible tag; if
 neither exists, use the default-branch commit and its full hash as the upstream
 version. Record the resolved commit and source inspection date in the package
 README, independently of live verification. An unexamined newer release is a

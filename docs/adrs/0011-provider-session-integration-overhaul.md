@@ -95,27 +95,42 @@ their source target and session generation.
 
 ### 4. Separate `systems/` and `modules/`, shared infrastructure
 
-Both directories contain trusted, locally distributed integration packages:
+Both directories contain trusted, locally distributed integration packages under
+`<upstream-id>/<foundry-generation>/`. Every generation is self-contained:
 
 - `manifest.json`;
 - `adapter.py`;
 - `README.md`;
 - runtime bindings/probes and tests as needed.
 
-The manifest discriminates `kind: system | module`. The integration manager,
+The manifest discriminates `kind: system | module` and declares the integer
+`foundryGeneration` matching its directory. The integration manager,
 protocol, loader, validation, catalog registration, and lifecycle are shared.
-The adapter matching the world's system is selected independently from adapters
-for its active modules.
+The exact observed Foundry generation selects a variant before Python import or
+runtime probing. The world's single system is selected independently from its
+active modules. Targets on different generations can use different variants of
+the same integration at the same time. A missing variant does not fall back.
+
+Versioned packages require Foundry generation 13 or later. Legacy flat packages
+without generation metadata retain their schema-1 compatibility contract, but
+cannot coexist with numeric variants for the same ID. Such a mixed layout is
+rejected as ambiguous. Copying an external complete generation directory is
+sufficient for discovery; no provider/registry table needs editing. Package-local
+helpers and runtime resources must not depend on a sibling generation.
 
 Runtime package validation isolates malformed packages and withholds all
-participants in a name collision. Unrelated valid packages remain available;
+participants in a name collision within overlapping generation scopes. The same
+public operation name across distinct exact generations is allowed. Unrelated valid packages remain available;
 development/package checks can use the loader's strict mode to reject the whole
-load. Errors stay visible in per-target integration status.
+load. A broken unselected variant is recorded without blocking a valid selected
+variant. Status reports the selected and available generations plus variant errors.
 
 Systems own system-specific API and data interpretation. Modules own their own
 public API bindings. The provider owns the execution mechanism and contains no
 per-module dispatch table. Core documents remain generic; system projections are
-declared with the corresponding system package.
+declared with the corresponding generation package. Core projection lookup also
+uses the target's actual Foundry generation; missing or unidentified variants
+leave raw document data instead of borrowing another generation's interpretation.
 
 A missing local system adapter does not disable generic core operations or an
 independent module. Compatibility with a system is distinct from dependence on
@@ -140,7 +155,7 @@ than silently normalized.
 A larger package may generate standalone scripts from a package-local operation
 registry and shared helper factory. Item Piles 0.2 uses this pattern: generated
 manifest, binding and probe files are checked in and verified for drift during
-build/tests. The production loader and protocol are unchanged. A binding still
+build/tests. Generated files use the same fixed-binding protocol as hand-authored packages. A binding still
 contains one fixed operation; JSON arguments cannot select an arbitrary method
 or executable source. A probe constructs the same helper factory without running
 the operation, keeping readiness and permission policy consistent.
@@ -216,9 +231,13 @@ that the remote write failed.
 
 ### 10. Version information describes evidence
 
-Each integration documents its adapter version/update date, upstream reference,
+Each generation package documents its adapter version/update date, upstream reference,
 upstream update date where known, last verification date, capabilities, and actual
 tested combinations. The remote installed version belongs to session status.
+Keep Foundry generation, upstream release and adapter version separate. Select
+the latest upstream release compatible with that generation; a newer-generation
+release must not advance an older directory's source pin. If the project has no
+releases, use a compatible tag; only projects without either use a commit hash.
 
 The adapters remain experimental. Empty tested-version lists mean no live
 compatibility claim. A runtime method probe is not equivalent to a live test of
@@ -226,8 +245,21 @@ all system rules. The initial delivery contained only reads; Item Piles 0.2 adds
 explicit reads and mutations using its inspected 3.3.4 API contract. New
 operations require that version, Foundry generation 13 or 14 and the module's
 active dependencies; mutations additionally require a GM runtime and target
-write opt-in. Its original `get_items` remains capability-based. The two system
-adapters still expose actor-data reads, not the proposed skill-roll APIs.
+write opt-in. Its original `get_items` remains capability-based. System adapters
+0.2 add explicit reads, rule-aware rolls and selected mutations using pinned
+D&D 5e 6.1.1 and PF2e 8.7.1 contracts. New system operations require their inspected
+Foundry 14 build minimum and runtime APIs; mutation and side-effecting roll tools
+also require target write opt-in and document ownership. The detailed system
+adapters reside in `14/`; their `13/` variants preserve only the original raw
+read and explicitly have no inspected Foundry-13 upstream baseline. Item Piles
+has independent `13/` and `14/` packages using the inspected 3.3.4 source. Original
+raw reads retain their input/output/capability contracts inside the selected
+generation. None of these source checks establishes live support.
+
+Operation names remain explicit. [Core/system/module call selection](../guides/core-system-module-calls.md)
+is based on the requested effect, not a global precedence determined by installed
+modules. Bindings call the current runtime objects; unknown wrappers can change
+semantics and are not certified merely by a successful method probe.
 
 ## Alternatives considered
 

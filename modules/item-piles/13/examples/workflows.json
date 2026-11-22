@@ -1,0 +1,844 @@
+{
+  "format": "foundry-mcp-item-piles-recipes/v1",
+  "target_id": "item-piles-13-demo",
+  "notice": "Manual call recipes, not an execution or placeholder-substitution engine. Use a dedicated test scene/actors. Replace IDs and currency abbreviations using real results; repeat reads for every affected actor.",
+  "calls": [
+    {
+      "id": "currency_configuration",
+      "name": "module_item-piles_get_currency_config",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER"
+      },
+      "expect": "Use the returned registered abbreviations and configured system paths; gp/sp below are examples."
+    },
+    {
+      "id": "read_inventory",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER"
+      },
+      "expect": "Read exact embedded item IDs and module quantities."
+    },
+    {
+      "id": "read_balances",
+      "name": "module_item-piles_get_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "get_all": true,
+        "secondary": true
+      },
+      "expect": "Read both zero and nonzero configured balances, including secondaries."
+    },
+    {
+      "id": "item_categories",
+      "name": "module_item-piles_get_item_categories",
+      "arguments": {
+        "target_id": "item-piles-13-demo"
+      },
+      "expect": "Read localized categories for the active system."
+    },
+    {
+      "id": "inspect_template",
+      "name": "module_item-piles_inspect_item",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "item_uuid": "Item.TEMPLATE_POTION",
+        "actor_uuid": "Actor.PLAYER"
+      },
+      "expect": "Inspect quantity, cost, stacking and invalid-filter reason."
+    },
+    {
+      "id": "create_chest",
+      "name": "module_item-piles_create_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "scene_uuid": "Scene.DEMO",
+        "name": "MCP Treasure Chest",
+        "position": {
+          "x": 800,
+          "y": 600
+        },
+        "settings": {
+          "type": "container",
+          "closed": false,
+          "locked": false,
+          "deleteWhenEmpty": false
+        }
+      },
+      "expect": "Save result.actor_uuid as CHEST_EFFECTIVE and result.token_uuid as CHEST. base_actor_uuid is not the unlinked token inventory."
+    },
+    {
+      "id": "fill_chest",
+      "name": "module_item-piles_add_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE",
+        "items": [
+          {
+            "item_uuid": "Item.TEMPLATE_POTION",
+            "quantity": 4
+          }
+        ],
+        "remove_existing_items": false
+      },
+      "expect": "Four units are added; inspect the destination inventory for its actual embedded item ID."
+    },
+    {
+      "id": "read_chest",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE"
+      },
+      "expect": "Save the destination potion ID as CHEST_POTION_ID; added items can merge with existing stacks."
+    },
+    {
+      "id": "inspect_chest",
+      "name": "module_item-piles_get_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE"
+      },
+      "expect": "Check container type, flags and inventory-empty state."
+    },
+    {
+      "id": "lock_chest",
+      "name": "module_item-piles_set_container_state",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE",
+        "action": "lock"
+      },
+      "expect": "Verify closed=true and locked=true."
+    },
+    {
+      "id": "open_chest",
+      "name": "module_item-piles_set_container_state",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE",
+        "action": "open"
+      },
+      "expect": "Verify closed=false and locked=false."
+    },
+    {
+      "id": "take_potion",
+      "name": "module_item-piles_transfer_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.CHEST_EFFECTIVE",
+        "target_uuid": "Actor.PLAYER",
+        "items": [
+          {
+            "item_id": "CHEST_POTION_ID",
+            "quantity": 1
+          }
+        ],
+        "interaction_id": "demo-chest-transfer"
+      },
+      "expect": "One unit moves. Read both actors; interaction_id does not deduplicate."
+    },
+    {
+      "id": "remove_test_item",
+      "name": "module_item-piles_remove_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.CHEST_EFFECTIVE",
+        "items": [
+          {
+            "item_id": "CHEST_POTION_ID",
+            "quantity": 1
+          }
+        ]
+      },
+      "expect": "Remove an explicitly selected test unit; inspect the final quantity."
+    },
+    {
+      "id": "transfer_remaining_items",
+      "name": "module_item-piles_transfer_all_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.CHEST_EFFECTIVE",
+        "target_uuid": "Actor.PLAYER"
+      },
+      "expect": "Transfer eligible non-currency items. Currency is handled separately."
+    },
+    {
+      "id": "create_merchant",
+      "name": "module_item-piles_create_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "scene_uuid": "Scene.DEMO",
+        "name": "MCP Merchant",
+        "position": {
+          "x": 1100,
+          "y": 600
+        },
+        "settings": {
+          "type": "merchant",
+          "deleteWhenEmpty": false,
+          "buyPriceModifier": 1,
+          "sellPriceModifier": 0.5,
+          "infiniteQuantity": false,
+          "infiniteCurrencies": true
+        }
+      },
+      "expect": "Save effective actor_uuid and token_uuid. Configure prices/tables in Item Piles UI where needed."
+    },
+    {
+      "id": "stock_merchant",
+      "name": "module_item-piles_add_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "items": [
+          {
+            "item_uuid": "Item.TEMPLATE_POTION",
+            "quantity": 10
+          }
+        ],
+        "remove_existing_items": false
+      },
+      "expect": "Seed finite stock, then read the merchant to identify MERCHANT_POTION_ID."
+    },
+    {
+      "id": "read_merchant",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.MERCHANT_EFFECTIVE"
+      },
+      "expect": "Save the actual potion UUID as MERCHANT_POTION_UUID and its ID as MERCHANT_POTION_ID."
+    },
+    {
+      "id": "fund_player",
+      "name": "module_item-piles_add_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 20
+          }
+        ],
+        "interaction_id": "demo-fund-player"
+      },
+      "expect": "Add a known test balance using a denomination from currency_configuration."
+    },
+    {
+      "id": "merchant_modifiers",
+      "name": "module_item-piles_get_merchant_modifiers",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "merchant_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "actor_uuid": "Actor.PLAYER",
+        "absolute": false
+      },
+      "expect": "Read effective merchant multipliers for this customer."
+    },
+    {
+      "id": "set_customer_modifiers",
+      "name": "module_item-piles_update_merchant_modifiers",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "merchant_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "modifiers": [
+          {
+            "actor_uuid": "Actor.PLAYER",
+            "buy_price_modifier": 0.9,
+            "sell_price_modifier": 0.5,
+            "relative": false,
+            "override": true
+          }
+        ]
+      },
+      "expect": "Verify the observed Actor-specific modifiers."
+    },
+    {
+      "id": "quote_purchase",
+      "name": "module_item-piles_get_item_prices",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "item_uuid": "Actor.MERCHANT_EFFECTIVE.Item.MERCHANT_POTION_ID",
+        "seller_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "buyer_uuid": "Actor.PLAYER",
+        "quantity": 1
+      },
+      "expect": "Inspect payment_index, requested_units, units_per_purchase and affordability before trading."
+    },
+    {
+      "id": "buy_potion",
+      "name": "module_item-piles_trade_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "seller_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "buyer_uuid": "Actor.PLAYER",
+        "item_id": "MERCHANT_POTION_ID",
+        "quantity": 1,
+        "payment_index": 0,
+        "interaction_id": "demo-purchase"
+      },
+      "expect": "Execute one purchase line; quantity counts purchases. Read both inventories and both currency balances afterwards."
+    },
+    {
+      "id": "merchant_balances",
+      "name": "module_item-piles_get_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "get_all": true,
+        "secondary": true
+      },
+      "expect": "Inspect observed merchant balances; infiniteCurrencies changes expected stock/payment behavior."
+    },
+    {
+      "id": "refresh_merchant",
+      "name": "module_item-piles_refresh_merchant_inventory",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "merchant_uuid": "Actor.MERCHANT_EFFECTIVE",
+        "remove_existing_items": false
+      },
+      "expect": "Populate from tables configured in the merchant UI, retaining existing stock. This example is optional if no tables are configured."
+    },
+    {
+      "id": "create_vault",
+      "name": "module_item-piles_create_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "scene_uuid": "Scene.DEMO",
+        "name": "MCP Vault",
+        "position": {
+          "x": 1400,
+          "y": 600
+        },
+        "settings": {
+          "type": "vault",
+          "cols": 6,
+          "rows": 4,
+          "deleteWhenEmpty": false,
+          "logVaultActions": true,
+          "restrictVaultAccess": true,
+          "vaultAccess": [
+            {
+              "uuid": "Actor.PLAYER",
+              "view": true,
+              "organize": false,
+              "items": {
+                "withdraw": true,
+                "deposit": true
+              },
+              "currencies": {
+                "withdraw": true,
+                "deposit": true
+              }
+            }
+          ]
+        }
+      },
+      "expect": "Save effective actor_uuid/token_uuid. Access flags configure the player UI; MCP writes still require a GM."
+    },
+    {
+      "id": "vault_grid",
+      "name": "module_item-piles_get_vault_grid",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.VAULT_EFFECTIVE"
+      },
+      "expect": "Read actual free cells, occupied placements and the separate upstream free-space estimate."
+    },
+    {
+      "id": "vault_fit_one",
+      "name": "module_item-piles_check_vault_fit",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.VAULT_EFFECTIVE",
+        "item_uuid": "Actor.PLAYER.Item.PLAYER_POTION_ID"
+      },
+      "expect": "Check whether one item can merge or occupy a new position; space is not reserved."
+    },
+    {
+      "id": "vault_fit_batch",
+      "name": "module_item-piles_plan_vault_fit",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.VAULT_EFFECTIVE",
+        "items": [
+          {
+            "item_uuid": "Actor.PLAYER.Item.PLAYER_POTION_ID",
+            "quantity": 2
+          }
+        ]
+      },
+      "expect": "Preview only; nonstackable quantities expand to separate placements."
+    },
+    {
+      "id": "deposit_items",
+      "name": "module_item-piles_transfer_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.PLAYER",
+        "target_uuid": "Actor.VAULT_EFFECTIVE",
+        "items": [
+          {
+            "item_id": "PLAYER_POTION_ID",
+            "quantity": 2
+          }
+        ]
+      },
+      "expect": "Move two units using Item Piles' own inventory and vault behavior."
+    },
+    {
+      "id": "read_vault_inventory",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.VAULT_EFFECTIVE"
+      },
+      "expect": "Find the actual destination ID VAULT_POTION_ID before withdrawal."
+    },
+    {
+      "id": "withdraw_item",
+      "name": "module_item-piles_transfer_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.VAULT_EFFECTIVE",
+        "target_uuid": "Actor.PLAYER",
+        "items": [
+          {
+            "item_id": "VAULT_POTION_ID",
+            "quantity": 1
+          }
+        ]
+      },
+      "expect": "Withdraw one unit, then re-read both inventories and the vault grid."
+    },
+    {
+      "id": "create_loot",
+      "name": "module_item-piles_create_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "scene_uuid": "Scene.DEMO",
+        "name": "MCP Shared Loot",
+        "position": {
+          "x": 800,
+          "y": 900
+        },
+        "settings": {
+          "type": "pile",
+          "deleteWhenEmpty": false,
+          "shareItemsEnabled": true,
+          "shareCurrenciesEnabled": true,
+          "splitAllEnabled": true
+        }
+      },
+      "expect": "Save effective actor_uuid/token_uuid. Explicit sharing flags prevent the inspected split-currency defect."
+    },
+    {
+      "id": "roll_loot",
+      "name": "module_item-piles_roll_item_table",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "table_uuid": "RollTable.LOOT",
+        "actor_uuid": "Actor.LOOT_EFFECTIVE",
+        "rolls": 2,
+        "reset_table": false,
+        "normalize_table": false,
+        "display_chat": false,
+        "remove_existing_items": false
+      },
+      "expect": "Item deltas confirm the item response only. Text results may add currency; read the pile balances afterwards."
+    },
+    {
+      "id": "read_loot",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.LOOT_EFFECTIVE"
+      },
+      "expect": "Inspect the rolled loot before splitting."
+    },
+    {
+      "id": "loot_balances",
+      "name": "module_item-piles_get_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.LOOT_EFFECTIVE",
+        "get_all": true,
+        "secondary": true
+      },
+      "expect": "Inspect any currency side effects from table results."
+    },
+    {
+      "id": "configure_sharing",
+      "name": "module_item-piles_update_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.LOOT_EFFECTIVE",
+        "settings": {
+          "shareItemsEnabled": true,
+          "shareCurrenciesEnabled": true,
+          "splitAllEnabled": true
+        }
+      },
+      "expect": "Verify both item sharing and currency sharing before invoking split."
+    },
+    {
+      "id": "split_loot",
+      "name": "module_item-piles_split_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.LOOT_EFFECTIVE",
+        "recipient_uuids": [
+          "Actor.PLAYER",
+          "Actor.PLAYER_TWO"
+        ],
+        "instigator_uuid": "Actor.PLAYER"
+      },
+      "expect": "Verify deltas for exactly both recipients. Rounding/sharing may leave a remainder; read all three actors."
+    },
+    {
+      "id": "calculate_money",
+      "name": "module_item-piles_calculate_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 5
+          },
+          {
+            "abbreviation": "sp",
+            "quantity": 5
+          }
+        ],
+        "other_currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 1
+          }
+        ],
+        "subtract": true
+      },
+      "expect": "Compute a primary-currency amount using the configured exchange rates. No state changes."
+    },
+    {
+      "id": "quote_payment",
+      "name": "module_item-piles_get_payment_data",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 3
+          }
+        ],
+        "actor_uuid": "Actor.PLAYER",
+        "quantity": 1
+      },
+      "expect": "Inspect canBuy and change for a primary-currency payment snapshot."
+    },
+    {
+      "id": "set_test_balance",
+      "name": "module_item-piles_update_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 20
+          }
+        ]
+      },
+      "expect": "Set an attribute-backed test balance. Item-backed denominations are rejected by this tool."
+    },
+    {
+      "id": "remove_money",
+      "name": "module_item-piles_remove_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 1
+          }
+        ],
+        "change": true
+      },
+      "expect": "Remove a primary-currency amount; read the observed balance."
+    },
+    {
+      "id": "transfer_money",
+      "name": "module_item-piles_transfer_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.PLAYER",
+        "target_uuid": "Actor.VAULT_EFFECTIVE",
+        "currencies": [
+          {
+            "abbreviation": "gp",
+            "quantity": 3
+          }
+        ],
+        "change": true,
+        "interaction_id": "demo-vault-money"
+      },
+      "expect": "Transfer primary currency; read both balances after the operation."
+    },
+    {
+      "id": "transfer_all_money",
+      "name": "module_item-piles_transfer_all_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.VAULT_EFFECTIVE",
+        "target_uuid": "Actor.PLAYER"
+      },
+      "expect": "Transfer all configured currencies, including secondaries, through the upstream all-currency method."
+    },
+    {
+      "id": "set_attribute",
+      "name": "module_item-piles_set_attributes",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "attributes": {
+          "system.REPLACE_NUMERIC_ATTRIBUTE": 10
+        }
+      },
+      "expect": "Replace the path with a valid numeric system field. Sets the explicit amount."
+    },
+    {
+      "id": "add_attribute",
+      "name": "module_item-piles_add_attributes",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "attributes": {
+          "system.REPLACE_NUMERIC_ATTRIBUTE": 2
+        }
+      },
+      "expect": "Add a positive amount to the chosen numeric system field."
+    },
+    {
+      "id": "remove_attribute",
+      "name": "module_item-piles_remove_attributes",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER",
+        "attributes": {
+          "system.REPLACE_NUMERIC_ATTRIBUTE": 1
+        }
+      },
+      "expect": "Remove a positive amount without exceeding the observed source balance."
+    },
+    {
+      "id": "transfer_attribute",
+      "name": "module_item-piles_transfer_attributes",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.PLAYER",
+        "target_uuid": "Actor.PLAYER_TWO",
+        "attributes": {
+          "system.REPLACE_NUMERIC_ATTRIBUTE": 1
+        }
+      },
+      "expect": "Transfer an explicit safe system attribute between distinct actors."
+    },
+    {
+      "id": "transfer_attribute_currencies",
+      "name": "module_item-piles_transfer_all_attributes",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.PLAYER_TWO",
+        "target_uuid": "Actor.PLAYER"
+      },
+      "expect": "Transfer configured attribute-currency balances that exist on both actors; uses the public transferAttributes workaround."
+    },
+    {
+      "id": "transfer_everything",
+      "name": "module_item-piles_transfer_everything",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "source_uuid": "Actor.CHEST_EFFECTIVE",
+        "target_uuid": "Actor.PLAYER"
+      },
+      "expect": "Transfer all eligible items/currencies. Upstream may delete an emptied source token according to its settings."
+    },
+    {
+      "id": "combine_sources",
+      "name": "module_item-piles_combine_piles",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "target_uuid": "Actor.CHEST_EFFECTIVE",
+        "source_uuids": [
+          "Actor.SOURCE_PILE_A",
+          "Actor.SOURCE_PILE_B"
+        ]
+      },
+      "expect": "Combine enabled distinct source piles. Residual eligible balances make the outcome uncertain; no atomic rollback is promised."
+    },
+    {
+      "id": "convert_existing_token",
+      "name": "module_item-piles_convert_tokens",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "token_uuids": [
+          "Scene.DEMO.Token.EXISTING"
+        ],
+        "settings": {
+          "type": "pile",
+          "deleteWhenEmpty": false
+        }
+      },
+      "expect": "Enable Item Piles on an existing token; linked tokens also affect their shared Actor."
+    },
+    {
+      "id": "revert_existing_token",
+      "name": "module_item-piles_revert_tokens",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "token_uuids": [
+          "Scene.DEMO.Token.EXISTING"
+        ]
+      },
+      "expect": "Disable Item Piles while retaining Actor and inventory; linked Actor effects are verified."
+    },
+    {
+      "id": "delete_empty_chest",
+      "name": "module_item-piles_delete_pile",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "token_uuid": "Scene.DEMO.Token.CHEST"
+      },
+      "expect": "Remove only the selected pile token. The base Actor is not deleted."
+    },
+    {
+      "id": "read_second_player",
+      "name": "module_item-piles_get_items",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER_TWO"
+      },
+      "expect": "Inspect the second loot recipient after splitting."
+    },
+    {
+      "id": "second_player_balances",
+      "name": "module_item-piles_get_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.PLAYER_TWO",
+        "get_all": true,
+        "secondary": true
+      },
+      "expect": "Inspect the second loot recipient's currency balances."
+    },
+    {
+      "id": "vault_balances",
+      "name": "module_item-piles_get_currencies",
+      "arguments": {
+        "target_id": "item-piles-13-demo",
+        "actor_uuid": "Actor.VAULT_EFFECTIVE",
+        "get_all": true,
+        "secondary": true
+      },
+      "expect": "Inspect monetary vault effects separately from inventory and grid results."
+    }
+  ],
+  "workflows": [
+    {
+      "id": "chest",
+      "title": "Create, fill and use a treasure chest",
+      "steps": [
+        "currency_configuration",
+        "inspect_template",
+        "create_chest",
+        "fill_chest",
+        "read_chest",
+        "inspect_chest",
+        "lock_chest",
+        "open_chest",
+        "take_potion",
+        "read_chest",
+        "read_inventory"
+      ]
+    },
+    {
+      "id": "merchant",
+      "title": "Prepare a merchant and buy one item line",
+      "steps": [
+        "create_merchant",
+        "stock_merchant",
+        "read_merchant",
+        "fund_player",
+        "read_balances",
+        "merchant_modifiers",
+        "set_customer_modifiers",
+        "quote_purchase",
+        "buy_potion",
+        "read_merchant",
+        "read_inventory",
+        "read_balances",
+        "merchant_balances"
+      ]
+    },
+    {
+      "id": "vault",
+      "title": "Plan, deposit and withdraw vault inventory",
+      "steps": [
+        "create_vault",
+        "vault_grid",
+        "vault_fit_one",
+        "vault_fit_batch",
+        "deposit_items",
+        "read_vault_inventory",
+        "vault_grid",
+        "withdraw_item",
+        "read_vault_inventory",
+        "read_inventory",
+        "vault_grid"
+      ]
+    },
+    {
+      "id": "loot",
+      "title": "Roll and split shared loot",
+      "steps": [
+        "create_loot",
+        "roll_loot",
+        "read_loot",
+        "loot_balances",
+        "configure_sharing",
+        "split_loot",
+        "read_loot",
+        "loot_balances",
+        "read_inventory",
+        "read_balances",
+        "read_second_player",
+        "second_player_balances"
+      ]
+    },
+    {
+      "id": "maintenance",
+      "title": "Currency, combining and token lifecycle",
+      "steps": [
+        "currency_configuration",
+        "calculate_money",
+        "quote_payment",
+        "transfer_money",
+        "read_balances",
+        "vault_balances",
+        "vault_grid",
+        "combine_sources",
+        "read_chest",
+        "convert_existing_token",
+        "revert_existing_token",
+        "delete_empty_chest"
+      ]
+    }
+  ]
+}

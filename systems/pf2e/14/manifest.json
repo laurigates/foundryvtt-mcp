@@ -1,0 +1,2179 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": 1,
+  "kind": "system",
+  "foundryGeneration": 14,
+  "id": "pf2e",
+  "adapterVersion": "0.2.0",
+  "updatedAt": "2026-11-22",
+  "entrypoint": "adapter.py",
+  "status": "experimental",
+  "upstream": {
+    "repository": "https://github.com/foundryvtt/pf2e",
+    "reference": "pf2e-8.7.1@397f125aea87e6d6fa36e878c9c07d0e672826cf",
+    "updatedAt": "2026-11-17",
+    "verifiedAt": null
+  },
+  "compatibility": {
+    "foundryVersions": [],
+    "integrationVersions": [],
+    "tested": []
+  },
+  "operations": [
+    {
+      "id": "add_currency",
+      "description": "Add positive PF2e pp/gp/sp/cp amounts through inventory.addCurrency and verify the copper-value change. Item currency is managed by PF2e. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "coins": {
+            "type": "object",
+            "properties": {
+              "pp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "gp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [],
+            "additionalProperties": false,
+            "minProperties": 1
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "coins"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "denominations": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "copper_value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "denominations",
+          "copper_value"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/add_currency.js",
+      "probe": "probes/add_currency.js",
+      "readOnly": false
+    },
+    {
+      "id": "decrease_condition",
+      "description": "Decrease one valued PF2e condition step or remove an explicit condition through the system API. Verifies the observed remaining condition. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "condition_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "force_remove": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "condition_slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "temporary": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type",
+                "slug",
+                "value",
+                "active",
+                "locked",
+                "temporary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "conditions"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/decrease_condition.js",
+      "probe": "probes/decrease_condition.js",
+      "readOnly": false
+    },
+    {
+      "id": "get_actor_data",
+      "description": "Read an Actor document and its unmodified pf2e system data. Does not calculate game rules or roll dice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "description": "Actor UUID in the selected target world."
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "system": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "name",
+          "type",
+          "system"
+        ],
+        "additionalProperties": true
+      },
+      "binding": "get_actor_data.js",
+      "probe": "probe.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_actor_summary",
+      "description": "Read PF2e prepared Actor level, abilities, HP, armor class, traits, movement and resources. Does not recalculate rules outside PF2e.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "uuid",
+              "name",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "level": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "abilities": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "hit_points": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "armor_class": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "movement": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "resources": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "actor",
+          "level",
+          "abilities",
+          "hit_points",
+          "armor_class",
+          "traits",
+          "movement",
+          "resources",
+          "statuses"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_actor_summary.js",
+      "probe": "probes/get_actor_summary.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_conditions",
+      "description": "Read PF2e conditions including value, active/overridden state, locked grants and temporary conditions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "temporary": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type",
+                "slug",
+                "value",
+                "active",
+                "locked",
+                "temporary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "conditions"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_conditions.js",
+      "probe": "probes/get_conditions.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_currency",
+      "description": "Read PF2e inventory.currency denomination amounts and system-computed copper value.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "denominations": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "copper_value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "denominations",
+          "copper_value"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_currency.js",
+      "probe": "probes/get_currency.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_inventory",
+      "description": "Read PF2e physical inventory and system-computed bulk. Unidentified item names and values are hidden from non-GMs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "identified": {
+                  "type": "boolean"
+                },
+                "container_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "equipped": {
+                  "type": "boolean"
+                },
+                "invested": {
+                  "type": "boolean"
+                },
+                "bulk_light_units": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "asset_value": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type",
+                "quantity",
+                "identified",
+                "container_id",
+                "equipped",
+                "invested",
+                "bulk_light_units",
+                "asset_value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "bulk": {
+            "type": "object",
+            "properties": {
+              "light_units": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "encumbered_after": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "max": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "encumbered": {
+                "type": "boolean"
+              },
+              "over_max": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "light_units",
+              "encumbered_after",
+              "max",
+              "encumbered",
+              "over_max"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "items",
+          "bulk"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_inventory.js",
+      "probe": "probes/get_inventory.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_resource",
+      "description": "Read an existing numeric PF2e resource by exact slug, such as focus or hero-points.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "resource_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "resource_slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "slug",
+              "label",
+              "value",
+              "max"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "resource"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_resource.js",
+      "probe": "probes/get_resource.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_spellcasting",
+      "description": "Read PF2e spellcasting entries, prepared slot data and associated spells. Does not cast spells or consume slots.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "tradition": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attribute": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "statistic": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "attribute": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "rank": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "proficient": {
+                          "type": "boolean"
+                        },
+                        "modifier": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "dc": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "check_type": {
+                          "type": "string"
+                        },
+                        "breakdown": {
+                          "type": "string"
+                        },
+                        "dc_breakdown": {
+                          "type": "string"
+                        },
+                        "domains": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "label",
+                        "attribute",
+                        "rank",
+                        "proficient",
+                        "modifier",
+                        "dc",
+                        "check_type",
+                        "breakdown",
+                        "dc_breakdown",
+                        "domains"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "slots": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "spells": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "uuid": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "rank": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "location": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "uuid",
+                      "name",
+                      "type",
+                      "rank",
+                      "location"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "category",
+                "tradition",
+                "attribute",
+                "statistic",
+                "slots",
+                "spells"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_spellcasting.js",
+      "probe": "probes/get_spellcasting.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_statistic",
+      "description": "Read a PF2e statistic by its exact slug, including lore and system-prepared custom statistics.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "statistic_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "statistic_slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "statistic": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "attribute": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rank": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "proficient": {
+                "type": "boolean"
+              },
+              "modifier": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "dc": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "check_type": {
+                "type": "string"
+              },
+              "breakdown": {
+                "type": "string"
+              },
+              "dc_breakdown": {
+                "type": "string"
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "slug",
+              "label",
+              "attribute",
+              "rank",
+              "proficient",
+              "modifier",
+              "dc",
+              "check_type",
+              "breakdown",
+              "dc_breakdown",
+              "domains"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "statistic"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_statistic.js",
+      "probe": "probes/get_statistic.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_statistics",
+      "description": "List PF2e prepared skills, lore, saves and perception with modifiers and DCs; contextual roll results may differ.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "attribute": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rank": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "proficient": {
+                  "type": "boolean"
+                },
+                "modifier": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "dc": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "check_type": {
+                  "type": "string"
+                },
+                "breakdown": {
+                  "type": "string"
+                },
+                "dc_breakdown": {
+                  "type": "string"
+                },
+                "domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "slug",
+                "label",
+                "attribute",
+                "rank",
+                "proficient",
+                "modifier",
+                "dc",
+                "check_type",
+                "breakdown",
+                "dc_breakdown",
+                "domains"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "statistics"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_statistics.js",
+      "probe": "probes/get_statistics.js",
+      "readOnly": true
+    },
+    {
+      "id": "get_strikes",
+      "description": "List prepared PF2e strikes and MAP variants. Re-read before rolling; index plus exact item UUID protects against reordered actions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "strikes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "label": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "item_uuid": {
+                  "type": "string"
+                },
+                "ready": {
+                  "type": "boolean"
+                },
+                "visible": {
+                  "type": "boolean"
+                },
+                "modifier": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "index",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "alternative_usages": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "index",
+                "label",
+                "slug",
+                "item_uuid",
+                "ready",
+                "visible",
+                "modifier",
+                "variants",
+                "alternative_usages"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "strikes"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/get_strikes.js",
+      "probe": "probes/get_strikes.js",
+      "readOnly": true
+    },
+    {
+      "id": "increase_condition",
+      "description": "Increase a valued PF2e condition using the system condition API and verify the resulting value. Rejects locked or temporary conditions. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "condition_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 1
+          },
+          "maximum": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "condition_slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "temporary": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type",
+                "slug",
+                "value",
+                "active",
+                "locked",
+                "temporary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "conditions"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/increase_condition.js",
+      "probe": "probes/increase_condition.js",
+      "readOnly": false
+    },
+    {
+      "id": "recharge",
+      "description": "Recharge PF2e frequencies/resources for turn, round or daily preparation via Actor.recharge({commit:true}). Daily preparation can restore spell slots; this is not a full rest or healing operation. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "turn",
+              "round",
+              "day"
+            ]
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "duration"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "object",
+            "properties": {
+              "frequencies": {
+                "type": "boolean"
+              },
+              "spell_slots": {
+                "type": "boolean"
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "frequencies",
+              "spell_slots",
+              "resources"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "duration",
+          "affected"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/recharge.js",
+      "probe": "probes/recharge.js",
+      "readOnly": false
+    },
+    {
+      "id": "remove_currency",
+      "description": "Remove PF2e currency through inventory.removeCurrency, optionally making change. Checks funds and verifies the resulting total; compound updates are not atomic. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "coins": {
+            "type": "object",
+            "properties": {
+              "pp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "gp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [],
+            "additionalProperties": false,
+            "minProperties": 1
+          },
+          "by_value": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "coins"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "denominations": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "copper_value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "denominations",
+          "copper_value"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/remove_currency.js",
+      "probe": "probes/remove_currency.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_perception",
+      "description": "Roll the prepared PF2e perception Statistic without opening its modifier dialog. This does not update encounter initiative. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "message_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ],
+            "default": "public"
+          },
+          "create_message": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "natural": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "degree_of_success": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "formula",
+          "natural",
+          "degree_of_success",
+          "message_uuid",
+          "message_mode",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/roll_perception.js",
+      "probe": "probes/roll_perception.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_save",
+      "description": "Roll fortitude, reflex or will with the live PF2e Statistic API. A supplied DC is numeric; contextual spell/origin options are not inferred. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "save": {
+            "type": "string",
+            "enum": [
+              "fortitude",
+              "reflex",
+              "will"
+            ]
+          },
+          "token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "message_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ],
+            "default": "public"
+          },
+          "create_message": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "save"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "natural": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "degree_of_success": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "formula",
+          "natural",
+          "degree_of_success",
+          "message_uuid",
+          "message_mode",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/roll_save.js",
+      "probe": "probes/roll_save.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_skill",
+      "description": "Roll a prepared PF2e skill or lore through its live Statistic API, including predicates, stacking and degree of success. May publish chat and trigger rule hooks. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "skill": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "message_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ],
+            "default": "public"
+          },
+          "create_message": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "skill"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "natural": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "degree_of_success": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "formula",
+          "natural",
+          "degree_of_success",
+          "message_uuid",
+          "message_mode",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/roll_skill.js",
+      "probe": "probes/roll_skill.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_statistic",
+      "description": "Roll an exact existing PF2e statistic slug through its runtime method; no caller formula, arbitrary method or modifiers are evaluated. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "statistic_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "dc": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "message_mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "gm",
+              "blind",
+              "self"
+            ],
+            "default": "public"
+          },
+          "create_message": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "statistic_slug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "natural": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "degree_of_success": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "formula",
+          "natural",
+          "degree_of_success",
+          "message_uuid",
+          "message_mode",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/roll_statistic.js",
+      "probe": "probes/roll_statistic.js",
+      "readOnly": false
+    },
+    {
+      "id": "roll_strike",
+      "description": "Roll one prepared PF2e strike/MAP variant against an explicit rendered target token. Requires disabled check dialogs for the paired user. May consume ammunition and consumable weapons; does not apply damage. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "target_token_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "strike_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expected_item_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "attack_number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "default": 1
+          },
+          "create_message": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "token_uuid",
+          "target_token_uuid",
+          "strike_index",
+          "expected_item_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "natural": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "degree_of_success": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "message_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "formula",
+          "natural",
+          "degree_of_success",
+          "message_uuid",
+          "message_mode",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/roll_strike.js",
+      "probe": "probes/roll_strike.js",
+      "readOnly": false
+    },
+    {
+      "id": "set_condition",
+      "description": "Set an explicit PF2e condition presence through Actor.toggleCondition({active}); never blindly toggle. Persistent damage editors and locked/temporary grants are excluded. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "condition_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "condition_slug",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "temporary": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "name",
+                "type",
+                "slug",
+                "value",
+                "active",
+                "locked",
+                "temporary"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "conditions"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/set_condition.js",
+      "probe": "probes/set_condition.js",
+      "readOnly": false
+    },
+    {
+      "id": "set_resource",
+      "description": "Set an existing PF2e numeric resource through updateResource; validates bounds and checks the observed value. Investiture is read-only. WRITE: requires the selected target's writeEnabled=true and OWNER permission on the Actor (or a GM runtime). An outcome_unknown result must not be retried automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\S+$"
+          },
+          "resource_slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "resource_slug",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actor_uuid": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "slug",
+              "label",
+              "value",
+              "max"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actor_uuid",
+          "resource"
+        ],
+        "additionalProperties": false
+      },
+      "binding": "bindings/set_resource.js",
+      "probe": "probes/set_resource.js",
+      "readOnly": false
+    }
+  ]
+}

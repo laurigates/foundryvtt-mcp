@@ -93,24 +93,36 @@ native acknowledgement data is also an unknown outcome, not success.
 |---|---|
 | `list_targets` | List configured targets and statuses even when remote worlds are offline |
 | `get_target_status` | Inspect one target's identity, capabilities and integration failures |
-| `list_systems` / `list_modules` | Inspect packaged integrations and their per-target readiness |
+| `list_systems` / `list_modules` | Inspect packaged integrations, selected/available Foundry generations, variant errors and per-target readiness |
 | `reconnect_target` | Explicitly reconnect just the selected target |
 
-Initial experimental integration examples include `system_dnd5e_get_actor_data`, `system_pf2e_get_actor_data` and `module_item-piles_get_items`. Names preserve exact upstream IDs. These require the applicable runtime API and the target's `runtime.execute` capability; a manifest alone does not make a tool usable. The initial adapters are not claimed live-verified. See [Writing integrations](writing-integrations.md).
+Dynamic names preserve exact upstream IDs through `system_{id}_{operation}` and
+`module_{id}_{operation}`. Each operation requires its applicable runtime API and
+the target's `runtime.execute` capability; a manifest alone does not make a tool
+usable. See the [system bridge catalog](../bridges/systems.md) and
+[module bridge catalog](../bridges/modules.md) for package versions, source pins,
+Foundry requirements and links to operation references.
 
-The system adapters remain actor-data reads. Item Piles additionally exposes
-explicit inventory, currency, transfer, merchant, pile and vault operations.
-Each has its own input/output contract and read/write classification; there is
-no generic API-method or JavaScript argument. Mutations require the selected
-target's write opt-in and a GM runtime, including when Item Piles performs its
-own privileged callbacks. Read operations check document access.
+Packages use `systems/<id>/<generation>/` and `modules/<id>/<generation>/`.
+Only the exact Foundry generation is selected on each target, before Python
+imports or runtime probes. Missing generations do not fall back. New adapters
+are discovered by copying a complete directory; no registry edit is required.
 
-The earlier `get_items` read keeps its capability-based availability. New Item
-Piles operations are restricted to the inspected `3.3.4` API on Foundry `13` or
-`14`, with active `socketlib` and `lib-wrapper`. An unknown/different version is
-not treated as compatible. These are readiness gates, not live-tested claims;
-the package remains experimental. See its
-[operation reference](../../modules/item-piles/README.md).
+The system adapters expose explicit data reads, rule-aware rolls and selected
+mutations. Module adapters expose their own domain workflows. Every operation has
+its own input/output contract and read/write classification; callers cannot supply
+a generic API-method name or JavaScript. Rolls with chat or other side effects
+require target write opt-in, as do document and resource changes. Runtime document
+ownership and any stronger package-specific permission still apply.
+
+Original raw reads preserve their existing capability-based contracts inside
+their selected generation. New
+operations enforce the inspected upstream version and narrower Foundry/API gates.
+An unknown/different version is not treated as compatible. These are readiness
+checks, not live-tested claims; packages remain experimental. The
+[call selection guide](core-system-module-calls.md) explains why a core document
+patch, a system action and a module workflow are distinct, without a global
+priority or automatic mutation fallback.
 
 Malformed packages are reported in target integration status without suppressing
 unrelated valid packages. Integration structured results retain their provenance

@@ -19,8 +19,8 @@ src/index.ts                     MCP stdio entry point, startup and shutdown
             ├─ src/providers/    Core ports, transport, world cache and execution
             ├─ src/diagnostics/  Diagnostics scoped to the selected provider
             └─ src/integrations/ Manifest validation, probes, Python worker
-                 ├─ systems/     Game-system adapters and projections
-                 └─ modules/     Foundry-module adapters and bindings
+                 ├─ systems/<id>/<generation>/  System adapters and projections
+                 └─ modules/<id>/<generation>/  Module adapters and bindings
 
 src/config/index.ts               Environment and backward compatibility
 src/config/targets.ts             Explicit target schemas, secrets and routing IDs
@@ -64,26 +64,41 @@ For resources, update `src/tools/resources.ts` and the corresponding capability/
 - Make connection/authentication stages bounded and abortable, and share cleanup completion across concurrent `close()` calls. Never admit a missing/blank world ID as a session identity.
 - Preserve the distinction between the native Socket.IO document protocol and relay-executed Foundry document APIs. Never replay uncertain writes automatically; report `outcome_unknown` and require inspection.
 - Validate mutation acknowledgement envelopes/results before returning success. Update supported journal-page broadcasts and mark cached changes stale when they cannot be applied safely.
-- Keep system-specific projections in `systems/<system-id>/actor-projection.json` rather than hardcoding them into a generic provider.
+- Keep system-specific projections in `systems/<system-id>/<generation>/actor-projection.json`. Pass the target's actual Foundry version to projection/validation helpers; never borrow a descriptor from another generation.
 - Add provider, session and protocol regression tests. Live compatibility with a specific Foundry version requires an actual world test; mocked or fake-relay tests cannot establish it.
 
 ## Add a system or module integration
 
-1. Put a trusted integration package in `systems/<upstream-id>/` or `modules/<upstream-id>/`, preserving the exact upstream ID.
-2. Supply `manifest.json`, `adapter.py`, `README.md`, packaged JS bindings and probes, and adapter tests. Validate the contract using `src/integrations/manifest.ts`.
+1. Put a trusted, self-contained package in `systems/<upstream-id>/<generation>/` or `modules/<upstream-id>/<generation>/`, preserving the exact upstream ID. `npm run create:integration -- --kind module --id example-module --foundry 14` creates an unavailable starting skeleton.
+2. Supply `manifest.json` with matching numeric `foundryGeneration`, `adapter.py`, `README.md`, fixed JS bindings/probes and adapter tests. Validate the contract using `src/integrations/manifest.ts`.
 3. Use the shared `src/integrations/manager.ts` / `python-worker.ts` infrastructure; one optional Python process is scoped to each target. Credentials and provider selection stay in Node, not in Python.
 4. Expose names as `system_{id}_{operation}` or `module_{id}_{operation}`. Never normalize hyphens, silently overwrite conflicting schemas or expose arbitrary JS execution as an MCP tool.
 5. Probe the actual runtime API, return JSON-safe DTOs, validate inputs/outputs, and only advertise an operation while its target and provider can execute it.
-6. Record upstream source, integration version and actual live-tested version combinations. Keep experimental status until live verification is performed.
+6. Record the latest compatible upstream source for that Foundry generation, the separate adapter version and actual live-tested combinations. Keep experimental status until live verification is performed.
 
-The Item Piles example keeps its authored registry, domain handlers and helper
-factory in `modules/item-piles/src/`. Run `npm run generate:item-piles` after
-editing those sources. `npm run check:item-piles` verifies deterministic output
-and rejects drift/orphan files; both the main build and test commands run that
-check. `npm run test:item-piles` executes the package's Node standard-library
-tests, while `npm run test:python` discovers its Python adapter tests. Generated
-files remain standalone scripts for the existing loader; they are never bundled
-or compiled in the production request path.
+The system and module packages keep authored registries, domain handlers and
+helper factories under their generation's `src/` directory. Run
+`npm run generate:integrations` after editing those sources, then
+`npm run check:integrations`. Discovery covers every local package without a
+central list of IDs; generators, when supplied, verify deterministic output and
+reject drift/orphan files. `npm run test:bindings` discovers Node binding/tooling
+tests and `npm run test:python` discovers Python adapter tests. Existing system
+and Item Piles aliases select their respective packages across generations.
+Generated files remain standalone scripts; they are not compiled in the request
+path. A hand-authored external package does not require a generator.
+
+Copying a complete external generation directory is sufficient for discovery.
+Do not import a sibling generation's source. Refresh/reconnect after installation,
+and check selected/available generations in integration status. Legacy flat
+packages without generation metadata remain loadable only when not mixed with
+numeric variants for the same ID. Test missing/unknown generations, per-target
+selection, nonselected broken variants and same-generation name collisions.
+
+Keep system rules separate from administrative document edits. The
+[core/system/module selection guide](core-system-module-calls.md) documents
+runtime overrides, explicit namespaces and why a failed rule operation must not
+fall back to a generic core patch. Call the actual runtime object, without
+bypassing module wrappers through a captured prototype.
 
 Runtime package errors must remain local to their package; keep strict loader
 validation available for development and smoke checks. A closed worker must not
@@ -104,6 +119,9 @@ bun run smoke:dotenv       # dotenv load order
 bun run smoke:integrations # Packaged Python worker integration path
 bun run smoke:pack         # npm package in a fresh consumer (requires dependency resolution)
 bun run test:item-piles    # Generation check and standalone Node binding contracts
+bun run test:systems       # Generation checks and both system binding contracts
+bun run check:integrations # Every discovered package and optional generator
+bun run test:bindings      # All discovered Node binding/tooling contracts
 just docs-check            # TypeDoc check
 just antipatterns          # ast-grep scan
 ```

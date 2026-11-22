@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import inspect
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -115,16 +116,37 @@ class Worker:
         if not isinstance(key, str) or ":" not in key:
             raise ProtocolError("invalid_integration", "Integration identity is required")
         kind, integration_id = key.split(":", 1)
-        if kind not in ("system", "module"):
-            raise ProtocolError("invalid_integration", "Unknown integration family")
+        if kind not in ("system", "module") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", integration_id):
+            raise ProtocolError("invalid_integration", "Invalid integration family or identifier")
+        foundry_generation = params.get("foundryGeneration")
+        if "foundryGeneration" in params and (
+            type(foundry_generation) is not int
+            or foundry_generation < 13
+            or foundry_generation > 9007199254740991
+        ):
+            raise ProtocolError("invalid_foundry_generation", "Foundry generation must be an integer of at least 13")
         family = self.package_root / ("systems" if kind == "system" else "modules")
-        root = Path(params["root"]).resolve(strict=True)
-        expected = (family / integration_id).resolve(strict=True)
-        if root != expected or not root.is_relative_to(family.resolve()):
-            raise ProtocolError("invalid_path", "Adapter directory does not match its identity")
-        entrypoint = (root / params["entrypoint"]).resolve(strict=True)
-        if not entrypoint.is_relative_to(root) or entrypoint.suffix != ".py":
-            raise ProtocolError("invalid_path", "Adapter entrypoint escapes its integration directory")
+        expected = family / integration_id
+        if foundry_generation is not None:
+            expected /= str(foundry_generation)
+        root_arg = params.get("root")
+        entrypoint_arg = params.get("entrypoint")
+        if not isinstance(root_arg, str) or not isinstance(entrypoint_arg, str) or not entrypoint_arg:
+            raise ProtocolError("invalid_path", "Adapter root and entrypoint are required")
+        relative_entrypoint = Path(entrypoint_arg)
+        if relative_entrypoint.is_absolute() or ".." in relative_entrypoint.parts or "\\" in entrypoint_arg:
+            raise ProtocolError("invalid_path", "Adapter entrypoint must stay within its integration directory")
+        try:
+            root = Path(root_arg).resolve(strict=True)
+            # Canonical packageRoot is fixed at handshake. Neither an identity nor
+            # a generation folder may alias a sibling or an external directory.
+            if expected.resolve(strict=True) != expected or root != expected or not root.is_dir():
+                raise ProtocolError("invalid_path", "Adapter directory does not match its identity and generation")
+            entrypoint = (root / relative_entrypoint).resolve(strict=True)
+            if not entrypoint.is_relative_to(root) or entrypoint.suffix != ".py" or not entrypoint.is_file():
+                raise ProtocolError("invalid_path", "Adapter entrypoint escapes its integration directory")
+        except (OSError, RuntimeError, ValueError) as error:
+            raise ProtocolError("invalid_path", "Cannot resolve the adapter directory or entrypoint") from error
         if key in self.adapters:
             raise ProtocolError("duplicate_adapter", "Adapter is already loaded")
         module_name = "foundry_adapter_" + hashlib.sha256(str(entrypoint).encode()).hexdigest()

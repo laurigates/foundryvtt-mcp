@@ -66,9 +66,32 @@ Item Piles 0.2 retains the `module_item-piles_get_items` name, `actor_uuid` inpu
 and array of `{ id, uuid, name, type, quantity }` summaries. It also retains that
 operation's capability-based version policy. Its new operations have separate
 names and explicit contracts, and require the inspected Item Piles 3.3.4 API on
-Foundry 13/14. Their write classification does not enable writes on an existing
+Foundry 13/14 through independent generation packages. Their write classification does not enable writes on an existing
 read-only target. Document arguments such as `target_uuid` remain distinct from
 the host's `target_id` routing argument.
+
+### Integration packages by Foundry generation
+
+New packages use `systems/<id>/<generation>/` and `modules/<id>/<generation>/`,
+with a matching integer `foundryGeneration` in each manifest. Existing public
+tool names and routing arguments stay unchanged. The target's actual Foundry
+generation chooses the implementation; no nearby generation is used as fallback.
+
+The shipped raw Actor reads keep their schemas and binding/probe behavior in
+independent `13/` and `14/` packages. Generation 13 retains those reads only; the
+new detailed system rules integrations are generation-14 packages. The legacy
+Item Piles read is similarly retained in each of its two packages. This migration
+does deliberately limit each packaged variant to its declared generation.
+
+External flat schema-1 packages without `foundryGeneration` remain loadable
+under their existing compatibility policy. Their flat manifest must not coexist
+with numeric generation directories for the same ID; mixed layouts produce an
+explicit error. Move the complete package and add matching metadata to migrate.
+See the [installation and authoring guide](writing-integrations.md#install-a-third-party-adapter).
+
+System projection descriptors move inside each generation package as well.
+Unknown or missing generations retain generic document identity/raw data and
+generic patch validation, without borrowing another variant's fields or bounds.
 
 ### Multiple targets
 

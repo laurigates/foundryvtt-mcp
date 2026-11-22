@@ -6,13 +6,15 @@
 
 This branch introduces target-scoped providers for all MCP access, independent
 connections to multiple Foundry worlds, and Python integrations in separate
-`systems/` and `modules/` directories. Exact upstream IDs are preserved in tool
+`systems/<id>/<foundry-generation>/` and `modules/<id>/<foundry-generation>/`
+directories. Each generation has a self-contained adapter package. Exact upstream IDs are preserved in tool
 names: `system_{id}_{operation}` and `module_{id}_{operation}`. Existing environment
 configuration is converted into one target; explicit multi-target calls use `target_id`.
 
 - [Providers and target configuration](docs/guides/providers-and-targets.md)
 - [Backward compatibility and migration boundaries](docs/guides/backward-compatibility.md)
 - [Writing system and module integrations](docs/guides/writing-integrations.md)
+- [Choosing core, system and module calls](docs/guides/core-system-module-calls.md)
 - [Architecture decisions and rationale](docs/adrs/0011-provider-session-integration-overhaul.md)
 - [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
 - [Example target configuration](examples/targets.example.json)
@@ -22,11 +24,17 @@ and [system bridge catalog](docs/bridges/systems.md). These catalogs record adap
 versions, upstream source references, Foundry requirements and verification
 status, and link to each package's README for installation, operations and examples.
 The integration support and maintenance scope starts at **Foundry VTT 13,
-inclusive**; earlier generations are outside that scope. This policy does not
-establish compatibility with every later generation or add a shared runtime
-version check. Individual package gates and actually tested combinations are
-documented separately. Python 3.10+ is optional for the core and required for
-active Python integrations.
+inclusive**; earlier generations are outside that scope. The loader selects the
+package matching the connected target's generation, then applies its upstream
+version and capability checks. A missing generation remains unavailable; the
+server does not borrow another generation's adapter. Individual package gates
+and actually tested combinations are documented separately. Python 3.10+ is
+optional for the core and required for active Python integrations.
+
+To add an external integration, copy its complete generation directory under
+the matching system or module ID. No central registration table is required.
+See [installing and creating adapters](docs/guides/writing-integrations.md#install-a-third-party-adapter)
+for the package contract, validation commands and migration from the older layout.
 
 Provider lifecycles keep delayed multi-step calls bound to their original
 session; interrupted mutations can still have unknown remote outcomes and are

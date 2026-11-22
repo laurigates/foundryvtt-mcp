@@ -266,3 +266,127 @@ Those Ajv/Vitest regressions could not execute in this dependency-free workspace
 the full TypeScript build and installed-package smoke could not complete.
 The earlier provider-pass and 2026-11-19 results above remain separate historical
 evidence. No live Foundry compatibility is recorded for this expansion.
+## Detailed systems and generation packages — verification on 2026-11-22
+
+This follow-up adds detailed system APIs and then separates all shipped bridges
+by Foundry generation. It supersedes earlier flat-package paths and read-only
+system coverage statements in this historical record.
+
+### Implemented packages
+
+| Generation package | Adapter | Inspected upstream baseline | Operations |
+|---|---|---|---|
+| `systems/dnd5e/13/` | `0.1.1` | Unrecorded; preserved raw-data contract only | 1 read |
+| `systems/dnd5e/14/` | `0.2.0` | D&D 5e `release-6.1.1`, commit `bc1b2c921e2f306dc5079f8de883ad64607118a6` | 25: 10 reads, 15 writes |
+| `systems/pf2e/13/` | `0.1.1` | Unrecorded; preserved raw-data contract only | 1 read |
+| `systems/pf2e/14/` | `0.2.0` | PF2e `pf2e-8.7.1`, commit `397f125aea87e6d6fa36e878c9c07d0e672826cf` | 22: 10 reads, 12 writes |
+| `modules/item-piles/13/` | `0.2.1` | Item Piles `3.3.4`, commit `85ab971406623fb1c5d01eb1f093fe4855ede6e4` | 40: 13 reads, 27 writes |
+| `modules/item-piles/14/` | `0.2.1` | Item Piles `3.3.4`, same inspected source | 40: 13 reads, 27 writes |
+
+D&D 5e's new operations require generation 14, build 367 or later and exact
+system version 6.1.1. PF2e's require generation 14, build 361 or later and exact
+system version 8.7.1. The latter repository publishes multiple products; the
+release reference was selected for the actual `pf2e` system. Their package
+READMEs and `UPSTREAM.md` files record inspected methods, source links, examples
+and explicit coverage boundaries. Generation 13 does not claim a backport of
+those newer rules APIs or an inspected older upstream release.
+
+Original Actor reads, the Item Piles `get_items` binding/probe and the existing
+D&D display descriptor were preserved in each corresponding variant. Public
+tool names and original read schemas remain stable. Package selection now
+deliberately confines those bindings to their generation.
+
+### Selection, copying and call semantics
+
+The manifest's integer `foundryGeneration` must match its numeric directory.
+The loader selects the exact generation of the connected target before importing
+Python or probing runtime methods; it does not fall back across generations.
+System and module identity, exact-version restrictions, runtime readiness,
+operation permissions and target write enablement continue to apply.
+
+Status has one entry per integration with `foundryGeneration`,
+`availableGenerations` and diagnostic `variantErrors`. Invalid unselected
+variants do not block a healthy selected variant. Same-generation public-name
+collisions withhold their owners, while mutually exclusive generation variants
+can preserve one public name. The multi-target catalog continues to withhold
+incompatible schemas. Session-generation fencing remains separate from the
+Foundry-generation selector.
+
+Legacy flat third-party packages without generation metadata remain readable.
+Mixing a flat manifest with numeric variants for one ID is an explicit error.
+Structural symlink aliases and files escaping a variant are rejected. Python
+worker loading validates the matching identity/generation path independently.
+
+Every shipped variant contains its own sources, generated scripts, adapter,
+tests, source notes and examples. The six packages were also copied and checked
+one at a time without sibling packages. The offline scaffolder
+`npm run create:integration -- --kind module --id example-module --foundry 14`
+creates an unavailable skeleton; it does not overwrite an existing variant,
+download code or install dependencies. Generic discovery/check/test commands
+require no central list of integration IDs.
+
+Core projections now select the same generation and validate manifest identity;
+their caches distinguish canonical paths and descriptor/manifest revisions.
+Missing variants retain raw document data and generic patch validation. The
+provider normalizes the release version or generation consistently for world
+inspection and projections. Files at would-be directory paths do not break core
+reads, and descriptors cannot alias a sibling generation.
+
+The [call selection guide](../guides/core-system-module-calls.md) documents
+core document operations, system rules and module workflows as distinct
+contracts. There is no global module/system/core priority, automatic replacement
+of a named tool or fallback after a dispatched mutation. Bindings call current
+runtime objects so installed overrides participate; arbitrary module stacks are
+not thereby certified.
+
+### Review corrections
+
+- D&D rolls use Foundry-14 message modes and redact results when actual chat
+  visibility cannot confirm access. Spell slots are explicit and base-level;
+  unsupported upcasting and continuation assumptions are rejected. Activity
+  attack damage keeps explicit ability/mode/ammunition context. Rest results
+  verify the returned Actor/Item update plan, with effect/hook limits documented.
+- PF2e strike calls respect the actual wrapper's dialog behavior and explicit
+  token/target/Item identity. Conditions and currency use system APIs. Recharge
+  checks source-document changes against the returned plan, rather than treating
+  prepared data or an `affected` report as persistence confirmation.
+- Writes and side-effecting rolls retain target permission gates; uncertain
+  outcomes are propagated without replay. Python tests cover real callback
+  routing for both system reads and mutations.
+
+### Verification performed
+
+Environment: Node.js **24.22.3**, Python **3.12.14**. Package-manager dependency
+installation was not performed; this workspace has no `node_modules` or built
+`dist`. Tests needing a temporary directory used a writable workspace `TMPDIR`.
+
+| Check | Observed result |
+|---|---|
+| Generic package/generator checks | All **6 generation packages** passed |
+| Node binding and tooling contracts | **634 passed, 0 failed, 0 skipped** across 15 files |
+| Python worker/adapter suite | **46 passed**, including path/generation isolation and uncertain-outcome propagation |
+| Each variant copied in isolation | Its generator, Node tests and Python adapter tests passed without the repository or sibling variants |
+| JSON Schema Draft 7 checks with external retrieval disabled | **258 input/output schemas**, **168 recipes** and **25 workflows** checked; all operations covered |
+| Invalid recipe cases | **168 unknown-property** and **280 missing-required-field** cases rejected |
+| Recorded outputs from executed D&D/PF2e bindings | All **47 generation-14 operation samples** revalidated against their input/output contracts |
+| Legacy raw binding/probe and descriptor preservation | Original bytes/schemas compared with the pre-change baseline |
+| TypeScript/JavaScript syntax | Modified host/tooling sources parsed with Node 24; this is not a typecheck |
+| Local Markdown links | **158 relative links** in 30 current documents checked |
+| Offline npm pack dry-run | All six variants' runtime/docs/examples and the new guide included; tests/cache artifacts excluded; no built distribution claimed |
+| `npm test` | Node phase passed as above; full command stopped because **Vitest is unavailable** |
+| `npm run build` | Package checks passed; TypeScript compilation stopped because **tsc is unavailable** |
+| `npm run lint` | Not executable: **Biome is unavailable** |
+| Installed integration smoke | Not executable: **Ajv and built `dist` are unavailable** |
+
+New Vitest cases cover host generation selection and core projection isolation,
+including distinct 13/14 descriptors, missing/future generations, malformed
+manifests, layout ambiguity, symlinks, caches and independent target write policy.
+They were syntax-checked and reviewed, but not executed here. Full TypeScript
+typechecking, Ajv strict/Vitest validation and installed-runtime smoke remain
+required in an environment with the declared dependencies.
+
+**No live Foundry world was exercised.** Every shipped variant remains
+`experimental`, with `compatibility.tested: []` and `upstream.verifiedAt: null`.
+Source inspection, generated-file checks, local fixtures and packaging checks
+are separate from live system/module compatibility verification.
+

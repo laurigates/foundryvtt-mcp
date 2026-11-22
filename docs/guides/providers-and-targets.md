@@ -223,10 +223,20 @@ the installed package, independently of the current working directory.
 
 A missing Python executable, invalid manifest, failed API probe, or incompatible
 version is reported in integration status. The healthy core connection remains
-usable. D&D 5e and PF2e currently provide actor-data reads. Item Piles also provides
-explicit mutations, each subject to the selected target's write setting and its
-runtime GM check. All packages remain experimental and their READMEs distinguish
+usable. System and module packages provide explicitly classified reads, rolls
+and mutations, each subject to the selected target's policy and runtime
+permissions. All packages remain experimental and their READMEs distinguish
 source inspection and local tests from live compatibility verification.
+
+Generation packages live under `systems/<id>/<foundry-generation>/` and
+`modules/<id>/<foundry-generation>/`. Each target selects only the folder matching
+its observed Foundry version, for example `14/` for `14.370`. Missing generations
+remain unavailable; the host does not try a neighboring version. This release
+generation is separate from the session-generation counter used for reconnects.
+The same upstream ID can therefore use independent adapters on targets running
+different Foundry generations. Their source pins and adapter versions can differ.
+See [external package installation](writing-integrations.md#install-a-third-party-adapter)
+and the [system](../bridges/systems.md) / [module](../bridges/modules.md) catalogs.
 
 Runtime package loading isolates malformed packages so unrelated valid packages
 can still activate; inspect `list_systems`, `list_modules` or `get_target_status`
@@ -236,7 +246,8 @@ provider, it reports `outcome_unknown` and does not replay the request.
 
 The original `module_item-piles_get_items` operation keeps its capability-based
 availability. New Item Piles operations require module version `3.3.4`, Foundry
-generation `13` or `14`, and active `socketlib` / `lib-wrapper` dependencies.
+generation `13` or `14` through separate packages, and active `socketlib` /
+`lib-wrapper` dependencies.
 Unknown or different versions withhold those operations. Writes require a GM in
 the paired runtime in addition to `writeEnabled: true`; reads require appropriate
 document access. The two credentials of a composite target can represent

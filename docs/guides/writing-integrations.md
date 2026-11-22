@@ -1,22 +1,94 @@
 # Writing system and module integrations
 
 An integration is a trusted package distributed with this MCP server. Put game
-system integrations in `systems/<upstream-id>/` and module integrations in
-`modules/<upstream-id>/`. Keep the exact upstream ID, including hyphens. Display
+system integrations in `systems/<upstream-id>/<foundry-generation>/` and module
+integrations in `modules/<upstream-id>/<foundry-generation>/`. Keep the exact
+upstream ID, including hyphens. Display
 titles do not participate in identity or routing.
 
 ## Package structure
 
-Every package includes `manifest.json`, `adapter.py`, and `README.md`. Each declared
+Each numeric directory is a complete independent package, for example
+`modules/example-module/13/`, `modules/example-module/14/`, or
+`systems/example-system/14/`. There is no upper generation limit baked into the
+directory convention: a future `15/` package follows the same contract, but it
+must be authored and checked before it becomes usable.
+
+Every generation package includes `manifest.json`, `adapter.py`, and `README.md`. Each declared
 operation identifies a fixed JavaScript binding and a runtime probe. Colocated
 `tests/` directories hold adapter contract tests. The shared loader/protocol is
 identical for both families.
 
-Use the D&D 5e and PF2e packages as small actor-data read examples. Item Piles is
-the larger example: explicit read/write operations, shared runtime helpers,
-generated fixed bindings, contract tests and a documented upstream source
-reference. These are experimental integrations; local fixtures do not establish
-live compatibility.
+Keep runtime files and local helpers within that generation directory. Bindings,
+probes and the entrypoint cannot escape it through `..` or symlinks. Do not import
+code from a sibling generation: copying `14/` must not require `13/`. An optional
+README directly under the upstream ID can index the available generations; it
+is not an adapter package and has no manifest.
+
+The D&D 5e, PF2e and Item Piles packages expose explicit reads and mutations with
+shared package-local helpers, generated fixed bindings, contract tests and pinned
+upstream source references. Their original raw reads remain available under the
+existing contracts. These are experimental integrations; local fixtures do not
+establish live compatibility.
+
+## Install a third-party adapter
+
+An external GitHub repository can use the same layout or distribute one complete
+generation directory as a release artifact. Installation is local:
+
+1. Obtain and review the adapter's source or release. The upstream Foundry module
+   or system still needs its normal installation in Foundry; this is its MCP bridge.
+2. Copy the **complete generation directory** into this server's package root,
+   keeping the exact upstream ID: `modules/<id>/14/` or `systems/<id>/14/`.
+   Copy another generation as a separate sibling when needed. Do not merge a
+   new package into an existing variant or leave a flat manifest at the ID root.
+3. Run `npm run check:integrations`, `npm run test:bindings` and
+   `npm run test:python` from the server checkout. A package can supply its own
+   generator and tests; runtime loading does not require a generator.
+4. Refresh or reconnect the target, or restart the MCP server. Inspect
+   `list_systems`, `list_modules` or `get_target_status` for the selected generation,
+   upstream version observed in the world, unavailable operations and load errors.
+
+There is no central ID allowlist, provider dispatch table or Python registry to
+edit. Discovery inspects the filesystem. Merely creating a directory does not
+activate it: its manifest, exact generation, installed upstream package, provider
+execution support and operation probes must agree. A missing generation does not
+enable a nearby version's tool set.
+
+These are trusted executable packages, not sandboxed uploads. The server does not
+clone GitHub repositories, install Python dependencies or execute arbitrary source
+supplied in an MCP call. Keep external adapters in a maintained checkout or image;
+edits inside a transient `npx` cache or an installed dependency can disappear on
+upgrade. No network access is needed for package discovery or generation selection.
+
+### Create a new package
+
+From the server checkout, create a self-contained starting package with:
+
+```bash
+npm run create:integration -- --kind module --id example-module --foundry 14
+```
+
+Use `--kind system` for a system bridge. The generated skeleton intentionally
+stays unavailable until its fixed binding and readiness probe are implemented.
+Fill in the input/output schemas, permissions, upstream reference and README,
+then add contract tests. Existing packages are not overwritten. The scaffold
+creates files only; it does not install or activate anything in Foundry.
+
+### Migrating a flat package
+
+Existing third-party `modules/<id>/manifest.json` and
+`systems/<id>/manifest.json` packages without `foundryGeneration` remain readable
+under their original compatibility policy. This is a migration allowance, not
+the format for new packages. A legacy flat manifest cannot coexist with numeric
+variant directories for the same ID: the loader reports the ambiguity instead
+of silently choosing an implementation.
+
+Move the complete flat package under its actual generation, add the matching
+integer `foundryGeneration` to its manifest, fix package-local paths and test it.
+For another generation, copy or create a separate self-contained package and
+review the matching upstream code. Public tool names do not gain a generation
+suffix; target routing determines which implementation runs.
 
 ## Manifest contract
 
@@ -27,6 +99,7 @@ live compatibility.
 | `schemaVersion`, `protocolVersion` | Both currently `1` |
 | `kind` | `system` or `module` |
 | `id` | Must exactly match the directory and upstream ID |
+| `foundryGeneration` | Integer `13` or later, required for a numeric generation directory and exactly equal to its name; omitted only by legacy flat packages |
 | `adapterVersion`, `updatedAt` | Our adapter version and last update date |
 | `entrypoint` | Python entrypoint relative to this directory |
 | `status` | `experimental` or `supported` |
@@ -45,7 +118,9 @@ module_{id}_{operation}
 
 For example, `module_item-piles_get_items` preserves `item-piles`. IDs are never
 silently normalized. The registry rejects invalid names and collisions, including
-collisions between differently split identifiers. The runtime stores the original
+collisions between differently split identifiers that can coexist on the same
+generation. The same operation name can have separate implementations in `13/`
+and `14/` because only one can be selected per target. The runtime stores the original
 identity fields separately rather than splitting the public tool name.
 
 ### Output schemas and reference scope
@@ -71,18 +146,32 @@ MCP client, including invalid data, recursion and any nested `$id` resources.
 
 ### Version filters
 
-An empty `foundryVersions` or `integrationVersions` filter imposes no exact-version
-restriction; it is not a compatibility guarantee. `compatibility.tested` records
+`foundryGeneration` selects the package from the observed Foundry version:
+`14.370` selects `14/`. This is independent of the session generation counter,
+which increments when a connection is replaced. A target with an unknown Foundry
+version or no matching variant does not load that versioned Python adapter or
+probe its bindings. Other targets and independent integrations remain usable.
+
+After generation selection, an empty `foundryVersions` or `integrationVersions`
+filter imposes no further exact-version restriction; it is not a compatibility
+guarantee. Nonempty lists compare full observed strings exactly. `compatibility.tested` records
 actual live combinations and stays empty until they are verified. Optional
 `compatibility.systems` restricts a module to named systems. This restriction
 does not require that our corresponding system adapter is installed.
 
 The integration support and maintenance scope starts at **Foundry VTT 13,
 inclusive**. Foundry 12 and earlier are outside that scope even if an existing
-probe succeeds. This is a support policy, not a shared runtime version guard;
-document the actual per-operation checks separately. A minimum of 13 does not
-establish support for every later generation. Do not put major numbers or range
-expressions into exact-match manifest arrays to represent this policy.
+probe succeeds. Versioned packages enforce this floor and their exact generation.
+Per-operation build requirements and upstream-version checks can narrow that
+selection. Generic core operations and legacy flat packages retain their existing
+policies. Do not put major numbers or range expressions into exact-match manifest
+arrays: use `foundryGeneration` for the generation and a probe for additional
+build/API requirements.
+
+Three version identities must stay separate: `foundryGeneration` selects a
+directory; the pinned upstream release identifies the system/module contract;
+`adapterVersion` identifies our implementation of that contract. Updating one
+generation never advances the source pin or adapter version of another.
 
 ## Python adapter
 
@@ -131,8 +220,10 @@ target waits for the locally tracked request to settle. A failed mutating
 operation that already invoked the provider is reported as `outcome_unknown`
 unless the provider explicitly rejected execution. Never retry it automatically.
 Item Piles demonstrates mutating operations with `readOnly: false`, target-local
-write enablement and an additional runtime GM gate. The system adapters currently
-contain only actor-data reads.
+write enablement and an additional runtime GM gate. System rolls and mutations
+also require write opt-in; their bindings check document ownership and any
+operation-specific permission. A roll is not read-only merely because it returns
+a number: it may create chat, consume resources or trigger hooks.
 
 ## Shared helpers without changing the provider
 
@@ -152,13 +243,20 @@ fresh in-memory output without writing. Regeneration is a separate explicit
 `--write` action; obsolete generated files are detected.
 
 ```bash
-npm run generate:item-piles
-npm run check:item-piles
-npm run test:item-piles
+npm run generate:integrations
+npm run check:integrations
+npm run test:bindings
 npm run test:python
 ```
 
-The core loader, manifest version, Python protocol and providers are unchanged.
+The scripts discover generation packages without hardcoded IDs. A package-local
+`build.mjs`, when supplied, supports `--write` and `--check`. Main build/test
+commands check every discovered generator; a hand-authored package needs no build
+step. Existing `generate:systems`, `check:systems`, `test:systems` and Item Piles
+aliases select their corresponding packages across generations.
+
+The manifest/protocol version remains `1`; versioned loading adds generation
+metadata and an optional worker-load field while preserving legacy flat packages.
 Arguments remain JSON data for a fixed operation. `target_id` is reserved by the
 host; use fields such as `source_uuid` and `target_uuid` for documents participating
 in an operation. Keep the previous public contract when extending a package.
@@ -170,14 +268,16 @@ bundling or eliminate that discovery cost.
 
 ## Systems and modules in one session
 
-The system matching the world's identity is selected independently from active
-modules. A missing system adapter leaves core document access and independent
+The system matching the world's identity and Foundry generation is selected
+independently from active modules of that same generation. A missing system adapter leaves core document access and independent
 module integrations available. Each world has separate adapter instances and a
 separate optional Python process; the package code itself is shared on disk.
 
 Runtime loading records a malformed package as an integration error and keeps
 unrelated valid packages usable. Every package involved in a public-name
-collision is withheld; load order never selects a winner. Direct
+collision within a simultaneously eligible generation is withheld; load order
+never selects a winner. Invalid variants in a different generation are reported
+without activating them or blocking a valid selected variant. Direct
 `loadIntegrations(packageRoot)` calls remain strict for development and package
 smoke checks. The runtime explicitly selects the error-reporting loader mode.
 
@@ -186,8 +286,16 @@ is implemented. Avoid imports between every module and every system. Introduce a
 module-specific compatibility binding only when a real API difference requires it.
 
 The optional `actor-projection.json` used by the core provider belongs in the
-system package. It declares data paths and existing validation bounds; unknown
-systems keep raw document data and are not assigned D&D-specific fields.
+selected generation package. It declares data paths and existing validation
+bounds. Projection lookup uses the target's Foundry generation too; unknown
+systems and missing generations keep raw document data rather than borrowing
+another version's fields or validation bounds.
+
+For choosing an operation, follow [core, system and module call selection](core-system-module-calls.md).
+Invoke current runtime document methods so participating wrappers can run; do
+not bypass them through a saved prototype. This does not certify arbitrary module
+overrides. There is no global module-over-system-over-core priority or automatic
+fallback after a rejected or uncertain mutation.
 
 ## Upstream source references
 
@@ -195,14 +303,24 @@ The adapter version identifies our package. The upstream source baseline identif
 the external module or system code inspected and used to align that package.
 Record both: an adapter update date alone cannot identify its upstream contract.
 
+Apply reference selection to the actual upstream module/system ID **and the
+Foundry generation of the directory**. A repository may
+publish several products: inspect the release assets/manifest and choose the
+latest compatible release for this package, not an unrelated repository-wide
+latest release. The latest overall release may require a newer Foundry generation;
+in that case the older directory stays on the latest compatible release, with
+its own source-check date. Do not backport by changing only a version number.
+
 Choose the synchronization reference in this order:
 
-1. **Latest official published release**, when available. Record its version/tag
+1. **Latest official published release compatible with this generation**, when
+   the project has releases. Record its version/tag
    and a link to that specific release; label a prerelease explicitly if selected.
-2. **Latest official tag**, only when upstream has no releases. Record the tag and
+2. **Latest compatible official tag**, only when upstream has no releases. Record the tag and
    its source link, resolving annotated tags to the underlying commit.
 3. **Current default-branch commit**, only when upstream has neither releases nor
-   tags. Use the **full commit hash as the upstream version**, with an immutable
+   tags and that code is compatible with the selected generation. Use the
+   **full commit hash as the upstream version**, with an immutable
    commit link. Do not invent a release number or use the branch name as a version.
 
 For all three cases, record the full resolved commit SHA. A release/tag URL alone
@@ -211,6 +329,10 @@ newer untagged branch work while a release exists; when choosing among tags, che
 the upstream version/date convention rather than relying on lexical tag ordering.
 An unavailable repository or failed lookup does not prove that releases or tags
 are absent: leave the reference unknown or record the check as incomplete.
+If no eligible upstream reference supports the requested generation, record that
+gap and leave the relevant rules operations unavailable. An older raw-data
+compatibility operation may remain explicitly unpinned; do not present it as a
+reviewed integration of an older system release.
 
 "Latest" means latest when checked, so record that date. The reference selected
 for synchronization becomes the **used source baseline** only after its relevant
@@ -223,13 +345,14 @@ Each package README records these fields separately:
 | Field | Required documentation |
 |---|---|
 | Adapter version / update | `adapterVersion` and `updatedAt` from this package |
+| Foundry generation | Directory name and matching `foundryGeneration` |
 | Upstream repository | Official source repository |
 | Upstream source version / kind | Used release version, tag name, or full commit hash; identify which kind it is |
 | Upstream source commit | Full resolved SHA and immutable source link |
 | Upstream release / commit date | Publication date for a release; commit date for a tag or commit baseline |
 | Source inspected on | Date the relevant upstream code was examined |
 | Latest reference checked on | Check date and latest reference found; identify any pending alignment |
-| Foundry scope / runtime checks | Minimum project scope of 13, package restrictions and actual operation gates |
+| Foundry scope / runtime checks | Exact selected generation, narrower build/API requirements and actual operation gates |
 | Live verification / tested combinations | Only performed live checks, separately from source inspection and fixtures |
 
 Unknown source fields stay explicitly unrecorded. Missing provenance is not a
