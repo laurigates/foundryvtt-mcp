@@ -16,7 +16,12 @@ test('autonomous generation-13 package is reproducible and exposes only the orig
   assert.equal(manifest.foundryGeneration, 13);
   assert.equal(manifest.adapterVersion, '0.1.1');
   assert.deepEqual(manifest.operations, [legacyOperation]);
-  assert.deepEqual(manifest.upstream, { repository: null, reference: null, updatedAt: null, verifiedAt: null });
+  assert.deepEqual(manifest.upstream, {
+    repository: 'https://github.com/foundryvtt/pf2e',
+    reference: 'pf2e-7.12.2@522dec9d289c7da8b69ac0167b11ccd639871fef',
+    updatedAt: '2026-04-06',
+    verifiedAt: null,
+  });
   assert.deepEqual(manifest.compatibility.tested, []);
   assert.equal(await readFile(new URL('../get_actor_data.js', import.meta.url), 'utf8'), legacyBinding);
   assert.equal(await readFile(new URL('../probe.js', import.meta.url), 'utf8'), legacyProbe);

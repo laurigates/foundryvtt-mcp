@@ -42,9 +42,9 @@ adapter or live support is established by the current directory convention.
 
 | Package | Adapter / inspected upstream | Coverage and scope |
 |---|---|---|
-| `systems/dnd5e/13/` | `0.1.1` / no inspected generation-13 baseline | Original `get_actor_data` only |
+| `systems/dnd5e/13/` | `0.1.1` / D&D 5e `5.3.3` | Original `get_actor_data` only; upstream minimum 13.347 |
 | `systems/dnd5e/14/` | `0.2.0` / D&D 5e `6.1.1` | 25 operations; new rules operations require Foundry 14 build 367+ |
-| `systems/pf2e/13/` | `0.1.1` / no inspected generation-13 baseline | Original `get_actor_data` only |
+| `systems/pf2e/13/` | `0.1.1` / PF2e `7.12.2` | Original `get_actor_data` only; upstream minimum 13.348, maximum 13 |
 | `systems/pf2e/14/` | `0.2.1` / PF2e `8.7.1` | 22 operations; new rules operations require Foundry 14 build 361+ |
 | `modules/item-piles/13/` | `0.2.1` / Item Piles `3.3.4` | 40 operations, generation 13 only |
 | `modules/item-piles/14/` | `0.2.1` / Item Piles `3.3.4` | 40 operations, generation 14 only |
@@ -53,6 +53,12 @@ Consult the [system](../bridges/systems.md) and [module](../bridges/modules.md)
 catalogs and package READMEs for exact source commits, API coverage and exclusions.
 The root README should remain generic and link to those catalogs. Keep specific
 module/system version claims in their dedicated documentation.
+
+The generation-13 source references were established on **2026-11-22** from the
+latest compatible official releases and their relevant Actor serialization
+sources. Their adapter versions, raw-read behavior and capability checks remain
+unchanged. The newer release for another Foundry generation is not the correct
+reference for an older directory.
 
 ### Read these files before changing a boundary
 
@@ -119,6 +125,12 @@ The final local pass on **2026-11-22** used Node **24.22.3** and Python **3.12.1
 The [dated verification record](../prps/provider-session-integration-overhaul.md)
 distinguishes this pass from earlier isolated-package and recorded-output checks.
 Do not carry forward a historical test result as proof for a later revision.
+
+Those runtime-suite results belong to the review published as `329eeaa`. The
+subsequent generation-13 source-reference update changed documentation, upstream
+metadata and the existing metadata assertions. Its package checks and targeted
+tests are recorded separately; it did not change host behavior, bindings, probes,
+operation schemas or adapter versions.
 
 ### Next work should resolve these gaps
 

@@ -8,8 +8,8 @@ to another generation and no source/runtime import between the packages.
 
 | Foundry generation | Package | Adapter | Upstream module version | Implemented scope |
 |---|---|---|---|---|
-| **13** | [13/README.md](13/README.md) | **0.2.1** | **3.3.4** | 40 operations: 13 reads, 27 writes |
-| **14** | [14/README.md](14/README.md) | **0.2.1** | **3.3.4** | 40 operations: 13 reads, 27 writes |
+| **13** | [13/README.md](13/README.md) | **0.2.1** | **[3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** | 40 operations: 13 reads, 27 writes |
+| **14** | [14/README.md](14/README.md) | **0.2.1** | **[3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** | 40 operations: 13 reads, 27 writes |
 
 Both variants are experimental with no live tested combinations. Their own
 README and UPSTREAM documents contain the pinned commit, generation gate,

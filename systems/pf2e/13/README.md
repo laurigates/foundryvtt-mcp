@@ -10,7 +10,12 @@ resource or mutation operations are available in this variant.
 | System ID | `pf2e` |
 | Foundry generation | **13**; `foundryGeneration: 13` |
 | Adapter version / update | **0.1.1** / **2026-11-22** |
-| Upstream release, tag, commit and system version | **Not inspected or pinned for Foundry 13** |
+| Upstream system release | **[PF2e 7.12.2](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-7.12.2)** |
+| Upstream tag / reference kind | `pf2e-7.12.2` / official release |
+| Resolved source commit | [`522dec9d289c7da8b69ac0167b11ccd639871fef`](https://github.com/foundryvtt/pf2e/commit/522dec9d289c7da8b69ac0167b11ccd639871fef) |
+| Upstream released on | **2026-04-06** |
+| Upstream-declared Foundry compatibility | Minimum **13.348**, verified **13.351**, maximum **13**, from the [release manifest](https://github.com/foundryvtt/pf2e/blob/522dec9d289c7da8b69ac0167b11ccd639871fef/system.pf2e.json) |
+| Source inspected / latest compatible release checked | **2026-11-22** / **7.12.2** for Foundry 13 |
 | Status | **Experimental** |
 | Tested live combinations | **None**; `compatibility.tested: []`, `upstream.verifiedAt: null` |
 | Operations | **1 read, 0 writes** |
@@ -21,9 +26,13 @@ its original capability probe is not a substitute for generation selection.
 An absent generation or absent matching package does not authorize fallback to
 another generation. Empty exact-version arrays do not widen the folder's scope.
 
-No official Foundry-13 upstream source version has been analyzed for this
-variant. A successful API probe does not establish compatibility with every
-system release. See [UPSTREAM.md](UPSTREAM.md) for the evidence boundary.
+The upstream source reference is **PF2e 7.12.2**, separately from adapter
+**0.1.1**. It records the release examined for the preserved raw Actor-data
+contract. The original capability-based probe and empty exact-version filters
+are unchanged: this source pin is not a new runtime version gate or live
+compatibility claim. PF2e 8.x requires Foundry 14 and belongs to the separate
+generation-14 package. See [UPSTREAM.md](UPSTREAM.md) for the source evidence and
+scope of inspection.
 
 ## Install and use
 
@@ -74,5 +83,6 @@ python3 -B -m unittest discover -s tests -v
 
 `node build.mjs --write` regenerates the manifest and preserved scripts from
 package-local sources. Local tests are fixtures, not live Foundry verification.
-Record a source pin and live combinations only after the corresponding analysis
-or actual live test; do not copy those claims from another generation.
+Update the source reference after inspecting the relevant upstream release and
+record live combinations only after actual live tests; do not copy either claim
+from another generation.

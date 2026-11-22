@@ -12,7 +12,7 @@ package does not expose the complete system API or every sheet interaction.
 | Adapter version / update | **0.2.1** / `2026-11-22` |
 | Status | **Experimental** |
 | Upstream repository | [foundryvtt/pf2e](https://github.com/foundryvtt/pf2e) |
-| Upstream system version | **8.7.1** |
+| Upstream system release | **[8.7.1](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-8.7.1)** |
 | Source reference / kind | Release [pf2e-8.7.1](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-8.7.1) |
 | Upstream source commit | [`397f125aea87e6d6fa36e878c9c07d0e672826cf`](https://github.com/foundryvtt/pf2e/commit/397f125aea87e6d6fa36e878c9c07d0e672826cf) |
 | Upstream release date | `2026-11-17` |

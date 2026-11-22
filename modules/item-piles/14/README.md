@@ -15,11 +15,13 @@ See the [coverage boundaries](UPSTREAM.md#deliberately-separate-surfaces).
 | Adapter version / update | `0.2.1` / `2026-11-22` |
 | Status | **Experimental** |
 | Upstream repository | [fantasycalendar/FoundryVTT-ItemPiles](https://github.com/fantasycalendar/FoundryVTT-ItemPiles) |
-| Upstream source version / kind | **Release [3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** |
+| Upstream module release | **[3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** |
+| Upstream release tag | `3.3.4` |
 | Upstream source commit | [`85ab971406623fb1c5d01eb1f093fe4855ede6e4`](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/commit/85ab971406623fb1c5d01eb1f093fe4855ede6e4) |
 | Upstream release date | `2026-07-18` |
 | Source inspected on | `2026-11-22` |
 | Latest reference checked on | `2026-11-22`; latest release **3.3.4**, same as the inspected baseline |
+| Upstream Foundry declaration | Minimum **13**, verified **14**, maximum **14**; [pinned source manifest](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/blob/85ab971406623fb1c5d01eb1f093fe4855ede6e4/module.json) |
 | Project Foundry scope | **13 or later**, including 13; narrower operation gates below still apply |
 | New-operation runtime gate | Item Piles **3.3.4**, Foundry generation **14**, required public methods and active dependencies |
 | Actually tested live combinations | **None**; `compatibility.tested: []`, `upstream.verifiedAt: null` |

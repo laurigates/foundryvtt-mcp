@@ -1,4 +1,4 @@
-/** Historical raw read only; no inspected Foundry 13 upstream release is claimed. */
+/** Historical raw read; source baseline PF2e 7.12.2 for Foundry 13, without live verification. */
 export const metadata = Object.freeze({
   "schemaVersion": 1,
   "protocolVersion": 1,
@@ -9,9 +9,9 @@ export const metadata = Object.freeze({
   "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
-    "repository": null,
-    "reference": null,
-    "updatedAt": null,
+    "repository": "https://github.com/foundryvtt/pf2e",
+    "reference": "pf2e-7.12.2@522dec9d289c7da8b69ac0167b11ccd639871fef",
+    "updatedAt": "2026-04-06",
     "verifiedAt": null
   },
   "compatibility": {

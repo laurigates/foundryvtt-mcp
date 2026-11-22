@@ -251,7 +251,10 @@ D&D 5e 6.1.1 and PF2e 8.7.1 contracts. New system operations require their inspe
 Foundry 14 build minimum and runtime APIs; mutation and side-effecting roll tools
 also require target write opt-in and document ownership. The detailed system
 adapters reside in `14/`; their `13/` variants preserve only the original raw
-read and explicitly have no inspected Foundry-13 upstream baseline. Item Piles
+read, with scoped source references to D&D 5e **5.3.3** and PF2e **7.12.2**.
+Those generation-13 pins document the inspected raw-data contract and do not
+backport the generation-14 rules operations or change the original capability
+probes. Item Piles
 has independent `13/` and `14/` packages using the inspected 3.3.4 source. Original
 raw reads retain their input/output/capability contracts inside the selected
 generation. None of these source checks establishes live support.

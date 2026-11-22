@@ -1,4 +1,4 @@
-/** Historical raw read only; no inspected Foundry 13 upstream release is claimed. */
+/** Historical raw read only; source reference inspected against D&D5e 5.3.3. */
 export const metadata = Object.freeze({
   "schemaVersion": 1,
   "protocolVersion": 1,
@@ -9,9 +9,9 @@ export const metadata = Object.freeze({
   "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
-    "repository": null,
-    "reference": null,
-    "updatedAt": null,
+    "repository": "https://github.com/foundryvtt/dnd5e",
+    "reference": "release-5.3.3@965ad2d0cf5d063dac675ba078b5bd3c3c0dd449",
+    "updatedAt": "2026-05-07",
     "verifiedAt": null
   },
   "compatibility": {

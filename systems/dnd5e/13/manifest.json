@@ -8,9 +8,9 @@
   "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
-    "repository": null,
-    "reference": null,
-    "updatedAt": null,
+    "repository": "https://github.com/foundryvtt/dnd5e",
+    "reference": "release-5.3.3@965ad2d0cf5d063dac675ba078b5bd3c3c0dd449",
+    "updatedAt": "2026-05-07",
     "verifiedAt": null
   },
   "compatibility": {

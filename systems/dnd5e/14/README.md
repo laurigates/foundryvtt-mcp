@@ -13,7 +13,8 @@ implement the complete D&D5e API or reproduce every sheet/chat-card workflow.
 | Adapter version / update | **0.2.0** / **2026-11-22** |
 | Status | **Experimental** |
 | Official source repository | [foundryvtt/dnd5e](https://github.com/foundryvtt/dnd5e) |
-| Upstream source version / kind | **6.1.1**, release [`release-6.1.1`](https://github.com/foundryvtt/dnd5e/releases/tag/release-6.1.1) |
+| Upstream system release | **[6.1.1](https://github.com/foundryvtt/dnd5e/releases/tag/release-6.1.1)** |
+| Upstream release tag | `release-6.1.1` |
 | Resolved upstream commit | [`bc1b2c921e2f306dc5079f8de883ad64607118a6`](https://github.com/foundryvtt/dnd5e/commit/bc1b2c921e2f306dc5079f8de883ad64607118a6) |
 | Release published | **2026-11-16** |
 | Source inspection / latest-reference check | **2026-11-22**; latest published release matches the inspected baseline |

@@ -469,3 +469,50 @@ no PR was opened or consulted. It explicitly asks for architectural discussion
 and does not present the experimental code as production-validated or ready to
 merge. Both handoff and draft documents are included in the package file list.
 
+## Generation-13 upstream release references — 2026-11-22
+
+The previous compatibility/visibility corrections were confirmed published in
+`329eeaa18e9d1c9751650f52d53170f5e1fa984c`. This follow-up resolves the missing
+generation-13 system provenance recorded in the earlier historical tables.
+
+| Package | Official release / tag | Resolved commit | Upstream Foundry declaration |
+|---|---|---|---|
+| `systems/dnd5e/13/` | [D&D 5e 5.3.3](https://github.com/foundryvtt/dnd5e/releases/tag/release-5.3.3), tag `release-5.3.3`, published 2026-05-07 | `965ad2d0cf5d063dac675ba078b5bd3c3c0dd449` | Minimum 13.347; upstream verified 14; this package selects only generation 13 |
+| `systems/pf2e/13/` | [PF2e 7.12.2](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-7.12.2), published 2026-04-06 | `522dec9d289c7da8b69ac0167b11ccd639871fef` | Minimum 13.348, upstream verified 13.351, maximum 13 |
+
+Official release metadata, tag resolution and immutable system manifests were
+checked on **2026-11-22**. The nine newer stable D&D 5e 6.x manifests and seventeen
+newer stable PF2e 8.x manifests require Foundry 14. The generation-13 references
+are therefore the latest stable releases compatible with that generation at the
+time of inspection. The generation-14 references remain D&D 5e **6.1.1** and
+PF2e **8.7.1**. Item Piles' latest release and tag were reconfirmed as **3.3.4**
+at `85ab971406623fb1c5d01eb1f093fe4855ede6e4`, whose manifest declares Foundry 13–14.
+
+Source inspection for the two generation-13 systems was limited to the retained
+raw Actor-data contract: document registration/inheritance and source
+serialization. Their `UPSTREAM.md` files identify the inspected files and limits.
+Recording those releases does not introduce a rules integration, enforce a new
+exact-version/build gate or certify the historical D&D display descriptor.
+
+All six generation READMEs now visibly identify the official **upstream system
+or module release** separately from the adapter version. The two generation-13
+registries and generated manifests contain the actual repository, tag/SHA and
+release date. Package overviews, system catalog, development handoff, architecture
+record and discussion draft are aligned with those references.
+
+Verification for this metadata/documentation follow-up:
+
+- `npm run check:integrations`: all **6 independent packages** passed.
+- D&D 5e generation 13: **6 Node tests** and **5 Python tests** passed.
+- PF2e generation 13: **6 Node tests** and **5 Python tests** passed.
+- Existing metadata assertions were updated; raw bindings/probes, operation
+  schemas, compatibility filters, Python adapters and the D&D display descriptor
+  remain unchanged. Both generation-13 adapters remain **0.1.1**.
+- The shared host and the previously corrected PF2e generation-14 runtime remain
+  unchanged. The earlier full binding/worker-suite results remain historical
+  evidence rather than a claim that those complete suites were rerun here.
+
+All variants remain experimental, with `compatibility.tested: []` and
+`upstream.verifiedAt: null`. Upstream's `verified` field is its own Foundry
+declaration and is not a live-test record for this MCP adapter.
+

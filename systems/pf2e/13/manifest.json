@@ -8,9 +8,9 @@
   "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
-    "repository": null,
-    "reference": null,
-    "updatedAt": null,
+    "repository": "https://github.com/foundryvtt/pf2e",
+    "reference": "pf2e-7.12.2@522dec9d289c7da8b69ac0167b11ccd639871fef",
+    "updatedAt": "2026-04-06",
     "verifiedAt": null
   },
   "compatibility": {

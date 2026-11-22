@@ -344,7 +344,11 @@ code has been inspected and the adapter aligned with its contract. If the latest
 reference is ahead of the inspected baseline, list both and mark synchronization
 as pending. Do not advance the baseline merely because a newer release exists.
 
-Each package README records these fields separately:
+Each package README records these fields separately. Put the linked upstream
+system/module release near the top of the README, visibly separate from the
+adapter version. A generation-specific directory still needs its own upstream
+reference even when its only operation preserves an older raw-read contract.
+Inspect and document that narrower contract before recording its release pin.
 
 | Field | Required documentation |
 |---|---|

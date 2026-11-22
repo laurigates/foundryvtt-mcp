@@ -122,9 +122,9 @@ The branch contains six generation packages:
 
 | Package | Adapter | Inspected upstream baseline | Exposed operations |
 |---|---|---|---|
-| `systems/dnd5e/13/` | `0.1.1` | No Foundry-13-specific upstream baseline recorded | Original Actor-data read only |
+| `systems/dnd5e/13/` | `0.1.1` | D&D 5e `5.3.3`; raw-read source baseline | Original Actor-data read only |
 | `systems/dnd5e/14/` | `0.2.0` | D&D 5e `6.1.1` | 25: 10 reads, 15 writes |
-| `systems/pf2e/13/` | `0.1.1` | No Foundry-13-specific upstream baseline recorded | Original Actor-data read only |
+| `systems/pf2e/13/` | `0.1.1` | PF2e `7.12.2`; raw-read source baseline | Original Actor-data read only |
 | `systems/pf2e/14/` | `0.2.1` | PF2e `8.7.1` | 22: 10 reads, 12 writes |
 | `modules/item-piles/13/` | `0.2.1` | Item Piles `3.3.4` | 40: 13 reads, 27 writes |
 | `modules/item-piles/14/` | `0.2.1` | Item Piles `3.3.4` | 40: 13 reads, 27 writes |
@@ -133,7 +133,7 @@ D&D 5e's new operations require its inspected release and Foundry 14 build 367 o
 
 PF2e's new operations require its inspected release and Foundry 14 build 361 or later. They cover prepared statistics, inventory, currencies, conditions, resources, selected checks and strikes, and supported recharge behavior. Full spell casting, damage/IWR application and a complete rest workflow remain outside that coverage.
 
-The generation-13 system packages preserve the original raw read. They do not claim that the generation-14 rules integrations were backported. Item Piles exposes selected inventory, currency, transfer, merchant, pile and vault operations in separate autonomous packages.
+The generation-13 system packages preserve the original raw read. The source-reference follow-up on 2026-11-22 identified D&D 5e **5.3.3** and PF2e **7.12.2** as the latest stable releases compatible with that generation and recorded them without expanding the operations. They do not claim that the generation-14 rules integrations were backported. Item Piles exposes selected inventory, currency, transfer, merchant, pile and vault operations in separate autonomous packages.
 
 All variants remain experimental. Their source references and actual coverage belong in the [system catalog](../bridges/systems.md), [module catalog](../bridges/modules.md) and individual READMEs.
 

@@ -16,7 +16,12 @@ test('autonomous generation-13 package is reproducible and exposes only the orig
   assert.equal(manifest.foundryGeneration, 13);
   assert.equal(manifest.adapterVersion, '0.1.1');
   assert.deepEqual(manifest.operations, [legacyOperation]);
-  assert.deepEqual(manifest.upstream, { repository: null, reference: null, updatedAt: null, verifiedAt: null });
+  assert.deepEqual(manifest.upstream, {
+    repository: 'https://github.com/foundryvtt/dnd5e',
+    reference: 'release-5.3.3@965ad2d0cf5d063dac675ba078b5bd3c3c0dd449',
+    updatedAt: '2026-05-07',
+    verifiedAt: null,
+  });
   assert.deepEqual(manifest.compatibility.tested, []);
   assert.equal(await readFile(new URL('../get_actor_data.js', import.meta.url), 'utf8'), legacyBinding);
   assert.equal(await readFile(new URL('../probe.js', import.meta.url), 'utf8'), legacyProbe);
