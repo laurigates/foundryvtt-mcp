@@ -96,8 +96,11 @@ function rollCheck(system: InstanceType<typeof DiagnosticSystem>): Promise<boole
 }
 
 /** A REST-mode client whose `rollDice` answers with the given source. */
-function clientRolling(source: 'server' | 'local') {
-  const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+function clientRolling(source: 'server' | 'local', rest = true) {
+  const client = new FoundryClient({
+    baseUrl: 'http://localhost:30000',
+    ...(rest ? { apiKey: 'test-api-key' } : {}),
+  });
   vi.spyOn(client, 'rollDice').mockResolvedValue({
     formula: '1d20',
     total: 11,
@@ -120,13 +123,26 @@ describe('DiagnosticSystem.testDiceRolling, REST mode (#265)', () => {
 
 describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
   it('passes on a local roll, which is the only kind this mode makes', async () => {
-    const { config } = await import('../../config/index.js');
-    const saved = config.foundry.apiKey;
-    Reflect.deleteProperty(config.foundry, 'apiKey');
-    try {
-      await expect(rollCheck(new DiagnosticSystem(clientRolling('local')))).resolves.toBe(true);
-    } finally {
-      Reflect.set(config.foundry, 'apiKey', saved);
-    }
+    const provider = clientRolling('local', false);
+    // The first/global target has a REST key; this native target must ignore it.
+    const diagnostic = new DiagnosticSystem(provider, { url: 'http://native.test' });
+    await expect(rollCheck(diagnostic)).resolves.toBe(true);
+  });
+
+  it('uses the selected provider even when a compatibility connection includes a stale key', async () => {
+    const provider = clientRolling('local', false);
+    const diagnostic = new DiagnosticSystem(provider, {
+      url: 'http://native.test',
+      apiKey: 'unused-key',
+    });
+    await expect(rollCheck(diagnostic)).resolves.toBe(true);
+  });
+
+  it('does not confuse composite native dice with standalone relay dice', async () => {
+    const provider = clientRolling('local', false);
+    vi.spyOn(provider, 'kind', 'get').mockReturnValue('composite');
+    await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(true);
+    vi.spyOn(provider, 'kind', 'get').mockReturnValue('rest-api');
+    await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(false);
   });
 });

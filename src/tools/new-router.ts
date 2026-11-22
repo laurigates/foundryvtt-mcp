@@ -10,7 +10,7 @@ import type { DiagnosticsClient } from '../diagnostics/client.js';
 import type { FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
-import type { ToolContext } from './base.js';
+import type { ProviderToolContext } from './base.js';
 // Import legacy handlers for tools not yet converted
 import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
 import {
@@ -38,7 +38,7 @@ export async function routeToolRequest(
 ) {
   logger.debug(`Routing tool request: ${name}`, { args });
 
-  const context: ToolContext = {
+  const context: ProviderToolContext = {
     provider,
     diagnosticsClient,
     diagnosticSystem,

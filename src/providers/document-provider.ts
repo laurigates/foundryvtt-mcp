@@ -1764,7 +1764,12 @@ export class DocumentProvider implements FoundryProvider {
    */
   async testConnection(): Promise<boolean> {
     try {
-      await this.connect();
+      if (!this.isConnected()) {
+        await this.connect();
+      } else if (this.config.apiKey) {
+        // Revalidate a historical API key without replacing a live session.
+        await probeRestModule((url) => this.http.get(url));
+      }
       logger.debug('Authenticated connection test successful', {
         transport: this.config.apiKey ? 'REST API' : 'Socket.IO',
       });

@@ -13,7 +13,7 @@ import { ProviderError } from '../providers/errors.js';
 import type { AttributePatch, FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
-import type { ToolContext, ToolResult } from './base.js';
+import type { ProviderToolContext, ToolResult } from './base.js';
 import { handleUpdateActorAttribute } from './handlers/actor-mutations.js';
 import { handleGetActorDetails, handleSearchActors } from './handlers/actors.js';
 import { handleGetChatMessages } from './handlers/chat.js';
@@ -68,7 +68,7 @@ export async function routeToolRequest(
 
   // Try the new registry system first
   if (toolRegistry.has(name)) {
-    const context: ToolContext = {
+    const context: ProviderToolContext = {
       provider,
       diagnosticsClient,
       diagnosticSystem,

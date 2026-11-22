@@ -82,10 +82,18 @@ export function projectActor(raw: WorldActor, systemId: string): FoundryActor {
   const hpTemp = value('hpTemp');
   // Preserve partial numeric HP data; missing fields must not erase present values.
   const hp: { value?: number; max?: number; temp?: number } = {};
-  if (typeof hpValue === 'number') hp.value = hpValue;
-  if (typeof hpMax === 'number') hp.max = hpMax;
-  if (typeof hpTemp === 'number') hp.temp = hpTemp;
-  if (Object.keys(hp).length > 0) actor.hp = hp;
+  if (typeof hpValue === 'number') {
+    hp.value = hpValue;
+  }
+  if (typeof hpMax === 'number') {
+    hp.max = hpMax;
+  }
+  if (typeof hpTemp === 'number') {
+    hp.temp = hpTemp;
+  }
+  if (Object.keys(hp).length > 0) {
+    actor.hp = hp;
+  }
   const ac = value('ac');
   if (typeof ac === 'number') {
     actor.ac = { value: ac };

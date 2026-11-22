@@ -410,6 +410,90 @@ describe('FoundrySessionManager', () => {
     expect(provider.refreshWorldData).not.toHaveBeenCalled();
   });
 
+  it.each(['before', 'during'] as const)(
+    'rejects a legacy REST world switch %s a read with no disconnect',
+    async (phase) => {
+      const fake = fakeProvider('world-a');
+      const other = fakeProvider('world-b');
+      let remoteWorld = 'world-a';
+      const provider: FoundryProvider = {
+        ...fake.provider,
+        kind: 'legacy-rest',
+        capabilities: new Set(['core.read']),
+        inspect: vi.fn(async () => environment(remoteWorld)),
+        getActor: vi.fn(async (id) => {
+          if (phase === 'during') {
+            remoteWorld = 'unexpected';
+          }
+          return { _id: id, name: `Actor in ${remoteWorld}`, type: 'character' };
+        }),
+      };
+      const config = target('legacy');
+      config.provider = {
+        kind: 'legacy-rest',
+        baseUrl: 'http://legacy.test',
+        apiKey: 'legacy-key',
+      };
+      if (phase === 'before') {
+        config.expectedWorldId = 'world-a';
+      }
+      const manager = new FoundrySessionManager([config, target('other')], {
+        providerFactory: (entry) => (entry.kind === 'legacy-rest' ? provider : other.provider),
+        integrationFactory: integrationStub,
+        monitorIntervalMs: 0,
+      });
+      managers.push(manager);
+      await manager.start();
+      const session = manager.resolve('legacy');
+      const generation = provider.getGeneration();
+      if (phase === 'before') {
+        remoteWorld = 'unexpected';
+      }
+      const result = session.run((core) => core.getActor('same'));
+      const queued = session.run((core) => core.getActor('same'));
+      await Promise.all([
+        expect(result).rejects.toMatchObject({ code: 'world_mismatch' }),
+        expect(queued).rejects.toMatchObject({ code: 'target_unavailable' }),
+      ]);
+      expect(provider.getGeneration()).toBe(generation);
+      expect(provider.getActor).toHaveBeenCalledTimes(phase === 'before' ? 0 : 1);
+      expect(session.state).toBe('error');
+      expect(session.environment?.world.id).toBe('world-a');
+      expect(session.status().error).toContain('expected world world-a');
+      await expect(
+        manager.resolve('other').run((core) => core.getActor('same')),
+      ).resolves.toMatchObject({ name: 'world-b' });
+    },
+  );
+
+  it('checks stable legacy REST identity without replacing its session', async () => {
+    const fake = fakeProvider('world-a');
+    const provider: FoundryProvider = {
+      ...fake.provider,
+      kind: 'legacy-rest',
+      capabilities: new Set(['core.read']),
+    };
+    const config = target('legacy');
+    config.provider = { kind: 'legacy-rest', baseUrl: 'http://legacy.test', apiKey: 'legacy-key' };
+    const manager = new FoundrySessionManager([config], {
+      providerFactory: () => provider,
+      integrationFactory: integrationStub,
+      monitorIntervalMs: 0,
+    });
+    managers.push(manager);
+    await manager.start();
+    const session = manager.resolve();
+    const generation = session.generation;
+    await expect(session.run((core) => core.getActor('same'))).resolves.toMatchObject({
+      name: 'world-a',
+    });
+    expect(provider.inspect).toHaveBeenCalledTimes(3);
+    expect(provider.getActor).toHaveBeenCalledTimes(1);
+    expect(session.state).toBe('ready');
+    expect(session.generation).toBe(generation);
+    expect(provider.refreshWorldData).not.toHaveBeenCalled();
+  });
+
   it('serializes operations per target without blocking other worlds', async () => {
     const a = fakeProvider('a');
     const b = fakeProvider('b');

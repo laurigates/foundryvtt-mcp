@@ -1,3 +1,4 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TargetConfig } from '../../config/targets.js';
 import type { IntegrationTool } from '../../integrations/types.js';
@@ -5,10 +6,12 @@ import { ProviderError } from '../../providers/errors.js';
 import type { FoundryProvider } from '../../providers/types.js';
 import { FoundrySessionManager, type SessionIntegrations } from '../../sessions/index.js';
 import { ToolCatalog } from '../catalog.js';
+import * as definitions from '../definitions.js';
 
 const managers: FoundrySessionManager[] = [];
 afterEach(async () => {
   await Promise.all(managers.splice(0).map((manager) => manager.close()));
+  vi.restoreAllMocks();
 });
 
 function fixture(
@@ -19,6 +22,7 @@ function fixture(
     write?: boolean;
     outputType?: string;
     stale?: boolean;
+    capabilities?: string[];
   } = {},
 ) {
   let connected = false;
@@ -26,7 +30,7 @@ function fixture(
   let stale = options.stale ?? false;
   const provider = {
     kind: 'socketio',
-    capabilities: new Set(['core.read', 'core.cache', 'core.write']),
+    capabilities: new Set(options.capabilities ?? ['core.read', 'core.cache', 'core.write']),
     connect: async () => {
       if (options.offline) {
         throw new Error('offline');
@@ -57,6 +61,7 @@ function fixture(
       type: 'character',
     })),
     getScenes: () => [{ _id: 'same-scene', name: id, active: true }],
+    getWorldSummary: () => ({ actors: 1, scenes: 1 }),
     deleteActorItem: vi.fn(async () => {}),
   } as FoundryProvider;
   const tool: IntegrationTool = {
@@ -133,6 +138,195 @@ const text = (result: { content: Array<{ text?: string }> }) =>
   result.content.map((entry) => entry.text ?? '').join('\n');
 
 describe('MCP target catalog', () => {
+  it('keeps the legacy single-target text at content[0] and adds only metadata', async () => {
+    const { catalog } = await setup(fixture('a'));
+    const result = await catalog.call('get_actor_details', { actorId: 'same-id' });
+    expect(result.content).toEqual([
+      {
+        type: 'text',
+        text: `🎭 **Actor Details: Actor in a**
+**Type:** character
+**Level:** Unknown
+**Hit Points:** Unknown/Unknown
+**Armor Class:** Unknown
+
+**Ability Scores:**
+No ability scores available
+
+**Description:** No description available.`,
+      },
+    ]);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result._meta).toEqual({ target_id: 'a', world_id: 'a', session_generation: 1 });
+    const schema = catalog.list().find((tool) => tool.name === 'get_actor_details')?.inputSchema;
+    expect(schema?.required).toContain('actorId');
+    expect(schema?.required).not.toContain('target_id');
+  });
+
+  it('preserves the refresh response and refreshes its session exactly once', async () => {
+    const a = fixture('a');
+    const { catalog, manager } = await setup(a);
+    const previous = manager.resolve().generation;
+    const result = await catalog.call('refresh_world_data', {});
+    expect(result.content).toEqual([
+      {
+        type: 'text',
+        text:
+          'World data refreshed successfully.\n\n**Collection Counts:**\n' +
+          '- **actors**: 1\n- **scenes**: 1',
+      },
+    ]);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result._meta?.session_generation).toBeGreaterThan(previous);
+    expect(a.provider.refreshWorldData).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists and reads legacy resource aliases with one configured target', async () => {
+    const { catalog } = await setup(fixture('a'));
+    expect(catalog.listResources()).toContainEqual({
+      uri: 'foundry://scenes',
+      name: 'All Scenes',
+      description: 'List of all scenes in the current world',
+      mimeType: 'application/json',
+    });
+    expect(catalog.listResources().some((item) => item.uri === 'foundry://targets/a/scenes')).toBe(
+      true,
+    );
+    const result = await catalog.readResource('foundry://scenes');
+    expect(result.contents[0]?.uri).toBe('foundry://scenes');
+    expect(JSON.parse(result.contents[0]?.text ?? '{}')).toMatchObject({
+      scenes: [{ _id: 'same-scene', name: 'a', active: true }],
+      total: 1,
+    });
+    expect(result._meta).toEqual({ target_id: 'a', world_id: 'a', session_generation: 1 });
+    expect(catalog.listResources().some((item) => item.uri.includes('system/diagnostics'))).toBe(
+      false,
+    );
+  });
+
+  it('keeps aliases unavailable when a second configured target is offline', async () => {
+    const { catalog } = await setup(fixture('a'), fixture('b', { offline: true }));
+    expect(catalog.listResources().every((item) => item.uri.startsWith('foundry://targets/'))).toBe(
+      true,
+    );
+    await expect(catalog.readResource('foundry://scenes')).rejects.toMatchObject({
+      code: 'ambiguous_target',
+    });
+  });
+
+  it('preserves MethodNotFound for unknown tool names before selecting a target', async () => {
+    const { catalog } = await setup(fixture('a'), fixture('b'));
+    await expect(catalog.call('no_such_tool', {})).rejects.toMatchObject({
+      code: ErrorCode.MethodNotFound,
+      message: expect.stringContaining('Unknown tool: no_such_tool'),
+    });
+  });
+
+  it('preserves typed MCP handler errors', async () => {
+    const a = fixture('a');
+    const error = new McpError(ErrorCode.InvalidParams, 'Actor does not exist');
+    vi.mocked(a.provider.getActor).mockRejectedValue(error);
+    const { catalog } = await setup(a);
+    await expect(catalog.call('get_actor_details', { actorId: 'missing' })).rejects.toBe(error);
+  });
+
+  it('classifies all core tools and blocks unclassified additions', async () => {
+    const a = fixture('a', {
+      write: true,
+      capabilities: [
+        'core.read',
+        'core.cache',
+        'core.write',
+        'diagnostics.read',
+        'compendium.read',
+      ],
+    });
+    const existing = definitions.getAllTools();
+    const template = existing[0];
+    if (!template) {
+      throw new Error('Expected at least one core tool');
+    }
+    vi.spyOn(definitions, 'getAllTools').mockReturnValue([
+      ...existing,
+      { ...template, name: 'unclassified_tool' },
+    ]);
+    const { catalog } = await setup(a);
+    const listed = new Set(catalog.list().map((tool) => tool.name));
+    for (const tool of existing) {
+      expect(listed.has(tool.name), tool.name).toBe(true);
+    }
+    expect(listed.has('unclassified_tool')).toBe(false);
+    const blocked = await catalog.call('unclassified_tool', {});
+    expect(blocked.isError).toBe(true);
+    expect(text(blocked)).toContain('unsupported_operation');
+  });
+
+  it.each(['core', 'integration', 'write'] as const)(
+    'does not return or relabel a stale %s result if reconnect happens after session.run settles',
+    async (kind) => {
+      const a = fixture('a', { module: true, write: true });
+      const { catalog, manager } = await setup(a);
+      const session = manager.resolve();
+      const generation = session.generation;
+      const run = session.run.bind(session);
+      // Model the real microtask boundary between session validation and MCP response creation.
+      vi.spyOn(session, 'run').mockImplementation(async (operation, options) => {
+        const result = await run(operation, options);
+        await session.reconnect();
+        return result;
+      });
+      const result =
+        kind === 'core'
+          ? await catalog.call('get_actor_details', { actorId: 'same-id' })
+          : kind === 'integration'
+            ? await catalog.call('module_item-piles_get_items', { actor_uuid: 'Actor.same' })
+            : await catalog.call('delete_actor_item', {
+                actorId: 'abcdefABCDEF0123',
+                itemId: '0123456789abcdef',
+              });
+      expect(result.isError).toBe(true);
+      expect(result._meta?.session_generation).toBe(generation);
+      expect(text(result)).toContain(kind === 'write' ? 'outcome_unknown' : 'session_changed');
+      expect(result.structuredContent).toBeUndefined();
+      expect(session.generation).toBeGreaterThan(generation);
+      if (kind === 'write') {
+        expect(a.provider.deleteActorItem).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
+
+  it('rejects a resource response if its session changes before response creation', async () => {
+    const { catalog, manager } = await setup(fixture('a'));
+    const session = manager.resolve();
+    const run = session.run.bind(session);
+    vi.spyOn(session, 'run').mockImplementation(async (operation, options) => {
+      const result = await run(operation, options);
+      await session.reconnect();
+      return result;
+    });
+    await expect(catalog.readResource('foundry://scenes')).rejects.toMatchObject({
+      code: 'session_changed',
+    });
+  });
+
+  it('rejects a reconnect before emitting a refresh result', async () => {
+    const { catalog, manager } = await setup(fixture('a'));
+    const session = manager.resolve();
+    const refresh = session.refreshWithContext.bind(session);
+    let refreshedGeneration = 0;
+    vi.spyOn(session, 'refreshWithContext').mockImplementation(async () => {
+      const context = await refresh();
+      refreshedGeneration = context.session_generation;
+      await session.reconnect();
+      return context;
+    });
+    const result = await catalog.call('refresh_world_data', {});
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('session_changed');
+    expect(result._meta?.session_generation).toBe(refreshedGeneration);
+    expect(session.generation).toBeGreaterThan(refreshedGeneration);
+  });
+
   it('lists management tools while all destinations are offline', async () => {
     const { catalog } = await setup(fixture('a', { offline: true }));
     expect(catalog.list().map((tool) => tool.name)).toEqual([

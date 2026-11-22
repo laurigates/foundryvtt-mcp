@@ -110,7 +110,7 @@ foundry://targets/campaign-b/combat
 | `foundry://world/settings` | World/system settings |
 | `foundry://system/diagnostics` | Legacy REST diagnostics, capability-dependent |
 
-When only one target is configured, unqualified legacy resource aliases remain readable. With multiple targets use `foundry://targets/<target_id>/<path>`; duplicate upstream document IDs across different worlds are not interchangeable.
+When only one target is configured, unqualified legacy resource aliases are also listed and remain readable, subject to readiness and capabilities. With multiple targets use `foundry://targets/<target_id>/<path>`; duplicate upstream document IDs across different worlds are not interchangeable. Core tool content keeps its original shape, with target provenance added in `_meta`; see [Backward compatibility](backward-compatibility.md).
 
 ## Not exposed as generic MCP capabilities
 

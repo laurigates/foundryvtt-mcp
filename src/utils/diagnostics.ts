@@ -392,7 +392,11 @@ export class DiagnosticSystem {
       }
       // In REST mode a local roll means /api/dice/roll failed and the client
       // fell back (#254); in Socket.IO mode every roll is local by design.
-      if (config.foundry.apiKey && result.source !== 'server') {
+      const requiresServerRoll =
+        this.provider.kind === 'legacy-rest' ||
+        this.provider.kind === 'rest-api' ||
+        (this.provider.kind === undefined && Boolean(this.connection.apiKey));
+      if (requiresServerRoll && result.source !== 'server') {
         logger.warn('Dice health check: REST dice roll fell back to the local roller');
         return false;
       }

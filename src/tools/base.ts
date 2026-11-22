@@ -8,18 +8,39 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import type { DiagnosticsClient } from '../diagnostics/client.js';
+import type { FoundryClient } from '../foundry/client.js';
 import { ProviderError } from '../providers/errors.js';
 import type { FoundryCore } from '../providers/types.js';
 import type { DiagnosticSystem } from '../utils/diagnostics.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Tool execution context containing all necessary dependencies
+ * Historical extension context. Existing tools can keep their FoundryClient
+ * type; current handlers use the transport-independent provider context below.
  */
-export interface ToolContext {
-  provider: FoundryCore;
+export interface ToolContext<Client extends FoundryCore = FoundryClient> {
+  foundryClient: Client;
   diagnosticsClient?: DiagnosticsClient;
   diagnosticSystem?: DiagnosticSystem;
+}
+
+export interface ProviderToolContext extends Omit<ToolContext, 'foundryClient'> {
+  provider: FoundryCore;
+}
+
+export type ToolContextInput = ToolContext<FoundryCore> | ProviderToolContext;
+export type ResolvedToolContext = ToolContext<FoundryCore> & ProviderToolContext;
+
+/** Both names must identify the same target, including for third-party tools. */
+export function normalizeToolContext(context: ToolContextInput): ResolvedToolContext {
+  const provider = 'provider' in context ? context.provider : context.foundryClient;
+  if (!provider || ('foundryClient' in context && context.foundryClient !== provider)) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Tool context must identify one provider; provider and foundryClient cannot disagree',
+    );
+  }
+  return { ...context, provider, foundryClient: provider };
 }
 
 /**
@@ -59,7 +80,7 @@ export interface Tool {
    * @param context - Tool execution context
    * @returns Tool execution result
    */
-  execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult>;
+  execute(args: Record<string, unknown>, context: ToolContextInput): Promise<ToolResult>;
 }
 
 /**
@@ -79,14 +100,14 @@ export abstract class BaseTool implements Tool {
   /**
    * Execute the tool with automatic validation
    */
-  async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
+  async execute(args: Record<string, unknown>, context: ToolContextInput): Promise<ToolResult> {
     logger.debug(`Executing tool: ${this.name}`, { args });
 
     // Validate input arguments against schema
     this.validateArgs(args);
 
     try {
-      return await this.executeValidated(args, context);
+      return await this.executeValidated(args, normalizeToolContext(context));
     } catch (error) {
       logger.error(`Tool execution failed: ${this.name}`, error);
 
@@ -106,7 +127,7 @@ export abstract class BaseTool implements Tool {
    */
   protected abstract executeValidated(
     args: Record<string, unknown>,
-    context: ToolContext,
+    context: ToolContext<FoundryCore>,
   ): Promise<ToolResult>;
 
   /**

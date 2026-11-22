@@ -2,8 +2,10 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import type { FoundrySession, FoundrySessionManager } from '../sessions/index.js';
+import type { SessionContext } from '../sessions/session.js';
 import type { ToolResult } from './base.js';
 import { getAllTools } from './definitions.js';
+import { formatWorldRefreshResult } from './handlers/world.js';
 import { getAllResources } from './resources.js';
 import { routeResourceRequest, routeToolRequest } from './router.js';
 
@@ -40,6 +42,18 @@ const CACHED = new Set([
   'refresh_world_data',
   'get_world_summary',
 ]);
+const READS = new Set([
+  'roll_dice',
+  'search_actors',
+  'get_actor_details',
+  'search_items',
+  'get_scene_info',
+  'generate_npc',
+  'generate_loot',
+  'lookup_rule',
+  'diagnose_errors',
+  'get_health_status',
+]);
 const MANAGEMENT = new Set([
   'list_targets',
   'get_target_status',
@@ -69,7 +83,7 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
-function requiredCapability(name: string): string {
+function requiredCapability(name: string): string | undefined {
   if (WRITES.has(name)) {
     return 'core.write';
   }
@@ -82,7 +96,8 @@ function requiredCapability(name: string): string {
   if (CACHED.has(name)) {
     return 'core.cache';
   }
-  return 'core.read';
+  // New tools must be classified explicitly before discovery or execution.
+  return READS.has(name) ? 'core.read' : undefined;
 }
 
 function targetArgument(args: Record<string, unknown>): string | undefined {
@@ -141,10 +156,12 @@ export class ToolCatalog {
   }
 
   private available(session: FoundrySession, name: string): boolean {
+    const capability = requiredCapability(name);
     return (
+      capability !== undefined &&
       session.state === 'ready' &&
       session.provider.isConnected() &&
-      session.provider.capabilities.has(requiredCapability(name)) &&
+      session.provider.capabilities.has(capability) &&
       (!WRITES.has(name) || session.config.writeEnabled) &&
       (!DND5E_DEMOS.has(name) || session.environment?.system.id === 'dnd5e')
     );
@@ -246,6 +263,16 @@ export class ToolCatalog {
   }
 
   async call(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+    const definitions = this.integrationDefinitions();
+    if (
+      !this.core.has(name) &&
+      !MANAGEMENT.has(name) &&
+      !definitions.tools.has(name) &&
+      !definitions.conflicts.has(name) &&
+      !this.sessions.all().some((session) => session.integrations.has(name))
+    ) {
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+    }
     const targetId = targetArgument(args);
     if (name === 'list_targets') {
       this.validate({ type: 'object', properties: {}, additionalProperties: false }, args);
@@ -255,6 +282,7 @@ export class ToolCatalog {
       });
     }
     const session = this.sessions.resolve(targetId);
+    let context = session.captureContext();
     const parameters = { ...args };
     delete parameters.target_id;
     if (MANAGEMENT.has(name)) {
@@ -265,9 +293,10 @@ export class ToolCatalog {
       if (name === 'reconnect_target') {
         try {
           await this.sessions.reconnect(session.config.id);
-          return this.attribute(session, jsonResult({ target: session.status() }));
+          context = session.captureContext();
+          return this.attribute(context, jsonResult({ target: session.status() }));
         } catch (error) {
-          return this.executionError(session, error);
+          return this.executionError(context, error);
         }
       }
       const kind = name === 'list_modules' ? 'module' : 'system';
@@ -282,14 +311,14 @@ export class ToolCatalog {
     if (definition) {
       if (WRITES.has(name) && !session.config.writeEnabled) {
         return this.error(
-          session,
+          context,
           'writes_disabled',
           `Writes are disabled for target ${session.config.id}`,
         );
       }
       if (!this.available(session, name)) {
         return this.error(
-          session,
+          context,
           'unsupported_operation',
           `Tool ${name} is unavailable on target ${session.config.id}`,
         );
@@ -297,8 +326,12 @@ export class ToolCatalog {
       this.validate(definition.inputSchema, parameters);
       try {
         if (name === 'refresh_world_data') {
-          await this.sessions.refresh(session.config.id);
-          return this.attribute(session, jsonResult({ refreshed: true, target: session.status() }));
+          context = await session.refreshWithContext();
+          session.assertContextCurrent(context);
+          return this.attribute(
+            context,
+            formatWorldRefreshResult(session.provider.getWorldSummary()),
+          );
         }
         const result = await session.run(
           () =>
@@ -311,16 +344,16 @@ export class ToolCatalog {
             ),
           { write: WRITES.has(name), refreshCache: true },
         );
-        return this.attribute(session, result);
+        session.assertContextCurrent(context, WRITES.has(name));
+        return this.attribute(context, result);
       } catch (error) {
-        return this.executionError(session, error);
+        return this.executionError(context, error);
       }
     }
 
-    const definitions = this.integrationDefinitions();
     if (definitions.conflicts.has(name)) {
       return this.error(
-        session,
+        context,
         'tool_schema_conflict',
         `Conflicting definitions for tool ${name}`,
       );
@@ -328,7 +361,7 @@ export class ToolCatalog {
     const integration = definitions.tools.get(name);
     if (!integration || !session.integrations.has(name)) {
       return this.error(
-        session,
+        context,
         'unsupported_operation',
         `Tool ${name} is unavailable on target ${session.config.id}`,
       );
@@ -338,29 +371,34 @@ export class ToolCatalog {
       const result = await session.run(() => session.integrations.call(name, parameters), {
         write: !integration.annotations?.readOnlyHint,
       });
-      return this.attribute(session, jsonResult({ result }));
+      session.assertContextCurrent(context, !integration.annotations?.readOnlyHint);
+      return this.attribute(context, jsonResult({ ...this.provenance(context), result }));
     } catch (error) {
-      return this.executionError(session, error);
+      return this.executionError(context, error);
     }
   }
 
   listResources() {
-    return this.sessions.list().flatMap((status) => {
+    const statuses = this.sessions.list();
+    return statuses.flatMap((status) => {
       const session = this.sessions.get(status.target_id);
       if (!session || session.state !== 'ready' || !session.provider.isConnected()) {
         return [];
       }
-      return getAllResources()
-        .filter((resource) => session.provider.capabilities.has(resourceCapability(resource.uri)))
-        .map((resource) => ({
-          ...resource,
-          uri:
-            'foundry://targets/' +
-            encodeURIComponent(status.target_id) +
-            '/' +
-            resource.uri.slice('foundry://'.length),
-          name: `${status.target_id}: ${resource.name}`,
-        }));
+      const available = getAllResources().filter((resource) =>
+        session.provider.capabilities.has(resourceCapability(resource.uri)),
+      );
+      const qualified = available.map((resource) => ({
+        ...resource,
+        uri:
+          'foundry://targets/' +
+          encodeURIComponent(status.target_id) +
+          '/' +
+          resource.uri.slice('foundry://'.length),
+        name: `${status.target_id}: ${resource.name}`,
+      }));
+      // Preserve resource discovery for existing single-world clients as well as reads.
+      return statuses.length === 1 ? [...available, ...qualified] : qualified;
     });
   }
 
@@ -391,13 +429,15 @@ export class ToolCatalog {
         `Resource is unsupported on target ${session.config.id}`,
       );
     }
+    const context = session.captureContext();
     const result = await session.run(
       () => routeResourceRequest(legacyUri, session.provider, session.diagnosticsClient),
       { refreshCache: true },
     );
+    session.assertContextCurrent(context);
     return {
       contents: result.contents.map((content) => ({ ...content, uri })),
-      _meta: this.provenance(session),
+      _meta: this.provenance(context),
     };
   }
 
@@ -411,47 +451,36 @@ export class ToolCatalog {
     }
   }
 
-  private provenance(session: FoundrySession): Record<string, unknown> {
+  private provenance(context: SessionContext): Record<string, unknown> {
     return {
-      target_id: session.config.id,
-      world_id: session.environment?.world.id ?? null,
-      session_generation: session.generation,
+      target_id: context.target_id,
+      world_id: context.world_id,
+      session_generation: context.session_generation,
     };
   }
 
-  private attribute(session: FoundrySession, result: ToolResult): ToolResult {
-    const source = this.provenance(session);
+  private attribute(context: SessionContext, result: ToolResult): ToolResult {
     return {
       ...result,
-      content: [
-        {
-          type: 'text',
-          text:
-            'Target: ' +
-            session.config.id +
-            ' | World: ' +
-            (session.environment?.world.id ?? 'unknown'),
-        },
-        ...result.content,
-      ],
-      _meta: source,
-      ...(result.structuredContent
-        ? { structuredContent: { ...source, ...result.structuredContent } }
-        : {}),
+      // Provenance is additive: existing clients keep their content[0] and payload shape.
+      _meta: { ...result._meta, ...this.provenance(context) },
     };
   }
 
-  private error(session: FoundrySession, code: string, message: string): ToolResult {
-    const result = this.attribute(session, jsonResult({ error: { code, message } }));
+  private error(context: SessionContext, code: string, message: string): ToolResult {
+    const result = this.attribute(context, jsonResult({ error: { code, message } }));
     // SDK clients validate any structuredContent against the success output schema,
     // including errors. Error details stay in content and provenance stays in _meta.
     delete result.structuredContent;
     return { ...result, isError: true };
   }
 
-  private executionError(session: FoundrySession, error: unknown): ToolResult {
+  private executionError(context: SessionContext, error: unknown): ToolResult {
+    if (error instanceof McpError) {
+      throw error;
+    }
     const code =
       isRecord(error) && typeof error.code === 'string' ? error.code : 'execution_failed';
-    return this.error(session, code, error instanceof Error ? error.message : 'Operation failed');
+    return this.error(context, code, error instanceof Error ? error.message : 'Operation failed');
   }
 }

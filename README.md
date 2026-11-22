@@ -11,6 +11,7 @@ names, including `module_item-piles_get_items`. Existing environment configurati
 is converted into one target; explicit multi-target calls use `target_id`.
 
 - [Providers and target configuration](docs/guides/providers-and-targets.md)
+- [Backward compatibility and migration boundaries](docs/guides/backward-compatibility.md)
 - [Writing system and module integrations](docs/guides/writing-integrations.md)
 - [Architecture decisions and rationale](docs/adrs/0011-provider-session-integration-overhaul.md)
 - [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
@@ -246,9 +247,10 @@ They do not implement the system's rules API.
 ## Available Resources
 
 With multiple targets, use `foundry://targets/<target_id>/<path>`, for example
-`foundry://targets/campaign-a/actors`. The aliases below are accepted only when
-exactly one target is configured. Resource availability follows provider
-capabilities.
+`foundry://targets/campaign-a/actors`. The aliases below are listed and accepted
+when exactly one target is configured and ready. Resource availability follows
+provider capabilities. Core tool results preserve their existing content; target
+and session information is added in `_meta`.
 
 - `foundry://actors` — up to 100 actor summaries and IDs, plus the total count
 - `foundry://items` — up to 100 item summaries and IDs, plus the total count

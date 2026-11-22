@@ -81,6 +81,7 @@
     "docs/adrs/0011-provider-session-integration-overhaul.md",
     "docs/prps/provider-session-integration-overhaul.md",
     "docs/guides/providers-and-targets.md",
+    "docs/guides/backward-compatibility.md",
     "docs/guides/writing-integrations.md",
     "examples/targets.example.json"
   ],

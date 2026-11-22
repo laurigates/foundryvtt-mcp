@@ -82,6 +82,33 @@ describe('FoundryClient', () => {
   });
 
   describe('testConnection authentication', () => {
+    it('checks a connected REST client without replacing its session generation', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+      await client.connect();
+      const generation = client.getGeneration();
+      const connect = vi.spyOn(client, 'connect');
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(connect).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
+      expect(client.getGeneration()).toBe(generation);
+    });
+
+    it('does not reconnect an already authenticated native client during diagnostics', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      vi.spyOn(client, 'isConnected').mockReturnValue(true);
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+      const generation = client.getGeneration();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(connect).not.toHaveBeenCalled();
+      expect(client.getGeneration()).toBe(generation);
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
+    });
+
     it('probes /api/world for a valid REST key without username/password', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockResolvedValue({

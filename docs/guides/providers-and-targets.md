@@ -146,11 +146,13 @@ foundry://targets/campaign-a/actors
 foundry://targets/campaign-b/actors
 ```
 
-Legacy resource aliases such as `foundry://actors` work only when the target is
-unambiguous. Tool results include target provenance. Core tools and integration
+Legacy resource aliases such as `foundry://actors` are listed and readable when
+exactly one target is configured, ready and capable. Core tool content retains
+its original shape; target provenance is additive in `_meta`. Integration tools
+also include it in their declared structured wrapper. Core tools and integration
 tools are listed according to actual capability and availability; the exact same
 catalog handles their calls. A tool cached by an MCP client is checked again
-before invocation.
+before invocation. See [Backward compatibility](backward-compatibility.md).
 
 ## Lifecycle, writes, and freshness
 
@@ -159,6 +161,11 @@ instances, and optional Python worker. A failure does not redirect requests to
 another target. Reconnection and explicit refresh rebuild the affected runtime
 context. A changed remote world/origin is rejected until the configuration and
 connection are deliberately reconciled.
+
+Historical REST sessions inspect world identity before and after each successful
+operation. A mismatch withholds the data and stops that target's queued work.
+Because the bridge does not attach world identity to each data response, a world
+switch and return entirely between those probes cannot be detected.
 
 Operations on the same target are serialized; different targets remain
 independent and can run concurrently. Before a subsequent cache-backed core

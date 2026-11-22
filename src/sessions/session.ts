@@ -43,6 +43,14 @@ export interface SessionStatus {
   integrationError?: string;
 }
 
+/** Captured at dispatch; transport generation is internal and is not sent in MCP metadata. */
+export interface SessionContext {
+  readonly target_id: string;
+  readonly world_id: string | null;
+  readonly session_generation: number;
+  readonly provider_generation: number;
+}
+
 /** A target owns its provider, caches, diagnostics and Python integration process. */
 export class FoundrySession {
   readonly diagnosticsClient: DiagnosticsClient;
@@ -140,7 +148,33 @@ export class FoundrySession {
   }
 
   async refresh(): Promise<void> {
-    return this.enqueue(() => this.establish('refresh'));
+    await this.refreshWithContext();
+  }
+
+  /** Keep refresh provenance tied to the lifecycle that produced its snapshot. */
+  async refreshWithContext(): Promise<SessionContext> {
+    return this.enqueue(async () => {
+      await this.establish('refresh');
+      return this.captureContext();
+    });
+  }
+
+  captureContext(): SessionContext {
+    return Object.freeze({
+      target_id: this.config.id,
+      world_id: this.environment?.world.id ?? null,
+      session_generation: this.generation,
+      provider_generation: this.providerGeneration,
+    });
+  }
+
+  /** Close the await boundary between run() settling and the caller emitting its result. */
+  assertContextCurrent(context: SessionContext, write = false): void {
+    if (context.target_id !== this.config.id) {
+      throw new SessionError('session_changed', 'Response belongs to a different target');
+    }
+    this.requireCurrent(context.session_generation, context.provider_generation, write);
+    this.requireReady();
   }
 
   /** The callback is bound to this target for its entire lifetime. No retry or fallback is performed. */
@@ -166,10 +200,17 @@ export class FoundrySession {
       ) {
         await this.refreshCache(generation, providerGeneration);
       }
+      if (this.provider.kind === 'legacy-rest') {
+        await this.verifyLegacyIdentity(generation, providerGeneration);
+      }
       this.requireCurrent(generation, providerGeneration, false);
       this.requireReady();
       started = true;
-      return operation(this.provider);
+      const value = await operation(this.provider);
+      if (this.provider.kind === 'legacy-rest') {
+        await this.verifyLegacyIdentity(generation, providerGeneration, options.write === true);
+      }
+      return value;
     });
     const result = this.scoped(
       () => work,
@@ -320,6 +361,31 @@ export class FoundrySession {
     return this.generation;
   }
 
+  /**
+   * The historical bridge has no identity-bearing response envelope or socket epoch.
+   * Probe on both sides of a request and withhold its result if the endpoint changed worlds.
+   * This cannot detect an A→B→A switch entirely between the probes.
+   */
+  private async verifyLegacyIdentity(
+    generation: number,
+    providerGeneration: number,
+    write = false,
+  ): Promise<void> {
+    const environment = await this.provider.inspect();
+    this.requireCurrent(generation, providerGeneration, write);
+    try {
+      this.assertIdentity(environment);
+      if (!environment.ready) {
+        throw new SessionError('target_unavailable', 'Foundry runtime is not ready');
+      }
+    } catch (error) {
+      this.currentState = 'error';
+      this.error = this.publicError(error);
+      this.options.onChange?.();
+      throw error;
+    }
+  }
+
   /** Snapshot freshness is ordinary serialized work, not a replacement of the target session. */
   private async refreshCache(generation: number, providerGeneration: number): Promise<void> {
     await this.provider.refreshWorldData();
@@ -448,19 +514,22 @@ export class FoundrySession {
     }
   }
 
-  private enqueue(operation: () => Promise<void>): Promise<void> {
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.lifecycle.then(async () => {
       if (this.closed) {
         throw new SessionError('session_closed', `Target ${this.config.id} is closed`);
       }
       this.lifecycleBusy = true;
       try {
-        await operation();
+        return await operation();
       } finally {
         this.lifecycleBusy = false;
       }
     });
-    this.lifecycle = next.catch(() => {});
+    this.lifecycle = next.then(
+      () => {},
+      () => {},
+    );
     return next;
   }
 

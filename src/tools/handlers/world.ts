@@ -100,19 +100,21 @@ export async function handleRefreshWorldData(
 ) {
   return withToolError('refresh world data', async () => {
     await provider.refreshWorldData();
-    const counts = provider.getWorldSummary();
-
-    const countLines = Object.entries(counts)
-      .map(([key, count]) => `- **${key}**: ${count}`)
-      .join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `World data refreshed successfully.\n\n**Collection Counts:**\n${countLines}`,
-        },
-      ],
-    };
+    return formatWorldRefreshResult(provider.getWorldSummary());
   });
+}
+
+/** Shared by the legacy handler and target lifecycle refresh without refreshing twice. */
+export function formatWorldRefreshResult(counts: Record<string, number>) {
+  const countLines = Object.entries(counts)
+    .map(([key, count]) => `- **${key}**: ${count}`)
+    .join('\n');
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `World data refreshed successfully.\n\n**Collection Counts:**\n${countLines}`,
+      },
+    ],
+  };
 }

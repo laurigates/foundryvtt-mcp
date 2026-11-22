@@ -8,7 +8,12 @@
 import type { FoundryCore } from '../../providers/types.js';
 import { logger } from '../../utils/logger.js';
 // import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { BaseTool, type ToolContext, type ToolResult } from '../base.js';
+import {
+  BaseTool,
+  type ProviderToolContext,
+  type ResolvedToolContext,
+  type ToolResult,
+} from '../base.js';
 import { ROLL_DICE_DESCRIPTION } from '../definitions.js';
 
 /**
@@ -34,7 +39,7 @@ export class RollDiceTool extends BaseTool {
 
   protected async executeValidated(
     args: Record<string, unknown>,
-    context: ToolContext,
+    context: ResolvedToolContext,
   ): Promise<ToolResult> {
     const { formula, reason } = args as { formula: string; reason?: string };
 
@@ -63,7 +68,7 @@ export async function handleRollDice(
   provider: FoundryCore,
 ): Promise<ToolResult> {
   const tool = new RollDiceTool();
-  const context: ToolContext = {
+  const context: ProviderToolContext = {
     provider,
   };
   return tool.execute(args, context);

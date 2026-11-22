@@ -34,6 +34,13 @@ tests/integration/, tests/e2e/    Live integration and browser test tiers
 
 `src/foundry/client.ts` is a **compatibility re-export**, not the application's shared client. New handlers accept `FoundryCore` from `src/providers/types.ts`. A `FoundrySession` owns one provider, cache, optional Python worker, generation/identity guards, write settings and pending operations. Different targets may run concurrently; work within a target is serialized.
 
+The [backward compatibility contract](backward-compatibility.md) covers legacy
+environment settings, client imports, custom tool contexts and MCP payloads.
+Preserve core content and put provenance in `_meta`; capture its session context
+before dispatch and verify it again immediately before constructing the response.
+`BaseTool` and `ToolRegistry` normalize old `foundryClient` contexts to the same
+provider instance. Keep this adapter at the extension boundary.
+
 Supported provider kinds are `socketio`, `legacy-rest` (the historical `/api/*` bridge), `rest-api` (paired ThreeHats runtime relay) and `composite` (native core plus relay execution). Their capabilities are not interchangeable and there is no fallback between providers after a failed mutation.
 
 ## Add or change a core MCP tool

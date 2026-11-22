@@ -82,9 +82,13 @@ const ConfigSchema = z.object({
  * TypeScript type derived from the ConfigSchema
  *
  * This type provides compile-time type checking for configuration objects
- * and ensures consistency between the schema and type definitions.
+ * and keeps pre-provider configuration objects valid for existing embedders.
+ * The exported runtime `config` uses ResolvedConfig, with required targets.
  */
-type Config = z.infer<typeof ConfigSchema> & { targets: TargetConfig[] };
+type Config = z.infer<typeof ConfigSchema> & { targets?: TargetConfig[] };
+
+/** Validated runtime configuration always has an explicit, normalized target list. */
+type ResolvedConfig = Config & { targets: TargetConfig[] };
 
 /**
  * Loads and validates configuration from environment variables
@@ -102,7 +106,7 @@ type Config = z.infer<typeof ConfigSchema> & { targets: TargetConfig[] };
  * console.log(`FoundryVTT URL: ${config.foundry.url}`);
  * ```
  */
-function loadConfig(): Config {
+function loadConfig(): ResolvedConfig {
   const rawConfig = {
     serverName: process.env.MCP_SERVER_NAME,
     serverVersion: process.env.MCP_SERVER_VERSION,
@@ -193,7 +197,7 @@ function loadConfig(): Config {
 /**
  * Cached configuration instance
  */
-let _config: Config | null = null;
+let _config: ResolvedConfig | null = null;
 
 /**
  * Gets the global configuration instance
@@ -214,12 +218,12 @@ let _config: Config | null = null;
  * }
  * ```
  */
-export const config = new Proxy({} as Config, {
+export const config = new Proxy({} as ResolvedConfig, {
   get(_target, prop) {
     if (_config === null) {
       _config = loadConfig();
     }
-    return _config[prop as keyof Config];
+    return _config[prop as keyof ResolvedConfig];
   },
 });
 
@@ -243,4 +247,4 @@ export function resetConfig(): void {
  * }
  * ```
  */
-export type { Config };
+export type { Config, ResolvedConfig };

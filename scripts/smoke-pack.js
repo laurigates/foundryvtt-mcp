@@ -9,7 +9,8 @@
  *   2. `npm pack` produces a tarball.
  *   3. The tarball can be installed as a dependency in a fresh consumer
  *      project.
- *   4. `node node_modules/<pkg>/dist/index.js` from the consumer reaches the
+ *   4. The historical client import and its declarations remain available.
+ *   5. `node node_modules/<pkg>/dist/index.js` from the consumer reaches the
  *      startup banner — same contract as smoke-test.js.
  *
  * Catches packaging-shape regressions that smoke-test.js cannot: smoke-test
@@ -196,6 +197,7 @@ function installInConsumer(tarball) {
   if (!existsSync(serverPath)) {
     fail(`server entrypoint missing in installed package: ${serverPath}`);
   }
+  verifyLegacyClientImport(installedRoot, consumer);
   const integrationSmoke = spawnSync(process.execPath, [join(repoRoot, 'scripts', 'smoke-integrations.js'), installedRoot], {
     cwd: consumer,
     encoding: 'utf8',
@@ -209,7 +211,58 @@ function installInConsumer(tarball) {
   return { consumer, serverPath };
 }
 
-// ── 4. Spawn the installed server and wait for the banner ────────────────
+// Import the public legacy subpath from the consumer, not the source tree.
+// Constructing a client and probing an injected getter makes no network request.
+function verifyLegacyClientImport(installedRoot, consumer) {
+  for (const declaration of [
+    'foundry/client.d.ts',
+    'foundry/rest-probe.d.ts',
+    'foundry/types.d.ts',
+    'providers/document-provider.d.ts',
+    'providers/types.d.ts',
+  ]) {
+    if (!existsSync(join(installedRoot, 'dist', declaration))) {
+      fail(`legacy client declaration missing in installed package: dist/${declaration}`);
+    }
+  }
+  const source = `
+    import assert from 'node:assert/strict';
+    import { FoundryClient, probeRestModule } from ${JSON.stringify(`${pkgJson.name}/dist/foundry/client.js`)};
+    assert.equal(typeof FoundryClient, 'function');
+    assert.equal(typeof probeRestModule, 'function');
+    const client = new FoundryClient({ baseUrl: 'http://127.0.0.1:1' });
+    try {
+      assert.equal(client.isConnected(), false);
+      for (const method of ['connect', 'disconnect', 'testConnection', 'searchActors', 'getActor',
+        'searchItems', 'searchCompendium', 'getWorldInfo', 'rollDice', 'get', 'post', 'put', 'delete']) {
+        assert.equal(typeof client[method], 'function', 'Missing legacy method: ' + method);
+      }
+      const world = await probeRestModule(async (url) => {
+        assert.equal(url, '/api/world');
+        return { data: { id: 'legacy-import-smoke' } };
+      });
+      assert.equal(world.id, 'legacy-import-smoke');
+    } finally {
+      await client.disconnect();
+    }
+    console.log('Legacy client import smoke passed: public exports, methods and declarations.');
+  `;
+  const childEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('FOUNDRY_')),
+  );
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], {
+    cwd: consumer,
+    env: { ...childEnv, FOUNDRY_URL: 'http://127.0.0.1:1', LOG_LEVEL: 'error' },
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+  if (result.status !== 0) {
+    fail('Installed legacy client import smoke failed', result.stderr || result.error?.message || result.stdout);
+  }
+  process.stdout.write(result.stdout);
+}
+
+// ── 5. Spawn the installed server and wait for the banner ────────────────
 function runInstalledServer({ consumer, serverPath }) {
   return new Promise((resolve) => {
     const child = spawn('node', [serverPath], {
