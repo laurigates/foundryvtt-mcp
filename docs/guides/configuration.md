@@ -1,91 +1,110 @@
 # Configuration Guide
 
-## Environment Variables
+One MCP server process can connect to **one or several separately configured Foundry targets**. Every target selects a provider, has its own connection and cache, and can enable writes independently. The schema and default values are implemented in `src/config/targets.ts`. See [Providers and targets](providers-and-targets.md) for all provider options and the [example JSON](../../examples/targets.example.json).
 
-Copy `.env.example` and set the required values:
+## Choose exactly one configuration style
 
-```bash
-cp .env.example .env
+1. **Legacy/single-target environment:** ordinary `FOUNDRY_*` settings become one target (`default`, or `FOUNDRY_TARGET_ID` if set).
+2. **Explicit target list:** set `FOUNDRY_TARGETS_FILE` **or** `FOUNDRY_TARGETS_JSON`; both together are invalid. An explicit list does **not** need `FOUNDRY_URL`, and does not inherit the global `FOUNDRY_WRITE_ENABLED` flag.
+
+A target ID is a local routing identifier, not the Foundry world ID. With multiple configured targets, pass `target_id` for target-specific MCP tools regardless of which worlds are online. There is no mutable global selected world.
+
+## Legacy single-target Socket.IO
+
+Copy `.env.example` to `.env` and set, for example:
+
+```dotenv
+FOUNDRY_URL=http://localhost:30000
+FOUNDRY_USERNAME=Assistant
+FOUNDRY_PASSWORD=your-foundry-world-password
+FOUNDRY_WRITE_ENABLED=false
 ```
 
-### Required / conditional authentication
+With no `FOUNDRY_API_KEY` or explicit `FOUNDRY_PROVIDER`, this uses authenticated `socketio`. `FOUNDRY_USER_ID` can bypass username-to-ID lookup; it does not bypass Foundry authentication. An active world, appropriate user permissions and a reachable Socket.IO endpoint are needed.
 
-| Variable | Required when | Description |
-|----------|---------------|-------------|
-| `FOUNDRY_URL` | Always | Active Foundry world URL (e.g. `https://foundry.example.com` or `http://localhost:30000`). |
-| `FOUNDRY_USERNAME` | Socket.IO mode | Foundry user name. |
-| `FOUNDRY_PASSWORD` | Socket.IO mode | Foundry user password. |
-| `FOUNDRY_API_KEY` | Optional REST mode | Authenticates to the **Foundry Local REST API module** and switches the MCP to REST mode. |
+| Setting | Purpose |
+|---|---|
+| `FOUNDRY_URL` | Server URL for legacy native/bridge targets, with HTTP(S) scheme |
+| `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD` | Foundry world account for Socket.IO |
+| `FOUNDRY_USER_ID` | Optional world user ID instead of username lookup |
+| `FOUNDRY_SOCKET_PATH` | Socket.IO path (default `/socket.io/`) |
+| `FOUNDRY_API_KEY` | **Historical** `/api/*` bridge key; chooses `legacy-rest` by default, not the relay |
+| `FOUNDRY_PROVIDER` | Optional explicit `socketio`, `legacy-rest`, `rest-api` or `composite` |
+| `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY`, `FOUNDRY_REST_CLIENT_ID` | Paired runtime relay configuration (separate from `FOUNDRY_API_KEY`) |
+| `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional relay execution endpoint path |
+| `FOUNDRY_EXPECTED_WORLD_ID`, `FOUNDRY_EXPECTED_ORIGIN` | Optional destination-identity pins; world ID required for composite targets |
+| `FOUNDRY_WRITE_ENABLED` | Single-target write opt-in, default `false` |
+| `FOUNDRY_PYTHON_EXECUTABLE` | Optional Python executable (default `python3`) |
+| `FOUNDRY_TIMEOUT`, `FOUNDRY_RETRY_ATTEMPTS`, `FOUNDRY_RETRY_DELAY` | Native/legacy transport timeouts and read retry settings |
+| `LOG_LEVEL`, `NODE_ENV` | Server logging/environment |
+| `CACHE_ENABLED`, `CACHE_TTL_SECONDS`, `CACHE_MAX_SIZE` | Legacy cache configuration; `CACHE_MAX_SIZE` must be a positive integer |
 
-### Optional
+The relay-only legacy environment can use `FOUNDRY_PROVIDER=rest-api` with its `FOUNDRY_REST_*` settings instead of a separate native server URL. `USE_REST_MODULE` is ignored; it does not enable a second transport.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FOUNDRY_USER_ID` | — | 16-char user document `_id`; an **alternative to `FOUNDRY_USERNAME`** in Socket.IO mode (bypasses username resolution). |
-| `FOUNDRY_SOCKET_PATH` | `/socket.io/` | Custom Socket.IO endpoint for reverse-proxy route prefixes. |
-| `FOUNDRY_WRITE_ENABLED` | `false` | Allow the mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
-| `LOG_LEVEL` | `info` | Logging verbosity (`debug`, `info`, `warn`, `error`) |
-| `NODE_ENV` | `development` | Environment mode |
-| `FOUNDRY_TIMEOUT` | `10000` | Request timeout in ms |
-| `FOUNDRY_RETRY_ATTEMPTS` | `3` | Retry failed requests |
-| `FOUNDRY_RETRY_DELAY` | `1000` | Delay between retries in ms |
-| `CACHE_ENABLED` | `true` | Enable response caching |
-| `CACHE_TTL_SECONDS` | `300` | Cache duration in seconds |
-| `CACHE_MAX_SIZE` | — | Maximum cache entries |
+## Multiple targets
 
-## Server Settings
+Put the following in a **local, private** JSON file, for example `foundry-targets.local.json`, and set `FOUNDRY_TARGETS_FILE` to its absolute path:
 
-```env
-# Logging
-LOG_LEVEL=info  # debug, info, warn, error
-
-# Performance
-FOUNDRY_TIMEOUT=10000      # Request timeout (ms)
-FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
+```json
+{
+  "version": 1,
+  "targets": [
+    {
+      "id": "campaign-a",
+      "provider": {
+        "kind": "socketio",
+        "baseUrl": "https://foundry-a.example.invalid",
+        "usernameEnv": "FOUNDRY_A_USERNAME",
+        "passwordEnv": "FOUNDRY_A_PASSWORD"
+      },
+      "writeEnabled": false
+    },
+    {
+      "id": "campaign-b",
+      "provider": {
+        "kind": "socketio",
+        "baseUrl": "https://foundry-b.example.invalid",
+        "usernameEnv": "FOUNDRY_B_USERNAME",
+        "passwordEnv": "FOUNDRY_B_PASSWORD"
+      },
+      "writeEnabled": false
+    }
+  ]
+}
 ```
 
-## Security
+The `.invalid` URLs are placeholders; do not use them as live endpoints. `FOUNDRY_TARGETS_JSON` accepts the same JSON inline as an alternative to a file. Each provider may use `usernameEnv`, `passwordEnv` and `apiKeyEnv` instead of literal credentials; do not specify a literal value and an environment reference for the same field.
 
-- Limit FoundryVTT user permissions to the minimum required.
-- Use HTTPS for remote Foundry instances; ensure the reverse proxy supports WebSocket upgrades.
-- Keep Foundry passwords and optional REST keys in private environment/client settings, not in source control.
-- Keep `FOUNDRY_WRITE_ENABLED=false` until you intend to use write tools, and monitor logs.
+Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`), `pythonExecutable` (default `python3`), `integrationTimeoutMs` (default `10000`), and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
 
-## FoundryVTT Authentication
+## Providers and capabilities
 
-By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. Setting `FOUNDRY_API_KEY` instead selects a different REST transport; it does not add REST capabilities alongside the Socket.IO session. See the [capability matrix — connection modes](./capabilities.md#connection-modes-not-interchangeable) for the canonical, mode-specific tool support.
+| Provider kind | Connection model | Capabilities and limits |
+|---|---|---|
+| `socketio` | Authenticated native Foundry session | World cache, read tools, native `modifyDocument` writes when permitted |
+| `legacy-rest` | Historical `/api/*` bridge | Bridge reads, compendium and REST diagnostics; not equivalent to a Socket.IO world cache |
+| `rest-api` | Paired relay with `clientId` and authenticated runtime | Snapshot reads and package-owned JS bindings; may perform target-enabled document writes through runtime APIs |
+| `composite` | Socket.IO core + relay execution | Core documents via Socket.IO, integration bindings through paired relay; remote identity must agree |
 
-### Socket.IO setup
+Capability support is **checked per target** by `src/tools/catalog.ts`. A tool can appear in discovery because one target supports it but still be unavailable when called for a different target. For exact implemented operations see [Capability matrix](capabilities.md). No automatic provider failover occurs after a failed write.
 
-1. Ensure FoundryVTT is running with an active world (not on the setup screen)
-2. Create or use an existing FoundryVTT user account with appropriate permissions
-3. Add credentials to your `.env` file
+## Resources and diagnostics
 
-### Authentication Flow
+Use `list_targets` and `get_target_status` to inspect remote identity, connection state, capabilities and integration availability. With multiple targets, resource URIs are qualified:
 
-The server authenticates through a four-stage flow:
+```text
+foundry://targets/campaign-a/actors
+foundry://targets/campaign-b/actors
+```
 
-1. Requests `/join` to obtain a session cookie.
-2. Resolves a user name to a document ID via Socket.IO `getJoinData` (unless `FOUNDRY_USER_ID` is supplied).
-3. Submits credentials to `POST /join` to authenticate the session.
-4. Opens an authenticated Socket.IO connection and requests the world snapshot using the `world` event.
+Historical unqualified aliases such as `foundry://actors` are accepted only when target selection is unambiguous. Relay snapshot reads may require an explicit `refresh_world_data` after changes performed by another client.
 
-This flow runs against the Foundry URL and does not require an open browser tab on the client PC.
+## Security and verification
 
-### Required permissions
+- Keep passwords, keys, token files and local target JSON containing secrets out of source control. For remote Foundry, use HTTPS and correctly forward Socket.IO traffic.
+- Default to `writeEnabled: false`. A target write opt-in **and** appropriate provider capabilities and Foundry permissions are necessary. Different provider kinds have different write execution mechanisms.
+- Relay execution is limited to trusted, packaged bindings; it is not a general-purpose JavaScript MCP tool.
+- Mutation timeouts can have an **unknown outcome**; inspect the selected world before any retry. Reconnect/refresh is target-specific.
+- Validate with `just qa` and `just build`. For connection checks run `bun run test-connection` against your actual configured targets. Local fake-relay tests do not prove upstream live compatibility.
 
-The Foundry user needs access to the documents the tools will read. Write operations also require appropriate GM/owner permissions and `FOUNDRY_WRITE_ENABLED=true`; an active Socket.IO session is mandatory. Pack search is not part of the default world snapshot and requires the optional REST transport.
-
-### Optional: REST-mode compendium search and diagnostics
-
-The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
-
-To configure this optional mode:
-
-1. In FoundryVTT: **Setup** > **Add-on Modules** > **Install Module**
-2. Paste: `https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json`
-3. Enable the module in your world and copy the generated API key
-4. Add to `.env`:
-   ```env
-   FOUNDRY_API_KEY=your_api_key_here
-   ```
+For connection problems see [Troubleshooting](../../TROUBLESHOOTING.md) and [the target configuration guide](providers-and-targets.md).

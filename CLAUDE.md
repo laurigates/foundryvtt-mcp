@@ -13,6 +13,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 ## Essential Commands
 
 ```bash
+just qa                # Pre-commit lint, TypeScript (src + scripts), Vitest and Python tests
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
@@ -65,22 +66,28 @@ use separate `FOUNDRY_REST_*` settings. `USE_REST_MODULE` remains a no-op.
 provider interfaces. See [ADR-011](docs/adrs/0011-provider-session-integration-overhaul.md)
 and the [configuration guide](docs/guides/providers-and-targets.md).
 
-**The exposed tool list depends on the mode** (`src/tools/availability.ts`):
-`tools/list` is filtered by transport, and the same rules gate `CallTool`.
+**Tool availability is target-scoped.** `src/tools/catalog.ts` is authoritative
+for MCP discovery, dispatch, resources and schema conflicts. It checks target
+readiness, provider capabilities, target-local writes, and D&D 5e-only demo
+helpers. A tool may be listed because one configured target supports it but
+remain unavailable for a different target; every call is rechecked.
 
-- **Shared** tools (e.g. `roll_dice`, `search_actors`, `get_health_status`) are
-  offered in both modes.
-- **Socket-only** tools (e.g. `search_world`, `get_combat_state`,
-  `get_journal`) are offered only in Socket.IO mode.
-- **REST-only** tools (`search_compendium`, `get_recent_logs`, `search_logs`,
-  `get_system_health`) are offered only in REST mode — they are **hidden** in
-  Socket.IO mode, not served as empty results.
-- **Write** tools (the 11 mutating tools, e.g. `move_token`, `end_combat`) are
-  offered **only** in Socket.IO mode **and** with `FOUNDRY_WRITE_ENABLED=true`.
+`src/tools/availability.ts` is retained for older two-transport helpers and
+tests, **not** used as the multi-target MCP gateway. The server exposes 33
+static core tools, 5 management tools and any compatible dynamically loaded
+system/module operations. Management discovery remains available while worlds
+are offline; resources are target-qualified (`foundry://targets/<id>/actors`).
 
-A direct `CallTool` for a hidden tool is rejected with a reason naming the
-actual cause (writes disabled vs REST mode vs Socket.IO mode); a name absent
-from the table falls through to the router's "Unknown tool" error.
+Write operations require `writeEnabled` on the selected target and the matching
+provider and remote permissions. Native Socket.IO core writes use
+`modifyDocument`; the standalone relay executes fixed Foundry document APIs.
+Composite mode uses Socket.IO for core work and the relay for packaged integration
+bindings. A write with an unknown outcome is never retried or failed over
+automatically.
+
+See [capabilities](docs/guides/capabilities.md),
+[development](docs/guides/development.md) and
+[write protocol](.claude/rules/foundry-write-protocol.md).
 
 ## Environment Variables
 
@@ -90,11 +97,13 @@ from the table falls through to the router's "Unknown tool" error.
 | `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user |
 | `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT password |
 | `FOUNDRY_USER_ID` | No | Bypass username→ID resolution |
-| `FOUNDRY_API_KEY` | No | REST API module key (read-only diagnostics path) |
-| `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default `false`) |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; selects `legacy-rest` by default |
+| `FOUNDRY_WRITE_ENABLED` | No | Legacy single-target write opt-in; explicit targets use their own `writeEnabled` (default `false`) |
+| `FOUNDRY_PROVIDER` | No | Select `socketio`, `legacy-rest`, `rest-api` or `composite` in legacy configuration |
+| `FOUNDRY_REST_RELAY_URL` / `FOUNDRY_REST_API_KEY` / `FOUNDRY_REST_CLIENT_ID` | Relay | Paired runtime relay settings, distinct from `FOUNDRY_API_KEY` |
 | `LOG_LEVEL` | No | `debug` for verbose output |
 | `FOUNDRY_TIMEOUT` | No | Request timeout (ms, default 10000) |
-| `FOUNDRY_TARGETS_FILE` / `FOUNDRY_TARGETS_JSON` | No | Mutually exclusive explicit target configuration |
+| `FOUNDRY_TARGETS_FILE` / `FOUNDRY_TARGETS_JSON` | No | Mutually exclusive explicit target configuration; `FOUNDRY_URL` is not required when used |
 | `FOUNDRY_PYTHON_EXECUTABLE` | No | Optional integration runtime, default `python3` |
 
 ## Rules

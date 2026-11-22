@@ -1,113 +1,79 @@
 ---
 paths:
   - "src/foundry/**"
+  - "src/providers/**"
+  - "src/sessions/**"
+  - "src/integrations/**"
   - "src/tools/**"
 ---
 
 # FoundryVTT Transport & Write Protocol
 
-How the MCP server talks to FoundryVTT, and how to perform game-state
-mutations. Read this before adding any tool that reads or (especially) writes
-FoundryVTT documents.
+Read this before changing document reads, writes, providers, integration bindings or routing. The architecture is target-scoped: see [ADR-011](../../docs/adrs/0011-provider-session-integration-overhaul.md) and [Provider configuration](../../docs/guides/providers-and-targets.md).
 
-## Two transports — Socket.IO is primary
+## Target and capability boundaries
 
-| Mode | Trigger | What it does |
-|------|---------|--------------|
-| **Socket.IO** (primary) | `FOUNDRY_USERNAME` + `FOUNDRY_PASSWORD` | Authenticates a real Foundry client session (4-step `/join` flow in `auth.ts`), connects to `FOUNDRY_URL` (`:30000`), and loads a read-only `worldData` snapshot. Reads are served from that cache. |
-| **REST / `apiKey`** (secondary) | `FOUNDRY_API_KEY` set | Hits `/api/*` on the REST module / bridge. Optional — per the README it powers "REST API diagnostics". May be extracted (`feat/extract-rest-api-module`). |
+`src/tools/catalog.ts` is the active MCP discovery **and** execution gate. A target is resolved through `src/sessions/` and checked for readiness, the needed provider capability and the target-local `writeEnabled` flag. `src/tools/availability.ts` retains older transport-only compatibility helpers; it is **not** the authoritative multi-target dispatch path.
 
-`.env.example` states Socket.IO is the primary method and `FOUNDRY_API_KEY` is
-commented out. **Do not assume the bridge/REST path is in use** — default
-deployments are Socket.IO-only. The bridge repo (`foundryvtt-local-rest-api`)
-is local-only (no remote) with active WIP; treat it as out-of-scope.
+| Provider | Core reads/writes | Integration execution |
+|---|---|---|
+| `socketio` | Direct authenticated Foundry world; cache with native document broadcasts; opt-in core writes through `modifyDocument` | No generic runtime binding executor |
+| `legacy-rest` | Historical `/api/*` bridge; different capabilities, no native Socket.IO write path | No paired relay execution |
+| `rest-api` | Paired runtime/relay snapshot and opt-in document writes using Foundry's runtime document APIs | Fixed package-owned JS bindings over `execute-js` |
+| `composite` | Socket.IO for core operations and write protocol | Paired relay for packaged integration bindings on the same identity-verified world |
 
-## Writes use the core `modifyDocument` Socket.IO protocol
+In legacy environment configuration, `FOUNDRY_API_KEY` chooses **`legacy-rest`**, not the ThreeHats relay. The relay uses separate `FOUNDRY_REST_*` settings or an explicit target provider. Explicit target lists do not inherit the global write flag. Verify remote world/origin and permissions before enabling writes.
 
-Mutations go over the existing authenticated socket (no bridge), per PRD-003
-(`docs/prds/write-operations.md`). The transport lives in `client.ts`:
-`assertWriteable()` → `emitWithAck()` → `modifyDocument()`.
+## Native Socket.IO document writes
 
-- **Gate**: writes require `FOUNDRY_WRITE_ENABLED=true` **and** an active socket
-  (`assertWriteable`). The connected user needs GM/owner permission.
-- **Request** (standard Socket.IO ack callback): `socket.emit("modifyDocument", request, cb)` where
-  `request = { type, action, operation }`:
-  - `type`: document name — `"Actor"`, `"Item"`, …
-  - `action`: `"create" | "update" | "delete"`
-  - `operation`: `data:[…]` (create) / `updates:[{_id, …}]` (update) / `ids:[…]` (delete),
-    plus `broadcast:true`, `pack:null`, and — for embedded docs —
-    `parentUuid:"Actor.<actorId>"`.
-- **Response**: `{ type, action, operation, userId, result: object[]|string[], error? }`.
-  Reject on `response.error`; `result` holds created/updated data or deleted ids.
-- Actor `system` updates take **dot-notation keys prefixed with `system.`**
-  (e.g. `"system.attributes.hp.value"`); Foundry merges recursively.
+The inherited engine is `src/providers/document-provider.ts` (imported through `src/providers/socketio.ts`); `src/foundry/client.ts` is only a compatibility re-export. `assertWriteable()` requires opt-in and an authenticated socket; the remote user must have appropriate GM/owner permission.
 
-## The cache follows writes automatically (#205)
+Native writes send the Foundry `modifyDocument` event and await a Socket.IO acknowledgement:
 
-`worldData` is no longer a connect-time snapshot. `client.ts` subscribes to the
-`modifyDocument` **broadcast** — the same event, arriving unsolicited — and
-`world-cache.ts` applies it to the cached collections. So a read after a write
-sees the write, and changes made by *other* users (a player moving a token, the
-GM editing in the UI) land in the cache too.
-
-Consequences for new write tools:
-
-- **Do not hand-patch `worldData` in a mutation method.** The broadcast already
-  covers it, and a manual splice would double-apply. Applying is idempotent
-  (`create` upserts by `_id`), so a doubled apply is harmless — but it is still
-  redundant code that will drift.
-- **A new document type needs a map entry**, not new plumbing: add it to
-  `TOP_LEVEL_COLLECTIONS` or `EMBEDDED_COLLECTIONS` in `world-cache.ts`.
-  Unmapped types are dropped silently (by design — an unmodelled payload leaves
-  the cache stale rather than corrupt).
-- **Known gap**: broadcasts parented to a *synthetic token actor*
-  (`Scene.<sid>.Token.<tid>.Actor.<aid>`, unlinked tokens) are not applied —
-  that actor is a per-token delta, not a document in any cached collection.
-  Those still need `refresh_world_data`.
-- `refreshWorldData()` (re-emits `world`) remains the full-resync escape hatch.
-
-## Verify the protocol against the bundled app source — don't guess
-
-The exact wire shape is FoundryVTT-version-specific and **not reliably
-documented on the web** (the wiki is JS-rendered). The authoritative source is
-the actual app, shipped unminified under `data/container_cache/foundryvtt-<ver>.zip`:
-
-```
-unzip -o -q ../foundryvtt-harness/data/container_cache/foundryvtt-13.348.zip 'resources/app/client/data/client-backend.mjs' -d /tmp/fvtt
+```text
+socket.emit("modifyDocument", {
+  type: "Actor" | "Item" | ...,
+  action: "create" | "update" | "delete",
+  operation: {
+    broadcast: true,
+    pack: null,
+    modifiedTime: ...,
+    data: [...] | updates: [{ _id: ..., ... }] | ids: [...],
+    parentUuid: "Actor.<id>"  // for embedded documents
+  }
+}, acknowledgement)
 ```
 
-That cache belongs to the sibling **foundryvtt-harness** checkout, not to this
-repo — run the command from the `foundryvtt-mcp` root. It holds exactly one
-build, `foundryvtt-13.348.zip`, and the version is hardcoded here because it
-names the file that is actually present rather than the version this repo pins.
+The response includes `result` and may include `error`. Actor `system` changes use dot-notated `system.*` keys. Do not invent packet shapes or bypass the provider's write guard. The exact wire contract may change by Foundry version.
 
-**Current state of this verification:** the shape implemented in `client.ts` was
-read out of that **v13.348** source. `docker-compose.test.yml` now pins
-**14.367**, and the shape has not been re-read against it.
+### Cache and acknowledgements
 
-Re-reading it at 14.367 needs a v14 zip, and nothing here produces one. The test
-container uses tmpfs `/data` with `CONTAINER_PRESERVE_CONFIG=false`, so it never
-persists a cache; the harness is the only checkout that does, and it must stay on
-13.348 — a v14 first launch migrates its live worlds irreversibly. Obtain the
-build another way (a throwaway felddy container with a scratch data volume, or a
-direct licensed download) before trusting the write tools on a v14 server.
+- `src/foundry/world-cache.ts` applies native `modifyDocument` broadcasts; do **not** also mutate the cache manually in a document method. Map new supported document types into the cache helper.
+- Synthetic unlinked-token actors (`Scene.<sid>.Token.<tid>.Actor.<aid>`) cannot be fully updated by the generic world cache and may require `refresh_world_data`.
+- A timeout, lost acknowledgement or connection change after dispatch can leave a mutation's outcome **unknown**. Report `outcome_unknown`; never automatically resend the write.
+- Every target has its own cache, serialized operation queue, generation and pending-work set. A reconnect may invalidate an old response; it must not cancel another target's work.
 
-Key files: `client/data/client-backend.mjs` (`#buildRequest`/`#dispatchRequest`),
-`client/helpers/socket-interface.mjs` (`dispatch` = emit-with-ack), and
-`common/abstract/socket.mjs` + `common/abstract/_types.mjs` (response shape and
-per-action `operation` fields). When implementing a new write feature
-(combat, tokens, scenes — PRD-003 FR-018…FR-024), confirm the shape there
-first, then smoke-test one round-trip against a live world.
+## Relay document writes and runtime bindings
 
-## What does NOT map to `modifyDocument`
+`src/providers/rest-api.ts` implements document mutation by executing **fixed, code-owned** Foundry runtime document methods (for example `createDocuments` / `updateDocuments` / `deleteDocuments` or the parent's embedded equivalents). It is not the historical `/api/*` bridge and does **not** use the Socket.IO `modifyDocument` packet. The relay is authenticated through its configured `clientId` and API key and must match the expected paired world/origin.
 
-Compendium reads (`search_compendium`, compendium-source item create) use
-`CompendiumCollection.getDocuments` / the pack index — a separate socket path,
-not `modifyDocument`. `search_compendium` is a **REST-only** tool: in Socket.IO
-mode it is hidden from `tools/list` and a direct call is rejected by the
-availability gate (see `src/tools/availability.ts`), so the old "graceful-empty
-without `apiKey`" behaviour no longer applies. The same mode-based hiding now
-covers the other REST-only diagnostics (`get_recent_logs`, `search_logs`,
-`get_system_health`), and the write tools are hidden outside Socket.IO +
-`FOUNDRY_WRITE_ENABLED=true`. Compendium-source create stays rejected over
-Socket.IO. Design a pack-read path before adding compendium writes.
+Relay writes invalidate the snapshot before dispatch and again when settling. The REST client cannot assume it receives native document broadcasts for changes made elsewhere. An ambiguous remote reply or transport loss after sending a mutation is `outcome_unknown`, and no fallback/replay is permitted.
+
+`composite` uses the Socket.IO core for ordinary documents and the relay specifically for packaged system/module bindings. The runtime user may be different from the core user; validate that identity and the necessary permissions for both. Integration manifests (`systems/` and `modules/`) declare whether bindings are read-only. A target write flag and provider/runtime permission are mandatory for mutating operations.
+
+There is no free-form JavaScript MCP tool. The Python worker is an optional per-target adapter runtime that invokes only packaged operations; credentials stay in Node. Validate arguments/results and run runtime probes before claiming a module or system operation is available.
+
+## Verify the native protocol against Foundry itself
+
+The historic native protocol implementation was checked against unminified **Foundry v13.348** application source (`client/data/client-backend.mjs`, `client/helpers/socket-interface.mjs` and common socket types). The repository's later test container is pinned to **v14.367**, and the wire contract has not been confirmed against that version by the historical check.
+
+Do **not** claim current v14 write compatibility based on the v13 verification. Obtain a licensed, disposable v14 build for verification rather than upgrading or mutating an unrelated persistent Foundry installation; inspect the actual runtime source and test one reversible round-trip in an isolated world.
+
+## Other operations and safety boundaries
+
+- Compendium queries are separate from `modifyDocument`; `search_compendium` is gated by `compendium.read` rather than the native world cache.
+- REST diagnostics (`get_recent_logs`, `search_logs`, `get_system_health`) require `diagnostics.read`; a generic relay does not automatically implement the historical bridge's diagnostics API.
+- Game document operations are authorized both by this MCP server and **by Foundry**. Read the document ID/target before destructive actions and check the outcome afterward.
+- Do not add a transport fallback after a write, an automatic cross-world transaction, a global selected world or an unclassified new write operation.
+
+The [capability matrix](../../docs/guides/capabilities.md) and [testing rules](testing.md) describe current catalog gates and verification tiers.

@@ -2,6 +2,8 @@
 
 This guide helps you diagnose and resolve common issues with the FoundryVTT MCP server.
 
+> **Scope:** most examples below assume the historical single-target Socket.IO or `/api/*` bridge setup. For the multi-target overhaul, run `list_targets`, then `get_target_status` with the relevant `target_id` to inspect that world's provider, identity, capabilities and integration failures. See [Providers and targets](docs/guides/providers-and-targets.md) and the [current capability matrix](docs/guides/capabilities.md). The paired `rest-api` relay is not the historical bridge.
+
 ## Quick Diagnostics
 
 ### Setup Wizard (Recommended for New Users)

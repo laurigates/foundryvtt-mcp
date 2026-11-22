@@ -30,12 +30,12 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 
 - **Dice Rolling** — dice terms and numeric modifiers; available syntax depends on the provider
 - **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
-- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
+- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (target-local write enablement, provider capability and Foundry permissions required; the native and relay write paths differ).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
 - **World Search** — searches names and selected narrative content in actors, items, scenes and journals, with plain-text match excerpts
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — `foundry://` URIs for direct reads.
-- **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
+- **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
@@ -65,7 +65,7 @@ It is recommended to create a separate FoundryVTT user account for the MCP serve
 
 ### Installation
 
-Run directly without installing — no clone needed:
+For the **published package** (which may not yet include this branch's overhaul), run without cloning:
 
 ```bash
 bunx foundryvtt-mcp
@@ -118,6 +118,8 @@ Add to your VS Code MCP settings:
   }
 }
 ```
+
+To use and test **this overhaul branch** rather than the published package, follow the [branch checkout instructions](docs/guides/providers-and-targets.md#run-the-overhaul-branch).
 
 ### Development Setup
 

@@ -1,103 +1,119 @@
-# FoundryVTT MCP capability matrix (verified against source)
+# FoundryVTT MCP capability matrix
 
-This document distinguishes **MCP tools that are exposed and implemented** from capabilities of Foundry VTT in general. It is based on this repository's `src/index.ts`, `src/tools/definitions.ts`, `src/tools/router.ts`, `src/tools/handlers/` and `src/foundry/client.ts`. The source revision exposes **33 tools (22 read/query/utility and 11 write tools)** and **9 MCP resources**.
+This page describes the **target-scoped overhaul** on `feat/multiworld-provider-overhaul`. It summarizes source contracts, not verified live compatibility with every Foundry version, game system or module. For the implementation details see `src/tools/catalog.ts`, `src/tools/definitions.ts`, `src/providers/`, `src/tools/resources.ts` and [ADR-011](../adrs/0011-provider-session-integration-overhaul.md).
 
-**Evidence level:** implementation and routing inspected; this is **not** a claim that all operations passed live end-to-end tests on every Foundry core version, world, system or combination of modules. A method that exists internally but is not available via `tools/list` is not counted as an MCP tool.
+## Discovery and target routing
 
-## Connection modes: not interchangeable
+The static catalog defines **33 core tools** (22 read/query/utility tools and 11 mutating tools). The new server additionally defines **5 management tools** (`list_targets`, `get_target_status`, `list_systems`, `list_modules`, `reconnect_target`). Trusted integrations may contribute further, dynamically available tools; there is **no fixed total tool count** across target configurations.
 
-| Mode | Configuration | Consequences |
-| --- | --- | --- |
-| **Socket.IO** (default) | `FOUNDRY_URL`, `FOUNDRY_USERNAME` or `FOUNDRY_USER_ID`, and `FOUNDRY_PASSWORD`. **Leave `FOUNDRY_API_KEY` unset.** | Authenticated connection to an active Foundry world. Loads world data and observes document changes. The 11 mutation tools require this mode, the write opt-in and Foundry permissions. |
-| **Foundry Local REST API** (optional) | Set `FOUNDRY_API_KEY` | Changes `FoundryClient.connect()` to REST-mode initialization using `/api/world`. Enables REST-only operations such as `search_compendium` and supporting diagnostics. **It does not create the Socket.IO session needed for mutation tools.** Several world-snapshot-dependent tools have reduced or unavailable behavior in this mode. |
+`src/index.ts` uses `ToolCatalog` for both `tools/list` and `tools/call`. The catalog:
+- resolves `target_id` to a session (optional only when exactly one target is configured);
+- lists a core tool if **at least one ready target** supports the required capability;
+- checks availability **again on the selected target** before execution, including connection state, write opt-in and any system restriction;
+- exposes integration operations only when their manifests, runtime probes and schemas are compatible; conflicting public schemas are withheld;
+- emits catalog change notifications on session/integration state changes.
 
-**Important:** `FOUNDRY_API_KEY` is a **transport selector**, not a way to add REST features to an existing Socket.IO session. `FOUNDRY_WRITE_ENABLED=true` does not enable mutations in REST mode. This section is the canonical description of the transport switch; other guides link here.
+`src/tools/availability.ts` retains the older two-transport availability helpers for compatibility and corresponding tests. It is **not** the target-aware MCP dispatch gate. A tool visible in the global catalog may be unavailable on an individual target.
 
-For **remote Foundry on Linux**, the local MCP client can access a reachable `FOUNDRY_URL` over Socket.IO without opening a Foundry browser tab on the client's computer. Foundry must have an active world and an authorized user; actual network and version compatibility should be tested.
+## Providers are not interchangeable
 
-## Read, search, utility and diagnostic tools (22)
+| Provider | How it connects | Relevant operations |
+|---|---|---|
+| `socketio` | Authenticated native Foundry session with live world-data cache | Core read/cache operations; core writes via Socket.IO `modifyDocument` if enabled |
+| `legacy-rest` | Historical `/api/*` bridge selected by `FOUNDRY_API_KEY` in legacy configuration | Shared core reads, compendium search and legacy REST diagnostics; no native Socket.IO world-cache capability |
+| `rest-api` | Paired ThreeHats relay, runtime bindings and refreshed world snapshot | Core read/cache and optional target-enabled document writes through Foundry runtime APIs; runtime integration bindings |
+| `composite` | Native Socket.IO core plus a separately authenticated paired relay | Socket.IO core operations and relay integration execution for one identity-verified world |
 
-| MCP tool | Implemented behavior | Important limits |
-| --- | --- | --- |
-| `search_actors` | Find world actors by name/type; summarize level and HP. | Text output does **not** include actor IDs. |
-| `get_actor_details` | Read HP, AC, abilities and level for a known actor ID. | Not a complete biography or owned-inventory listing. |
-| `search_items` | Find world-level items by name/type. | Not actor-owned items or packs; rarity filtering is REST-mode-only. |
-| `search_compendium` | Search enabled compendium packs with filters and cursors. | **Requires `FOUNDRY_API_KEY` (REST mode)**; otherwise reports no results with a note. Read-only. |
-| `get_scene_info` | Read current or specified scene's metadata. | Does not report walls, token coordinates or grid details; does not switch/edit scenes. |
-| `search_journals` | Match journal **names**, page **names** and page **text** (case-insensitive substring); returns matching entries and their IDs. | Substring matching only (no ranking, no HTML stripping of the matched text); use `get_journal` for page excerpts. |
-| `get_journal` | Return text excerpts of a journal's pages. | HTML stripped; up to 500 characters per page. |
-| `get_users` | Read users and online presence from world data. | Relies on available world state. |
-| `get_combat_state` | Read active encounter and initiative order. | Reads cached Socket.IO world state. |
-| `get_chat_messages` | Read recent game chat. | No MCP tool for posting messages. |
-| `search_world` | Case-insensitive **name** matching for actors, items, scenes, journals. | Despite earlier descriptions, **not full-text search of document bodies**. |
-| `get_world_summary` | World metadata and collection counts. | Snapshot-dependent counts use cached Socket.IO data. |
-| `refresh_world_data` | Re-fetch full world snapshot. | Requires active Socket.IO; does not alter the world. |
-| `roll_dice` | Roll dice, returning a total and breakdown. | Portable grammar: dice terms/integers joined with + or -. Advanced modifiers are rejected. REST mode supports some broader syntax (e.g., parentheses); local fallback does not. |
-| `generate_npc` | Generate a random NPC description and basic stats. | **Text only**; does not create a Foundry Actor. |
-| `generate_loot` | Generate simple coin amounts and item suggestions. | **Text only**; item list is fixed and `treasureType` does not affect the result. |
-| `lookup_rule` | Format a rule-search-like answer. | **Stub** returning template text; no real rules source is consulted. |
-| `get_recent_logs` | Read and filter recent Foundry logs. | REST diagnostics backend required. |
-| `search_logs` | Search logs and show matching entries. | REST diagnostics backend required. |
-| `get_system_health` | Fetch backend health/version/module and memory information. | REST diagnostics backend required; not full CPU/disk monitoring. |
-| `diagnose_errors` | Format a diagnosis summary. | **Stub**: fixed response, not an actual investigation. |
-| `get_health_status` | Summarize connection/world and available backend status. | Partial information without REST diagnostics; can warn about a stale world snapshot. |
+`FOUNDRY_API_KEY` is **not** a relay credential; `FOUNDRY_REST_API_KEY` supplies the legacy-environment relay key. Explicit targets select the provider using `provider.kind`. A composite verifies consistent world/origin/system identity; neither composite nor standalone relay silently falls back to another transport after an uncertain write. See [configuration](configuration.md) and [providers/targets](providers-and-targets.md).
 
-## Mutating tools (11)
+Capabilities used for the core include `core.read`, `core.cache`, `core.write`, `compendium.read` and `diagnostics.read`. `runtime.execute` is required for executable system/module integrations; operations may additionally depend on a specific active system or module. A write needs a target-local opt-in **and** suitable provider/runtime/Foundry permissions.
 
-The following tools **are implemented and routed**. Every write is gated by `FOUNDRY_WRITE_ENABLED=true` (default false), an **active authenticated Socket.IO session**, and Foundry's GM/owner permissions. Start testing with writes disabled.
+## Core read, query and utility tools (22)
 
-| MCP tool | Implemented behavior | Boundaries and safety |
-| --- | --- | --- |
-| `update_actor_attributes` | Set absolute dot-path values under `actor.system` (HP, currency, slots, etc.). | Not a general-purpose Actor editor or relative damage/healing operation; some game-stat bounds are validated. |
-| `create_actor_item` | Create an inline Item embedded in an existing Actor. | `source.type=compendium` is **rejected at runtime** despite appearing in the input schema. |
-| `update_actor_item` | JSON-merge-patch the `system` data of an owned item. | Needs actor ID and embedded item ID; arrays replace, `null` removes fields. |
-| `delete_actor_item` | Delete an item owned by an Actor. | **Destructive; no built-in undo.** Confirm exact IDs before use. |
-| `create_journal_entry` | Create a JournalEntry with one or more text pages. | Optional folder and visibility; defaults to GM-only. No corresponding existing-journal edit/delete tool. |
-| `start_combat` | Create Combat and add combatants from chosen/current scene tokens. | Does **not** check for an existing encounter, so can create a second combat. |
-| `next_turn` | Move to next combat turn/round. | Can optionally skip defeated combatants. |
-| `end_combat` | End by deleting the active Combat document. | **Destructive**, not a pause action. |
-| `set_initiative` | Change a combatant's initiative. | Preserves current acting combatant's place when possible; requires combatant ID. |
-| `move_token` | Move a placed token to new x/y scene coordinates. | Does not provide pathfinding/collision planning or create tokens. |
-| `apply_status_effect` | Apply/remove an ActiveEffect status via a token's actor. | Handles linked and synthetic (unlinked) actors; requires a valid status ID. |
+| Tool | What is implemented | Availability/limits |
+|---|---|---|
+| `roll_dice` | Dice total and breakdown | Grammar/remote evaluation depends on provider |
+| `search_actors` | Search world actors by name/type | Returns summaries, not a full list of embedded items |
+| `get_actor_details` | Basic actor information | Requires an actual actor ID |
+| `search_items` | World item search | Not a search of every actor's inventory |
+| `get_scene_info` | Current/selected scene metadata | Read-only; does not activate a scene |
+| `generate_npc` | Demonstration NPC text | Offered for D&D 5e targets only; creates no Actor |
+| `generate_loot` | Demonstration loot text | Offered for D&D 5e targets only; creates no items |
+| `lookup_rule` | Placeholder response | D&D 5e target only; **no real rules database** |
+| `diagnose_errors` | Placeholder diagnosis | Not a real error investigator |
+| `get_health_status` | Connection and cache health summary | Partial without legacy diagnostics |
+| `get_combat_state` | Current combat snapshot | Needs `core.cache` |
+| `get_chat_messages` | Recent world chat | Needs `core.cache`; no posting tool |
+| `get_users` | Users/online presence | Needs `core.cache` |
+| `search_journals` | Journal name and page search | Needs `core.cache` |
+| `get_journal` | Journal page excerpts | Needs `core.cache` |
+| `search_world` | Search actors, items, scenes and journals by names **and selected narrative fields** | Needs `core.cache`; plain-text match excerpts, no semantic ranking or compendium-wide search |
+| `get_world_summary` | World metadata and collection counts | Needs `core.cache` |
+| `refresh_world_data` | Explicit resynchronization of the selected world | Needs `core.cache`; may invalidate session/integration state |
+| `search_compendium` | Pack search with filters | Requires `compendium.read` (historical bridge capability) |
+| `get_recent_logs` | Historical REST backend logs | Requires `diagnostics.read` |
+| `search_logs` | Historical REST backend log search | Requires `diagnostics.read` |
+| `get_system_health` | Historical REST backend health metrics | Requires `diagnostics.read` |
 
-**IDs and read-before-write:** `search_actors`/`search_items` return text summaries **without IDs**. The `foundry://actors` and `foundry://items` resources expose IDs but cap each list at **100 entries**. `foundry://combat` includes combatant IDs in initiative order. No dedicated tool lists an actor's embedded item IDs. Do not guess IDs for destructive operations.
+`search_world` uses `src/foundry/world-search.ts` and returns the matching field/excerpt for content hits. It searches selected actor descriptions/biographies, item descriptions, scene annotations/tokens and journal page content, with HTML converted to plain text. It does not index arbitrary module fields or use an external search engine.
 
-## MCP resources (9)
+## Core mutating tools (11)
 
-| Resource URI | Contents |
-| --- | --- |
-| `foundry://actors` | First 100 actor summaries, IDs and total count. |
-| `foundry://items` | First 100 world item summaries, IDs and total count. |
-| `foundry://scenes` | Scene IDs, names, active state. |
-| `foundry://scenes/current` | Current scene details or no-active-scene message. |
-| `foundry://journals` | Journal IDs, names and page counts. |
-| `foundry://users` | Users and activity. |
-| `foundry://combat` | Active combat with combatants sorted by initiative. |
-| `foundry://world/settings` | World/system metadata. |
-| `foundry://system/diagnostics` | REST-backed diagnostics or unavailable notice. |
+| Tool | Action |
+|---|---|
+| `update_actor_attributes` | Patch supported actor system attributes |
+| `create_actor_item` | Create an embedded item on an actor |
+| `update_actor_item` | Update an actor's embedded item |
+| `delete_actor_item` | Delete an embedded item |
+| `create_journal_entry` | Create a journal with text pages |
+| `start_combat` | Create an encounter from selected scene tokens |
+| `next_turn` | Advance an active encounter |
+| `end_combat` | Delete an active encounter |
+| `set_initiative` | Set a combatant's initiative |
+| `move_token` | Move a token in a scene |
+| `apply_status_effect` | Add/remove a status effect on a token actor |
 
-## Not exposed through this MCP interface
+All core writes require `core.write`, the selected target's `writeEnabled: true` and remote user permissions. Socket.IO uses `modifyDocument`; `rest-api` executes the documented Foundry document APIs through its paired runtime. A `composite` keeps native core writes separate from relay integration bindings. Legacy `/api/*` is not a substitute for the native write path.
 
-This section means **no registered MCP tool currently offers the operation**. It does **not** claim Foundry VTT or a future REST adapter cannot perform it.
+Destructive operations have no general undo. An interrupted write may return `outcome_unknown` even if it was applied. **Inspect the selected world before retrying; never assume retries are safe.**
 
-- Create/delete world Actors or broadly edit the Actor document outside the exposed `actor.system` patch.
-- Create, delete or edit world scenes; switch the active scene; manage walls, doors, lights, tiles, drawings, regions, and sound emitters.
-- Create/delete scene tokens or perform collision-aware token movement.
-- Edit/delete existing journals; manage playlists, roll tables, decks, macro execution, or file operations through dedicated MCP tools.
-- Ask a specific player for a roll; send a new chat message.
-- Write to compendiums or import a compendium entry directly into an actor.
+## Management and dynamic integration tools
 
-## Example: local MCP client -> remote Linux Foundry (read only)
+| Tool | Purpose |
+|---|---|
+| `list_targets` | List configured targets and statuses even when remote worlds are offline |
+| `get_target_status` | Inspect one target's identity, capabilities and integration failures |
+| `list_systems` / `list_modules` | Inspect packaged integrations and their per-target readiness |
+| `reconnect_target` | Explicitly reconnect just the selected target |
 
-The canonical Socket.IO client configuration (with `FOUNDRY_API_KEY` deliberately **omitted**, since supplying it switches transports) lives in the [integration guide](./integration.md#connect-via-socketio-default). Use an account with the minimum permissions required, put real credentials in private client configuration (not in the repository), and set `FOUNDRY_WRITE_ENABLED=true` only after validating read behavior and backups.
+Initial experimental integration examples include `system_dnd5e_get_actor_data`, `system_pf2e_get_actor_data` and `module_item-piles_get_items`. Names preserve exact upstream IDs. These require the applicable runtime API and the target's `runtime.execute` capability; a manifest alone does not make a tool usable. The initial adapters are not claimed live-verified. See [Writing integrations](writing-integrations.md).
 
-## Source references
+## MCP resources: 9 base definitions, target-qualified URLs
 
-- Tool names, input schemas and descriptions: [`src/tools/definitions.ts`](../../src/tools/definitions.ts)
-- Exposed list and connection lifecycle: [`src/index.ts`](../../src/index.ts)
-- Handler dispatch: [`src/tools/router.ts`](../../src/tools/router.ts)
-- Implemented tool handlers: [`src/tools/handlers/`](../../src/tools/handlers)
-- Transport selection, reads, write gating, and socket mutations: [`src/foundry/client.ts`](../../src/foundry/client.ts)
-- Resource names: [`src/tools/resources.ts`](../../src/tools/resources.ts)
-- Resource payloads and truncation: [`src/tools/handlers/resources.ts`](../../src/tools/handlers/resources.ts)
-- Environment variables: [`src/config/index.ts`](../../src/config/index.ts)
+`src/tools/resources.ts` defines 9 resource types. The catalog only lists resources from **ready targets** whose provider supports their required capability. For example:
+
+```text
+foundry://targets/campaign-a/actors
+foundry://targets/campaign-a/items
+foundry://targets/campaign-b/combat
+```
+
+| Base resource | Contents |
+|---|---|
+| `foundry://actors` | Up to 100 actor summaries with IDs and total count |
+| `foundry://items` | Up to 100 world item summaries with IDs and total count |
+| `foundry://scenes` | Scenes |
+| `foundry://scenes/current` | Active scene |
+| `foundry://journals` | Journal entries |
+| `foundry://users` | Users/presence |
+| `foundry://combat` | Active combat state |
+| `foundry://world/settings` | World/system settings |
+| `foundry://system/diagnostics` | Legacy REST diagnostics, capability-dependent |
+
+When only one target is configured, unqualified legacy resource aliases remain readable. With multiple targets use `foundry://targets/<target_id>/<path>`; duplicate upstream document IDs across different worlds are not interchangeable.
+
+## Not exposed as generic MCP capabilities
+
+There is no unrestricted JavaScript execution tool, automatic cross-world synchronization, cross-world transaction support, universal rules lookup, or native pack-write tool. The shipped D&D 5e, PF2e and Item Piles adapters are intentionally narrow. Live Foundry/system/module compatibility must be demonstrated separately.
+
+For a client connecting to a remote Linux Foundry host, see [Remote Linux](remote-linux.md) for networking and [Providers and targets](providers-and-targets.md) for the current target-scoped configuration.
