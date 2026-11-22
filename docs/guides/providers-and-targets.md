@@ -223,12 +223,24 @@ the installed package, independently of the current working directory.
 
 A missing Python executable, invalid manifest, failed API probe, or incompatible
 version is reported in integration status. The healthy core connection remains
-usable. The initial D&D 5e, PF2e, and Item Piles packages are experimental reads;
-their READMEs deliberately list no unperformed live compatibility tests.
+usable. D&D 5e and PF2e currently provide actor-data reads. Item Piles also provides
+explicit mutations, each subject to the selected target's write setting and its
+runtime GM check. All packages remain experimental and their READMEs distinguish
+source inspection and local tests from live compatibility verification.
 
 Runtime package loading isolates malformed packages so unrelated valid packages
 can still activate; inspect `list_systems`, `list_modules` or `get_target_status`
 for failures. A closed worker is terminal and cannot be restarted by a delayed
-call. If a future mutating integration loses its worker response after invoking
-the provider, it reports `outcome_unknown`. All currently shipped integration
-operations declare `readOnly: true`.
+call. If a mutating integration loses its worker response after invoking the
+provider, it reports `outcome_unknown` and does not replay the request.
+
+The original `module_item-piles_get_items` operation keeps its capability-based
+availability. New Item Piles operations require module version `3.3.4`, Foundry
+generation `13` or `14`, and active `socketlib` / `lib-wrapper` dependencies.
+Unknown or different versions withhold those operations. Writes require a GM in
+the paired runtime in addition to `writeEnabled: true`; reads require appropriate
+document access. The two credentials of a composite target can represent
+different users, so its native GM status does not establish runtime permission.
+See the [Item Piles package](../../modules/item-piles/README.md) for arguments,
+workflow limits and the source reference behind these gates. No live tested
+combination is implied by them.

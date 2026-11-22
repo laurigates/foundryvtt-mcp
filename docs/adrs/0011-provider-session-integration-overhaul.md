@@ -137,6 +137,14 @@ registry stores kind, ID, and operation separately; it never reconstructs them
 by splitting a public name. Invalid names and collisions are rejected rather
 than silently normalized.
 
+A larger package may generate standalone scripts from a package-local operation
+registry and shared helper factory. Item Piles 0.2 uses this pattern: generated
+manifest, binding and probe files are checked in and verified for drift during
+build/tests. The production loader and protocol are unchanged. A binding still
+contains one fixed operation; JSON arguments cannot select an arbitrary method
+or executable source. A probe constructs the same helper factory without running
+the operation, keeping readiness and permission policy consistent.
+
 `target_id` stays an argument, not a tool-name suffix. One public name has one
 input contract across targets. Incompatible schemas are reported and withheld,
 not replaced by whichever session loaded last.
@@ -212,11 +220,14 @@ Each integration documents its adapter version/update date, upstream reference,
 upstream update date where known, last verification date, capabilities, and actual
 tested combinations. The remote installed version belongs to session status.
 
-The initial adapters are experimental. Empty tested-version lists mean no live
+The adapters remain experimental. Empty tested-version lists mean no live
 compatibility claim. A runtime method probe is not equivalent to a live test of
-all system rules. The initially shipped operations are read operations; examples
-of proposed skill-roll names in the design discussion are not advertised as
-implemented roll methods.
+all system rules. The initial delivery contained only reads; Item Piles 0.2 adds
+explicit reads and mutations using its inspected 3.3.4 API contract. New
+operations require that version, Foundry generation 13 or 14 and the module's
+active dependencies; mutations additionally require a GM runtime and target
+write opt-in. Its original `get_items` remains capability-based. The two system
+adapters still expose actor-data reads, not the proposed skill-roll APIs.
 
 ## Alternatives considered
 

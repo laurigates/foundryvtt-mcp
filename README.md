@@ -17,10 +17,15 @@ is converted into one target; explicit multi-target calls use `target_id`.
 - [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
 - [Example target configuration](examples/targets.example.json)
 
-The initial D&D 5e, PF2e, and Item Piles adapters provide experimental read
-operations. Their READMEs distinguish runtime probes and local tests from live
-compatibility verification. Python 3.10+ is optional for the core and required for
-active Python integrations.
+The D&D 5e and PF2e adapters provide experimental actor-data reads. The
+[Item Piles package](modules/item-piles/README.md) adds explicit inventory,
+currency, transfer, merchant, pile and vault operations, including target-enabled
+mutations restricted to a GM runtime. Its original `get_items` read remains
+available through capability probes. New operations require the inspected Item
+Piles 3.3.4 contract, Foundry generation 13 or 14 and active dependencies.
+These gates are not live compatibility verification: all adapters remain
+experimental and their tested-version matrices remain empty. Python 3.10+ is
+optional for the core and required for active Python integrations.
 
 Provider lifecycles keep delayed multi-step calls bound to their original
 session; interrupted mutations can still have unknown remote outcomes and are
@@ -43,6 +48,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — target-qualified `foundry://targets/<target_id>/...` URIs; unqualified aliases remain available with one configured target.
 - **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
+- **Item Piles integration** — fixed API operations and JSON results, with a package-local registry, shared helpers and checked-in generated bindings as an example for other module integrations.
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 

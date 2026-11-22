@@ -12,9 +12,11 @@ operation identifies a fixed JavaScript binding and a runtime probe. Colocated
 `tests/` directories hold adapter contract tests. The shared loader/protocol is
 identical for both families.
 
-Use the shipped D&D 5e, PF2e, and Item Piles packages as executable examples. They
-are deliberately small read integrations rather than speculative wrappers for
-unverified rule APIs.
+Use the D&D 5e and PF2e packages as small actor-data read examples. Item Piles is
+the larger example: explicit read/write operations, shared runtime helpers,
+generated fixed bindings, contract tests and a documented upstream source
+reference. These are experimental integrations; local fixtures do not establish
+live compatibility.
 
 ## Manifest contract
 
@@ -121,7 +123,43 @@ failure does not cancel a runtime request already sent: ordinary work on that
 target waits for the locally tracked request to settle. A failed mutating
 operation that already invoked the provider is reported as `outcome_unknown`
 unless the provider explicitly rejected execution. Never retry it automatically.
-The currently shipped adapters contain only read operations.
+Item Piles demonstrates mutating operations with `readOnly: false`, target-local
+write enablement and an additional runtime GM gate. The system adapters currently
+contain only actor-data reads.
+
+## Shared helpers without changing the provider
+
+For a large package, keep authored source under the package and generate the
+standalone files already supported by the loader. Item Piles uses a registry of
+`{ id, description, readOnly, inputSchema, outputSchema, requiredMethods, handler }`
+records collected from domain modules. Each handler receives `(args, runtime)`;
+the runtime factory provides shared helpers. Both functions must be self-contained
+when serialized: use the explicit runtime parameter instead of importing hidden
+handler dependencies.
+
+Its generator embeds the runtime factory and one selected handler into each
+binding. A probe only constructs the same runtime inside a readiness check; it
+never runs the handler. This keeps API/version/permission checks consistent.
+The manifest, bindings and probes are checked in, and `--check` compares them with
+fresh in-memory output without writing. Regeneration is a separate explicit
+`--write` action; obsolete generated files are detected.
+
+```bash
+npm run generate:item-piles
+npm run check:item-piles
+npm run test:item-piles
+npm run test:python
+```
+
+The core loader, manifest version, Python protocol and providers are unchanged.
+Arguments remain JSON data for a fixed operation. `target_id` is reserved by the
+host; use fields such as `source_uuid` and `target_uuid` for documents participating
+in an operation. Keep the previous public contract when extending a package.
+
+Readiness remains per operation. The manager currently probes operations in
+sequence, so a large package performs more relay roundtrips during activation.
+Generated helper reuse improves source maintenance; it does not claim runtime
+bundling or eliminate that discovery cost.
 
 ## Systems and modules in one session
 

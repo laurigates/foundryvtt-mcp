@@ -84,7 +84,8 @@ worker tests do not establish upstream live compatibility.
 
 - Implement and verify rule-aware skill rolls or other system actions against
   pinned upstream APIs. The initial actor-data adapters do not claim those APIs.
-- Expand Item Piles beyond the initial read operation after live API verification.
+- Live-verify the expanded Item Piles package against its inspected upstream
+  contract before promoting its experimental compatibility status.
 - Add a native bridge backend when a concrete Foundry-side bridge exists.
 - Add operation-specific system capabilities when a module actually needs them.
 - Design cross-world business operations separately; multiple independent worlds
@@ -207,3 +208,61 @@ keeps an ordinary target operation queued after the caller receives
 `outcome_unknown`, until the underlying provider request settles. These results
 do not substitute for the unavailable dependency, typechecking, packaging or
 live-server gates.
+
+## Item Piles package expansion — 2026-11-22
+
+The subsequent Item Piles 0.2 work expands the earlier single read into explicit
+inventory, currency, transfer, merchant, pile and vault operations. The package
+records the inspected upstream 3.3.4 source reference separately from live
+verification. Its status remains experimental and its tested-version matrix
+remains empty.
+
+Authored code is split into a package-local operation registry, domain handlers
+and a self-contained runtime helper factory. A deterministic generator produces
+the manifest and standalone binding/probe files consumed by the existing loader.
+Each binding contains one fixed handler; the caller cannot select an arbitrary
+API method or executable source. The Python adapter reads its allowlist from the
+installed manifest, without relying on the process working directory.
+
+The historical `get_items` name, input and result shape remain unchanged, with
+capability-based availability. New operations require Item Piles `3.3.4`, Foundry
+generation `13` or `14`, and active `socketlib` / `lib-wrapper`. Mutations also
+require target write enablement and a GM in the execution runtime. The package's
+runtime constructor applies the same readiness policy in probes and bindings.
+This strict source-version gate is not a live compatibility claim.
+
+The main build and test commands check generated-file drift; regeneration is
+explicit through `npm run generate:item-piles`. `npm run test:item-piles` checks
+the package with Node's standard-library test runner, including per-operation
+readiness/write classification, version/dependency failures, deterministic
+generation and orphan handling. Python adapter tests are included in the shared
+Python suite. Installed-package smoke now loads Item Piles and exercises both a
+read and a write callback through the real worker with local provider fixtures.
+
+Local verification of the expanded package on 2026-11-22:
+
+| Check | Result |
+|---|---|
+| `node modules/item-piles/build.mjs --write` | Generated 40 operations (13 reads, 27 writes) and 81 files |
+| `npm run check:item-piles` | Passed; checked-in output matches the authored sources |
+| `npm run test:item-piles` | 242 Node tests passed, none skipped |
+| `npm run test:python` | 16 tests passed, including the real Python worker's Item Piles read/write callbacks and uncertain-outcome propagation |
+| Offline JSON Schema validation | All 80 input/output schemas checked with Python Draft 7 validation; all 56 recipes cover the 40 operations and validate after routing is removed |
+| Rejected example inputs | 56 undeclared-property cases, 90 missing-required-property cases and 12 unsafe/invalid cases rejected; external schema retrieval disabled |
+| Offline npm pack dry-run | All 87 required Item Piles runtime/doc/example files included; package tests excluded. This is a file-list check, not an installed build |
+| Full build/test/lint gates | Attempted; generated checks and 242 Node tests pass, then missing `tsc`, `vitest` or `biome` prevents completion |
+| `npm run smoke:integrations` | Attempted; unavailable built `dist/integrations/manifest.js` prevents the installed-runtime smoke |
+
+The Node tests execute the actual package runtime and serialized handlers in VM
+contexts with local Foundry/API fixtures. They cover the public contracts,
+permissions, missing APIs, version gates, quantities, parser boundaries,
+postconditions, output projections, and generation drift. The worker tests use
+real Python processes with local provider callback fixtures; these are not live
+Foundry tests.
+
+A Vitest regression additionally compiles every generated input/output schema
+with the manager's strict Ajv options and validates the complete recipe catalog.
+Those Ajv/Vitest regressions could not execute in this dependency-free workspace;
+the full TypeScript build and installed-package smoke could not complete.
+The earlier provider-pass and 2026-11-19 results above remain separate historical
+evidence. No live Foundry compatibility is recorded for this expansion.

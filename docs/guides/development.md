@@ -76,6 +76,15 @@ For resources, update `src/tools/resources.ts` and the corresponding capability/
 5. Probe the actual runtime API, return JSON-safe DTOs, validate inputs/outputs, and only advertise an operation while its target and provider can execute it.
 6. Record upstream source, integration version and actual live-tested version combinations. Keep experimental status until live verification is performed.
 
+The Item Piles example keeps its authored registry, domain handlers and helper
+factory in `modules/item-piles/src/`. Run `npm run generate:item-piles` after
+editing those sources. `npm run check:item-piles` verifies deterministic output
+and rejects drift/orphan files; both the main build and test commands run that
+check. `npm run test:item-piles` executes the package's Node standard-library
+tests, while `npm run test:python` discovers its Python adapter tests. Generated
+files remain standalone scripts for the existing loader; they are never bundled
+or compiled in the production request path.
+
 Runtime package errors must remain local to their package; keep strict loader
 validation available for development and smoke checks. A closed worker must not
 restart from a delayed callback. Include wrapped-output schema tests for local
@@ -94,6 +103,7 @@ bun run smoke              # Installed entry point startup
 bun run smoke:dotenv       # dotenv load order
 bun run smoke:integrations # Packaged Python worker integration path
 bun run smoke:pack         # npm package in a fresh consumer (requires dependency resolution)
+bun run test:item-piles    # Generation check and standalone Node binding contracts
 just docs-check            # TypeDoc check
 just antipatterns          # ast-grep scan
 ```

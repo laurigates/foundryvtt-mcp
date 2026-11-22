@@ -98,10 +98,24 @@ native acknowledgement data is also an unknown outcome, not success.
 
 Initial experimental integration examples include `system_dnd5e_get_actor_data`, `system_pf2e_get_actor_data` and `module_item-piles_get_items`. Names preserve exact upstream IDs. These require the applicable runtime API and the target's `runtime.execute` capability; a manifest alone does not make a tool usable. The initial adapters are not claimed live-verified. See [Writing integrations](writing-integrations.md).
 
-All currently shipped operations are read-only. Malformed packages are reported
-in target integration status without suppressing unrelated valid packages.
-Integration structured results retain their provenance wrapper; the advertised
-schema preserves the result's local references and nested resource scope.
+The system adapters remain actor-data reads. Item Piles additionally exposes
+explicit inventory, currency, transfer, merchant, pile and vault operations.
+Each has its own input/output contract and read/write classification; there is
+no generic API-method or JavaScript argument. Mutations require the selected
+target's write opt-in and a GM runtime, including when Item Piles performs its
+own privileged callbacks. Read operations check document access.
+
+The earlier `get_items` read keeps its capability-based availability. New Item
+Piles operations are restricted to the inspected `3.3.4` API on Foundry `13` or
+`14`, with active `socketlib` and `lib-wrapper`. An unknown/different version is
+not treated as compatible. These are readiness gates, not live-tested claims;
+the package remains experimental. See its
+[operation reference](../../modules/item-piles/README.md).
+
+Malformed packages are reported in target integration status without suppressing
+unrelated valid packages. Integration structured results retain their provenance
+wrapper; the advertised schema preserves the result's local references and nested
+resource scope.
 
 ## MCP resources: 9 base definitions, target-qualified URLs
 

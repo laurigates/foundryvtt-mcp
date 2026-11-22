@@ -62,6 +62,14 @@ That wrapper now gives the result schema its own resource identity so local
 the structured payload fields remain the same. External schema documents are
 not fetched or registered by the integration loader.
 
+Item Piles 0.2 retains the `module_item-piles_get_items` name, `actor_uuid` input
+and array of `{ id, uuid, name, type, quantity }` summaries. It also retains that
+operation's capability-based version policy. Its new operations have separate
+names and explicit contracts, and require the inspected Item Piles 3.3.4 API on
+Foundry 13/14. Their write classification does not enable writes on an existing
+read-only target. Document arguments such as `target_uuid` remain distinct from
+the host's `target_id` routing argument.
+
 ### Multiple targets
 
 Once two or more targets are configured, pass `target_id` on calls and use

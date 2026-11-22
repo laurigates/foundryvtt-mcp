@@ -67,6 +67,45 @@ class WorkerProtocolTests(unittest.TestCase):
         self.handshake()
         self.load("module", "item-piles")
 
+    def test_item_piles_read_and_write_keep_operation_arguments_and_call_token(self):
+        self.handshake()
+        self.load("module", "item-piles")
+        for operation, arguments, result in (
+            ("get_items", {"actor_uuid": "Actor.one"}, []),
+            ("transfer_items", {"source_uuid": "Actor.one", "target_uuid": "Actor.two",
+                                "items": [{"item_id": "potion", "quantity": 2}]}, []),
+        ):
+            with self.subTest(operation=operation):
+                self.request(operation, "call", {
+                    "integration": "module:item-piles", "operation": operation,
+                    "arguments": arguments, "callToken": "token-" + operation,
+                })
+                callback = self.receive()
+                self.assertEqual(callback["method"], "invoke")
+                self.assertEqual(callback["params"], {
+                    "integration": "module:item-piles", "operation": operation,
+                    "arguments": arguments, "callToken": "token-" + operation,
+                })
+                self.send({"type": "response", "id": callback["id"], "generation": 7, "result": result})
+                self.assertEqual(self.receive()["result"], result)
+
+    def test_item_piles_preserves_uncertain_mutation_without_another_callback(self):
+        self.handshake()
+        self.load("module", "item-piles")
+        self.request("trade", "call", {
+            "integration": "module:item-piles", "operation": "trade_items",
+            "arguments": {"seller_uuid": "Actor.one", "buyer_uuid": "Actor.two",
+                          "item_id": "potion", "quantity": 1}, "callToken": "trade-token",
+        })
+        callback = self.receive()
+        self.assertEqual(callback["method"], "invoke")
+        self.send({"type": "response", "id": callback["id"], "generation": 7,
+                   "error": {"code": "outcome_unknown", "message": "Remote result was lost"}})
+        response = self.receive()
+        self.assertEqual(response["type"], "response")
+        self.assertEqual(response["id"], "trade")
+        self.assertEqual(response["error"]["code"], "outcome_unknown")
+
     def test_rejects_wrong_protocol_version(self):
         self.request("bad", "handshake", {"version": 999, "targetId": "alpha", "packageRoot": str(PACKAGE_ROOT)})
         self.assertEqual(self.receive()["error"]["code"], "protocol_version")
