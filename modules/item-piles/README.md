@@ -2,9 +2,11 @@
 
 This package exposes **40 fixed MCP operations: 13 reads and 27 writes** for
 inventories, currencies, loot piles, containers, merchants, tables and vaults.
-It is a complete worked example of a substantial **module integration**: all
-module-specific behavior lives here, while providers, target routing, Python
-transport and write policy remain in the shared host.
+It is a worked example of a substantial **module integration**: module-specific
+behavior lives here, while providers, target routing, Python transport and write
+policy remain in the shared host. Its scope is these data-oriented workflows;
+it does not expose every upstream method, UI interaction or optional extension.
+See the [coverage boundaries](UPSTREAM.md#deliberately-separate-surfaces).
 
 | Metadata | Value |
 |---|---|

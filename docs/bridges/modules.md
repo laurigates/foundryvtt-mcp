@@ -23,9 +23,9 @@ installation into the supported scope.
 
 ## Included modules
 
-| Module / package documentation | Adapter version / updated | Upstream source baseline | Foundry scope / runtime checks | Status / verified live combinations |
-|---|---|---|---|---|
-| [Item Piles](../../modules/item-piles/README.md) (`item-piles`) | `0.2.0` / `2026-11-22` | Release [3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4), [pinned source commit](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/commit/85ab971406623fb1c5d01eb1f093fe4855ede6e4) | **13 or 14** for new operations; exact module version and API/dependency probes apply | Experimental / **none** |
+| Module / package documentation | Module version used (upstream) | Adapter version / updated | Pinned upstream source | Foundry scope / runtime checks | Status / verified live combinations |
+|---|---|---|---|---|---|
+| [Item Piles](../../modules/item-piles/README.md) (`item-piles`) | **[3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** (release) | `0.2.0` / `2026-11-22` | Commit [85ab9714](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/commit/85ab971406623fb1c5d01eb1f093fe4855ede6e4) | **13 or 14** for new operations; exact module version and API/dependency probes apply | Experimental / **none** |
 
 The original Item Piles `get_items` operation retains capability-based checks
 without an exact module-version gate. That legacy read does not broaden this
@@ -35,8 +35,11 @@ operations, including the requirements for mutations.
 
 ## Reading and maintaining the catalog
 
-The **adapter version** identifies our integration package. The **upstream source
-baseline** identifies the module code inspected for that adapter; it is separate
+The **module version used (upstream)** is the external module release or tag
+inspected for this integration; it is not our adapter version. If upstream has
+neither releases nor tags, that column contains the full commit hash instead.
+The **adapter version** identifies our integration package, and the **pinned
+upstream source** identifies the exact inspected code. These values are separate
 from the version observed in a connected world and from live compatibility tests.
 
 Use the latest official release as the synchronization reference. If there are no

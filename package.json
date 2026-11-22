@@ -86,6 +86,7 @@
     "docs/guides/providers-and-targets.md",
     "docs/guides/backward-compatibility.md",
     "docs/guides/writing-integrations.md",
+    "docs/bridges/",
     "examples/targets.example.json"
   ],
   "dependencies": {

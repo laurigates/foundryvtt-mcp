@@ -23,10 +23,10 @@ into the supported scope.
 
 ## Included systems
 
-| System / package documentation | Adapter version / updated | Upstream source baseline | Foundry scope / runtime checks | Status / verified live combinations |
-|---|---|---|---|---|
-| [D&D 5e](../../systems/dnd5e/README.md) (`dnd5e`) | `0.1.0` / `2026-11-19` | **Not yet recorded** | **13+ policy**; exact combinations not established; system identity and Actor API probes | Experimental / **none** |
-| [Pathfinder 2e](../../systems/pf2e/README.md) (`pf2e`) | `0.1.0` / `2026-11-19` | **Not yet recorded** | **13+ policy**; exact combinations not established; system identity and Actor API probes | Experimental / **none** |
+| System / package documentation | System version used (upstream) | Adapter version / updated | Pinned upstream source | Foundry scope / runtime checks | Status / verified live combinations |
+|---|---|---|---|---|---|
+| [D&D 5e](../../systems/dnd5e/README.md) (`dnd5e`) | **Not yet recorded** | `0.1.0` / `2026-11-19` | Not yet recorded | **13+ policy**; exact combinations not established; system identity and Actor API probes | Experimental / **none** |
+| [Pathfinder 2e](../../systems/pf2e/README.md) (`pf2e`) | **Not yet recorded** | `0.1.0` / `2026-11-19` | Not yet recorded | **13+ policy**; exact combinations not established; system identity and Actor API probes | Experimental / **none** |
 
 The bundled operations read Actor data. They do not establish support for the
 systems' rule calculations or other system-specific APIs. Read the individual
@@ -41,10 +41,12 @@ core helpers, not capabilities introduced by the system adapter.
 
 ## Reading and maintaining the catalog
 
-The **adapter version** identifies our package. The **upstream source baseline**
-must identify the game-system code inspected for it. An unknown baseline does not
-mean that the official system has no releases or tags, and it must not be replaced
-with an unexamined latest release.
+The **system version used (upstream)** is the external system release or tag
+inspected for this integration; if neither exists, it is the full commit hash.
+The **adapter version** identifies our package, and the **pinned upstream source**
+identifies the exact inspected game-system code. An unknown source version does
+not mean that the official system has no releases or tags, and it must not be
+replaced with an unexamined latest release.
 
 When establishing or updating a baseline, use the latest official release; if
 none exists, use the latest official tag; if neither exists, use the current

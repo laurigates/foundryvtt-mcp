@@ -227,6 +227,7 @@ loot and vault workflows. It does not claim to expose every upstream method:
 | `getPaymentDataFromString` | Deprecated alias; use `get_payment_data` |
 | `getCurrenciesFromString`, `getStringFromCurrencies` | No free-form formula/parser tool; structured currency input is normalized locally |
 | `findSimilarItem` | Internal matching remains Item Piles' responsibility; mutating tool inputs use exact IDs |
+| `isItemPileBanker`, `isItemPileAuctioneer` | Optional `item_piles_bankers` and `item_piles_auctioneer` extension checks and workflows are outside this adapter's scope |
 | Private helper APIs, including vault access | Never invoked |
 
 ## Compatibility and verification policy
