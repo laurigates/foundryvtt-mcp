@@ -140,3 +140,70 @@ schema conflicts, and the MCP SDK's output-schema validation on errors.
 No live Foundry server, upstream relay deployment, D&D 5e/PF2e installation, or
 Item Piles installation was exercised. The initial adapter compatibility
 matrices remain empty, and their status remains experimental.
+
+## Second provider-boundary pass — 2026-11-22
+
+This pass tightens the existing architecture without adding a provider, degraded
+composite mode, new integration operation or live compatibility claim.
+
+| Boundary | Change |
+|---|---|
+| Session/provider dispatch | Carry the original operation context through asynchronous steps and Python callbacks; check it before sending, and keep ordinary target work queued until locally tracked requests settle |
+| Lifecycle cleanup | Share the in-progress close promise; abort replaced native authentication and bound each login stage by its configured timeout |
+| Native identity and writes | Reject missing/blank world IDs; validate acknowledgement success data and distinguish explicit rejection from unknown outcomes |
+| Cache | Apply supported journal-page broadcasts, mark unhandled cached changes stale, and prevent late refresh/mutation responses from overwriting a replacement snapshot |
+| Integration lifecycle | Prevent closed-worker resurrection; report malformed packages independently while preserving strict loader checks for development |
+| Integration writes | Treat worker failure after a mutating provider callback began as potentially unknown; do not replay it |
+| MCP schemas | Embed result schemas as separate resources so local references, recursive roots and nested IDs preserve their scope inside the provenance wrapper |
+| Documentation/discovery text | Describe all four providers, target-local writes, qualified resources and single-target aliases; retain experimental read-only adapter status |
+
+The schema regression was reproduced before the fix against the actual catalog
+source. After the fix, eight schema cases passed validation with the installed
+Python `jsonschema` Draft7 validator: absent, empty, fragment-only, relative and
+absolute root IDs, recursive references and nested resources. The validation
+registry explicitly rejects external resource retrieval. Valid results pass,
+invalid result values and missing provenance fail, and the original schema is
+not mutated. An exact-source catalog probe also confirmed stable resource IDs
+for equivalent key ordering and continued rejection of conflicting schemas.
+Ajv/Vitest regressions and a real MCP protocol fixture using `$defs`/`$ref` are
+included for the provisioned test environment.
+
+Focused local probes also exercise the actual TypeScript control flow with
+dependency doubles for unavailable packages; provider/session probes use the
+real Node asynchronous context mechanism. The Python worker/adapter suite runs
+with the local interpreter. These checks are narrower than the project gates:
+this environment has no installed project npm dependencies, TypeScript compiler,
+Vitest, Biome, Bun, Just or Gitleaks. The full build, typecheck, MCP/Ajv suite,
+installed-package smoke and hook checks have not been rerun for this pass.
+The 2026-11-19 results above are historical and do not establish those gates for
+this change. No live Foundry or upstream relay test was performed.
+
+A second local review exercised three relay response-order races against the
+actual provider source with HTTP/parser/cache dependencies replaced by doubles.
+All passed: an obsolete automatic refresh cannot replace the newer snapshot,
+an old mutation result is rejected after a provider generation change, and a
+mutation response does not patch a different snapshot within the same transport
+generation. A separate session probe confirmed that closing during integration
+cleanup does not start a new provider connection after close was requested.
+
+Final local verification for this pass:
+
+| Check | Result |
+|---|---|
+| Native provider, authentication and cache control-flow scenarios | 37/37 passed |
+| Session operation/queue/close control-flow scenarios | 7/7 passed |
+| Relay response-order and close-before-connect probes | 4/4 passed |
+| Integration lifecycle/package scenarios, including a real session and Python worker queue test | 16/16 passed |
+| Previous compatibility control-flow checks rerun against the changed source | 24/24 passed |
+| Wrapped JSON Schema validation with external retrieval disabled | 8/8 passed |
+| Python worker/adapter unittest suite | 11/11 passed |
+| Syntax parsing | 141 TypeScript, 10 JavaScript/bindings, 19 JSON and 10 Python files passed |
+| `npm run build`, `npm test`, `npm run lint` | Attempted; blocked by missing `tsc`, `vitest` and `biome` executables |
+
+The 88 control-flow checks above execute the actual changed source with local
+dependency doubles. They include a real Node async context and, for integration
+lifecycle cases, a real Python process. The combined session/worker regression
+keeps an ordinary target operation queued after the caller receives
+`outcome_unknown`, until the underlying provider request settles. These results
+do not substitute for the unavailable dependency, typechecking, packaging or
+live-server gates.

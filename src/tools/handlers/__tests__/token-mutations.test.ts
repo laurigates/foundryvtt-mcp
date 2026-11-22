@@ -219,11 +219,12 @@ describe('FoundryClient token mutations', () => {
           operation?: {
             updates?: Array<Record<string, unknown>>;
             data?: Array<Record<string, unknown>>;
+            ids?: string[];
           };
         }
       ).operation;
       const result = op?.updates ?? op?.data ?? [];
-      cb({ result: [result[0] ?? { _id: EFFECT_ID }] });
+      cb({ result: op?.ids ?? [{ _id: EFFECT_ID, ...result[0] }] });
     }) as SocketEmitMock);
     if (opts.connected !== false) {
       (client as unknown as { socket: { connected: boolean; emit: SocketEmitMock } }).socket = {

@@ -4,6 +4,7 @@ import type { DiceRoll } from '../foundry/types.js';
 import { applyDocumentBroadcast, parseDocumentBroadcast } from '../foundry/world-cache.js';
 import { DocumentProvider } from './document-provider.js';
 import { ProviderError } from './errors.js';
+import { assertOperationCurrent, trackOperation } from './operation-context.js';
 import { parseSnapshot, SNAPSHOT_SCRIPT } from './snapshot.js';
 import type { FoundryEnvironment, ProviderKind, RestApiProviderConfig } from './types.js';
 
@@ -37,7 +38,7 @@ export class RestApiProvider extends DocumentProvider {
     this.relayConfig = config;
     this.relay = axios.create({
       baseURL: config.relayUrl,
-      timeout: config.timeout ?? 10000,
+      timeout: this.config.timeout ?? 10000,
       headers: { 'x-api-key': config.apiKey, 'Content-Type': 'application/json' },
       maxRedirects: 0,
       maxContentLength: 50 * 1024 * 1024,
@@ -61,16 +62,23 @@ export class RestApiProvider extends DocumentProvider {
   }
 
   override async connect(): Promise<void> {
-    this.generation++;
+    assertOperationCurrent();
+    const epoch = ++this.generation;
     this._isConnected = false;
     this.boundIdentity = undefined;
     this.worldData = null;
     try {
       await this.readSnapshot();
+      assertOperationCurrent();
+      if (epoch !== this.generation) {
+        throw new ProviderError('session_changed', 'The connection changed while loading the world');
+      }
       this._isConnected = true;
     } catch (error) {
-      this.worldData = null;
-      this.runtimeReady = false;
+      if (epoch === this.generation) {
+        this.worldData = null;
+        this.runtimeReady = false;
+      }
       throw error;
     }
   }
@@ -88,6 +96,9 @@ export class RestApiProvider extends DocumentProvider {
   private async readSnapshot(): Promise<void> {
     const epoch = this.generation;
     const result = await this.request(SNAPSHOT_SCRIPT, {}, true);
+    // Session refresh can replace the snapshot without changing the transport
+    // epoch. An earlier automatic refresh must not overwrite that new snapshot.
+    assertOperationCurrent();
     let parsed: ReturnType<typeof parseSnapshot>;
     try {
       parsed = parseSnapshot(result);
@@ -97,7 +108,7 @@ export class RestApiProvider extends DocumentProvider {
       });
     }
     const worldId = parsed.snapshot.world.id;
-    if (typeof worldId !== 'string' || !worldId || !parsed.ready) {
+    if (typeof worldId !== 'string' || !worldId.trim() || !parsed.ready) {
       throw new ProviderError('invalid_response', 'The runtime did not identify a ready world');
     }
     if (this.relayConfig.expectedWorldId && this.relayConfig.expectedWorldId !== worldId) {
@@ -150,6 +161,7 @@ export class RestApiProvider extends DocumentProvider {
     args: Record<string, unknown>,
     options: { readOnly: boolean },
   ): Promise<unknown> {
+    assertOperationCurrent();
     if (!this.isConnected()) {
       throw new ProviderError('target_offline', 'The relay target is disconnected');
     }
@@ -186,6 +198,9 @@ export class RestApiProvider extends DocumentProvider {
     args: Record<string, unknown>,
     readOnly: boolean,
   ): Promise<unknown> {
+    // This check is outside the transport catch: a cancelled operation has not
+    // sent anything and must not be misreported as a new network failure.
+    assertOperationCurrent();
     const epoch = this.generation;
     const identity = this.boundIdentity;
     const guard = identity
@@ -200,15 +215,14 @@ if (typeof game === 'undefined' || !game.ready || game.world.id !== ${JSON.strin
       script: `const args = ${JSON.stringify(args)};\n${guard}\nreturn await (async () => {\n${script}\n})();`,
     };
     const controller = new AbortController();
+    assertOperationCurrent();
     this.pending.add(controller);
     try {
-      const response = await this.relay.post(
-        this.relayConfig.executeJsPath ?? '/execute-js',
-        body,
-        {
+      const response = await trackOperation(
+        this.relay.post(this.relayConfig.executeJsPath ?? '/execute-js', body, {
           params: { clientId: this.relayConfig.clientId },
           signal: controller.signal,
-        },
+        }),
       );
       if (epoch !== this.generation) {
         throw new ProviderError(
@@ -289,6 +303,8 @@ if (typeof game === 'undefined' || !game.ready || game.world.id !== ${JSON.strin
     operation: Record<string, unknown>,
   ): Promise<unknown[]> {
     this.assertWriteable();
+    const epoch = this.generation;
+    const snapshot = this.worldData;
     const result = await this.execute(
       `
 const parent = args.operation.parentUuid ? await fromUuid(args.operation.parentUuid) : null;
@@ -311,16 +327,28 @@ return Array.from(documents).map(document => args.action === 'delete' ? document
       { type, action, operation },
       { readOnly: false },
     );
+    try {
+      assertOperationCurrent();
+      if (epoch !== this.generation) {
+        throw new ProviderError('session_changed', 'The mutation belongs to an expired connection');
+      }
+    } catch (error) {
+      throw new ProviderError(
+        'outcome_unknown',
+        'Discarded a mutation result from an expired operation; inspect the world before retrying',
+        { cause: error },
+      );
+    }
     if (!Array.isArray(result)) {
       throw new ProviderError(
         'outcome_unknown',
         'The mutation completed without a valid document result',
       );
     }
-    if (this.worldData) {
+    if (snapshot && this.worldData === snapshot) {
       const broadcast = parseDocumentBroadcast({ type, action, operation, result });
       if (broadcast) {
-        applyDocumentBroadcast(this.worldData, broadcast);
+        applyDocumentBroadcast(snapshot, broadcast);
       }
     }
     return result;

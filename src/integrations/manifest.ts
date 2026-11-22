@@ -73,6 +73,19 @@ export interface IntegrationPackage {
   bindings: Map<string, { script: string; probe: string }>;
 }
 
+export interface IntegrationLoadFailure {
+  kind: IntegrationKind;
+  id: string;
+  adapterVersion: string;
+  operations: string[];
+  error: IntegrationError;
+}
+
+export interface IntegrationLoadOptions {
+  /** Runtime discovery can isolate bad packages; build/package checks remain strict by default. */
+  onError?: (failure: IntegrationLoadFailure) => void;
+}
+
 /** Works from both src/integrations and the installed dist/integrations directory. */
 export function defaultPackageRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -101,9 +114,10 @@ async function containedFile(root: string, path: string): Promise<string> {
 
 export async function loadIntegrations(
   packageRoot = defaultPackageRoot(),
+  options: IntegrationLoadOptions = {},
 ): Promise<IntegrationPackage[]> {
   const packages: IntegrationPackage[] = [];
-  const names = new Set<string>();
+  const failures: IntegrationLoadFailure[] = [];
   for (const [directory, kind] of [
     ['systems', 'system'],
     ['modules', 'module'],
@@ -123,50 +137,103 @@ export async function loadIntegrations(
         continue;
       }
       const root = resolve(family, id);
-      const familyRoot = await realpath(family);
-      const resolvedRoot = await realpath(root);
-      const relativeRoot = relative(familyRoot, resolvedRoot);
-      if (relativeRoot.startsWith('..') || isAbsolute(relativeRoot)) {
-        throw new IntegrationError(
-          'invalid_manifest',
-          `Integration directory escapes ${directory}: ${id}`,
-        );
-      }
-      let data: unknown;
+      let manifest: IntegrationManifest | undefined;
+      const names: string[] = [];
       try {
-        data = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
+        const familyRoot = await realpath(family);
+        const resolvedRoot = await realpath(root);
+        const relativeRoot = relative(familyRoot, resolvedRoot);
+        if (relativeRoot.startsWith('..') || isAbsolute(relativeRoot)) {
+          throw new IntegrationError(
+            'invalid_manifest',
+            `Integration directory escapes ${directory}: ${id}`,
+          );
+        }
+        const data: unknown = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
+        manifest = IntegrationManifestSchema.parse(data);
+        if (manifest.kind !== kind || manifest.id !== id) {
+          throw new IntegrationError(
+            'invalid_manifest',
+            `Folder and manifest identity differ: ${directory}/${id}`,
+          );
+        }
+        await containedFile(root, manifest.entrypoint);
+        await containedFile(root, 'README.md');
+        const bindings = new Map<string, { script: string; probe: string }>();
+        for (const operation of manifest.operations) {
+          const name = toolName(kind, id, operation.id);
+          if (bindings.has(operation.id)) {
+            throw new IntegrationError('duplicate_tool', `Duplicate integration tool: ${name}`);
+          }
+          names.push(name);
+          bindings.set(operation.id, {
+            script: await readFile(await containedFile(root, operation.binding), 'utf8'),
+            probe: await readFile(await containedFile(root, operation.probe), 'utf8'),
+          });
+        }
+        packages.push({ root, manifest, bindings });
       } catch (error) {
-        if (error instanceof Error && 'code' in error && error.code === 'ENOTDIR') {
+        if (!manifest && error instanceof Error && 'code' in error && error.code === 'ENOTDIR') {
           continue;
         }
-        throw new IntegrationError(
-          'invalid_manifest',
-          `Cannot read ${directory}/${id}/manifest.json: ${String(error)}`,
-        );
-      }
-      const manifest = IntegrationManifestSchema.parse(data);
-      if (manifest.kind !== kind || manifest.id !== id) {
-        throw new IntegrationError(
-          'invalid_manifest',
-          `Folder and manifest identity differ: ${directory}/${id}`,
-        );
-      }
-      await containedFile(root, manifest.entrypoint);
-      await containedFile(root, 'README.md');
-      const bindings = new Map<string, { script: string; probe: string }>();
-      for (const operation of manifest.operations) {
-        const name = toolName(kind, id, operation.id);
-        if (names.has(name)) {
-          throw new IntegrationError('duplicate_tool', `Duplicate integration tool: ${name}`);
-        }
-        names.add(name);
-        bindings.set(operation.id, {
-          script: await readFile(await containedFile(root, operation.binding), 'utf8'),
-          probe: await readFile(await containedFile(root, operation.probe), 'utf8'),
+        failures.push({
+          kind,
+          id,
+          adapterVersion: manifest?.adapterVersion ?? 'unknown',
+          operations: [...new Set(names)],
+          error:
+            error instanceof IntegrationError
+              ? error
+              : new IntegrationError(
+                  'invalid_manifest',
+                  `Cannot load ${directory}/${id}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
         });
       }
-      packages.push({ root, manifest, bindings });
     }
   }
-  return packages;
+
+  // Only fully validated packages own names. All owners of a collision are withheld,
+  // rather than letting directory order silently choose an implementation.
+  const owners = new Map<string, IntegrationPackage[]>();
+  for (const entry of packages) {
+    for (const operation of entry.manifest.operations) {
+      const name = toolName(entry.manifest.kind, entry.manifest.id, operation.id);
+      const existing = owners.get(name) ?? [];
+      existing.push(entry);
+      owners.set(name, existing);
+    }
+  }
+  const conflicts = new Map<IntegrationPackage, string[]>();
+  for (const [name, entries] of owners) {
+    if (entries.length < 2) {
+      continue;
+    }
+    for (const entry of entries) {
+      const names = conflicts.get(entry) ?? [];
+      names.push(name);
+      conflicts.set(entry, names);
+    }
+  }
+  for (const [entry, names] of conflicts) {
+    failures.push({
+      kind: entry.manifest.kind,
+      id: entry.manifest.id,
+      adapterVersion: entry.manifest.adapterVersion,
+      operations: entry.manifest.operations.map((operation) =>
+        toolName(entry.manifest.kind, entry.manifest.id, operation.id),
+      ),
+      error: new IntegrationError(
+        'duplicate_tool',
+        `Conflicting integration tools: ${names.join(', ')}`,
+      ),
+    });
+  }
+  for (const failure of failures) {
+    if (!options.onError) {
+      throw failure.error;
+    }
+    options.onError(failure);
+  }
+  return packages.filter((entry) => !conflicts.has(entry));
 }

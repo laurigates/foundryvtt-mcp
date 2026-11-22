@@ -1,4 +1,5 @@
 /** One catalog owns MCP discovery, target resolution and dispatch. */
+import { createHash } from 'node:crypto';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import type { FoundrySession, FoundrySessionManager } from '../sessions/index.js';
@@ -81,6 +82,34 @@ function canonical(value: unknown): string {
     );
   }
   return JSON.stringify(value) ?? 'null';
+}
+
+function integrationOutputSchema(
+  name: string,
+  resultSchema: Record<string, unknown>,
+): Record<string, unknown> {
+  // Embedding an anonymous schema changes the root of "#" and "#/$defs/...".
+  // Give result its own resource identity instead of rewriting references, so
+  // nested $id scopes and recursive references retain their original meaning.
+  const digest = createHash('sha256').update(canonical([name, resultSchema])).digest('hex');
+  const base = `https://schemas.foundryvtt-mcp.invalid/tools/${digest}/`;
+  const declaredId = resultSchema.$id;
+  const resultId =
+    typeof declaredId === 'string' && declaredId && !declaredId.startsWith('#')
+      ? declaredId
+      : new URL(typeof declaredId === 'string' ? declaredId : '', `${base}result`).href;
+  return {
+    $id: `${base}response`,
+    type: 'object',
+    properties: {
+      target_id: { type: 'string' },
+      world_id: { type: ['string', 'null'] },
+      session_generation: { type: 'integer' },
+      result: { ...resultSchema, $id: resultId },
+    },
+    required: ['target_id', 'world_id', 'session_generation', 'result'],
+    additionalProperties: false,
+  };
 }
 
 function requiredCapability(name: string): string | undefined {
@@ -181,17 +210,7 @@ export class ToolCatalog {
           name: definition.name,
           description: definition.description,
           inputSchema: definition.inputSchema,
-          outputSchema: {
-            type: 'object',
-            properties: {
-              target_id: { type: 'string' },
-              world_id: { type: ['string', 'null'] },
-              session_generation: { type: 'integer' },
-              result: definition.outputSchema,
-            },
-            required: ['target_id', 'world_id', 'session_generation', 'result'],
-            additionalProperties: false,
-          },
+          outputSchema: integrationOutputSchema(definition.name, definition.outputSchema),
           annotations: { readOnlyHint: definition.readOnly },
         };
         if (this.core.has(tool.name) || MANAGEMENT.has(tool.name)) {

@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import Ajv, { type ValidateFunction } from 'ajv';
 import { z } from 'zod';
 import {
+  assertOperationCurrent,
+  captureOperationContext,
+  type ProviderOperationContext,
+  withOperationContext,
+} from '../providers/operation-context.js';
+import {
   defaultPackageRoot,
+  type IntegrationLoadFailure,
   type IntegrationOperation,
   type IntegrationPackage,
   loadIntegrations,
@@ -37,6 +44,42 @@ interface RegisteredOperation {
   probe: string;
 }
 
+interface IntegrationCall {
+  name: string;
+  revision: number;
+  context: ProviderOperationContext | undefined;
+  possibleWrites: number;
+  pendingWrites: Set<Promise<unknown>>;
+}
+
+const UNCERTAIN_WRITE_ERRORS = new Set([
+  'worker_timeout',
+  'worker_exited',
+  'worker_protocol',
+  'protocol_limit',
+  'worker_unavailable',
+  'python_unavailable',
+  'stale_session',
+  'session_changed',
+  'session_closed',
+  'invalid_output',
+  'adapter_error',
+  'provider_error',
+]);
+
+// These execution errors attest that this particular binding did not mutate
+// Foundry. A provider must use outcome_unknown for a response lost after sending.
+const CONFIRMED_NO_WRITE_ERRORS = new Set([
+  'session_changed',
+  'session_closed',
+  'target_offline',
+  'target_unavailable',
+  'writes_disabled',
+  'unsupported_operation',
+  'identity_mismatch',
+  'execution_rejected',
+]);
+
 /** Session-owned integration instances; package definitions never contain connection credentials. */
 export class IntegrationManager {
   private readonly ajv = new Ajv({ allErrors: true, strict: true });
@@ -44,7 +87,8 @@ export class IntegrationManager {
   private worker: PythonWorker | undefined;
   private operations = new Map<string, RegisteredOperation>();
   private statuses: IntegrationStatus[] = [];
-  private calls = new Map<string, { name: string; revision: number }>();
+  private calls = new Map<string, IntegrationCall>();
+  private readonly interruptedWrites = new Set<Promise<unknown>>();
   private revision = 0;
   private closed = false;
 
@@ -62,11 +106,30 @@ export class IntegrationManager {
     const oldWorker = this.worker;
     this.worker = undefined;
     await oldWorker?.close();
-    const packages = await loadIntegrations(this.packageRoot);
+    const failures: IntegrationLoadFailure[] = [];
+    const packages = await loadIntegrations(this.packageRoot, {
+      onError: (failure) => failures.push(failure),
+    });
     if (revision !== this.revision || this.closed) {
       return;
     }
-    this.statuses = packages.map((entry) => this.status(entry, environment));
+    this.statuses = [
+      ...packages.map((entry) => this.status(entry, environment)),
+      ...failures.map(
+        (failure): IntegrationStatus => ({
+          kind: failure.kind,
+          id: failure.id,
+          adapterVersion: failure.adapterVersion,
+          state: 'error',
+          reason: failure.error.message,
+          operations: failure.operations.map((name) => ({
+            name,
+            available: false,
+            reason: failure.error.message,
+          })),
+        }),
+      ),
+    ];
     const candidates = packages.filter((_, index) => {
       const status = this.statuses[index];
       return status?.state === 'not-ready' && status.reason === undefined;
@@ -83,7 +146,10 @@ export class IntegrationManager {
       ...(this.options.timeoutMs === undefined ? {} : { timeoutMs: this.options.timeoutMs }),
       invoke: (request) => this.invoke(request, revision),
       onFailure: (error) => {
-        if (revision === this.revision) {
+        if (revision === this.revision && this.worker === worker) {
+          // Invalidate every continuation of the activation, including a remote
+          // probe already awaiting its response when this worker exits.
+          this.revision += 1;
           this.operations.clear();
           this.calls.clear();
           for (const status of this.statuses) {
@@ -101,10 +167,12 @@ export class IntegrationManager {
       },
     });
     this.worker = worker;
+    const current = () =>
+      revision === this.revision && !this.closed && this.worker === worker && worker.isRunning();
     try {
       await worker.start();
       for (const entry of candidates) {
-        if (revision !== this.revision || this.closed) {
+        if (!current()) {
           return;
         }
         const status = this.statuses.find(
@@ -117,6 +185,9 @@ export class IntegrationManager {
         try {
           const key = `${entry.manifest.kind}:${entry.manifest.id}`;
           await worker.load(key, entry.root, entry.manifest.entrypoint);
+          if (!current()) {
+            return;
+          }
           for (const definition of entry.manifest.operations) {
             const name = toolName(entry.manifest.kind, entry.manifest.id, definition.id);
             const binding = entry.bindings.get(definition.id);
@@ -143,13 +214,16 @@ export class IntegrationManager {
                 );
               }
               await this.probe(operation);
-              if (revision !== this.revision || this.closed) {
+              if (!current()) {
                 return;
               }
               available.available = true;
               delete available.reason;
               this.operations.set(name, operation);
             } catch (error) {
+              if (!current()) {
+                return;
+              }
               available.reason = error instanceof Error ? error.message : String(error);
             }
           }
@@ -164,8 +238,16 @@ export class IntegrationManager {
               'No operation is ready';
           }
         } catch (error) {
+          if (!current()) {
+            return;
+          }
           status.state = 'error';
           status.reason = error instanceof Error ? error.message : String(error);
+          for (const operation of status.operations) {
+            this.operations.delete(operation.name);
+            operation.available = false;
+            operation.reason = status.reason;
+          }
         }
       }
     } catch (error) {
@@ -203,6 +285,12 @@ export class IntegrationManager {
   }
 
   async call(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (this.interruptedWrites.size > 0) {
+      throw new IntegrationError(
+        'operation_pending',
+        'An earlier integration write is still settling; it must not be replayed',
+      );
+    }
     const operation = this.operations.get(name);
     const worker = this.worker;
     if (this.closed || !operation || !worker) {
@@ -247,7 +335,14 @@ export class IntegrationManager {
       );
     }
     const token = randomUUID();
-    this.calls.set(token, { name, revision });
+    const call: IntegrationCall = {
+      name,
+      revision,
+      context: captureOperationContext(),
+      possibleWrites: 0,
+      pendingWrites: new Set(),
+    };
+    this.calls.set(token, call);
     try {
       const result = await worker.call(
         `${operation.package.manifest.kind}:${operation.package.manifest.id}`,
@@ -255,6 +350,9 @@ export class IntegrationManager {
         args,
         token,
       );
+      // A trusted adapter must not report completion while its own write callback
+      // is still running, even if it forgot to await context.invoke().
+      await Promise.all([...call.pendingWrites]);
       if (revision !== this.revision || this.closed) {
         throw new IntegrationError(
           'stale_session',
@@ -263,8 +361,31 @@ export class IntegrationManager {
       }
       this.validate(operation.output, result, 'output');
       return result;
+    } catch (error) {
+      if (
+        call.possibleWrites > 0 &&
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string' &&
+        UNCERTAIN_WRITE_ERRORS.has(error.code)
+      ) {
+        throw new IntegrationError(
+          'outcome_unknown',
+          `Integration ${name} lost its result after a write was dispatched. Its outcome is unknown; it was not retried (${error.code})`,
+        );
+      }
+      throw error;
     } finally {
       this.calls.delete(token);
+      // The session tracks the actual provider request through its operation
+      // context. Standalone managers also reject a replay while that write drains.
+      for (const pending of call.pendingWrites) {
+        this.interruptedWrites.add(pending);
+        const settled = () => {
+          this.interruptedWrites.delete(pending);
+        };
+        void pending.then(settled, settled);
+      }
     }
   }
 
@@ -313,11 +434,40 @@ export class IntegrationManager {
     if (!operation.definition.readOnly && !this.options.writesEnabled) {
       throw new IntegrationError('writes_disabled', 'Writes are disabled for this target');
     }
-    const result = await this.options.execute(
-      operation.script,
-      request.arguments,
-      operation.definition.readOnly,
-    );
+    const execution = withOperationContext(call.context, async () => {
+      // The Python stdout listener was installed outside the original call's
+      // async context; restore its fence before marking or dispatching a write.
+      assertOperationCurrent();
+      if (!operation.definition.readOnly) {
+        call.possibleWrites += 1;
+      }
+      try {
+        return await this.options.execute(
+          operation.script,
+          request.arguments,
+          operation.definition.readOnly,
+        );
+      } catch (error) {
+        if (
+          !operation.definition.readOnly &&
+          error instanceof Error &&
+          'code' in error &&
+          typeof error.code === 'string' &&
+          CONFIRMED_NO_WRITE_ERRORS.has(error.code)
+        ) {
+          call.possibleWrites -= 1;
+        }
+        throw error;
+      }
+    });
+    if (!operation.definition.readOnly) {
+      call.pendingWrites.add(execution);
+      const settled = () => {
+        call.pendingWrites.delete(execution);
+      };
+      void execution.then(settled, settled);
+    }
+    const result = await execution;
     if (revision !== this.revision || this.closed) {
       throw new IntegrationError(
         'stale_session',

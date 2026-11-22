@@ -59,7 +59,11 @@ For resources, update `src/tools/resources.ts` and the corresponding capability/
 - Define/extend the `FoundryCore` and `FoundryProvider` ports in `src/providers/types.ts` and add the backend to `src/providers/factory.ts`.
 - Validate configuration in `src/config/targets.ts`; a target ID is not a remote world ID or a relay client ID.
 - Give each connection its own lifecycle, cache, identity checks, capability set and generation handling. Do not return results from an obsolete connection.
+- Use `src/providers/operation-context.ts` at dispatch boundaries: check the originating operation immediately before sending and track the actual local provider request until it settles. Multi-step methods and callbacks must retain the original context; capturing a fresh generation for each send is insufficient.
+- Keep the target queue occupied by tracked provider work after a public worker failure. Lifecycle replacement may invalidate the old generation, but cannot roll back completed remote steps or prove remote cancellation after a timeout.
+- Make connection/authentication stages bounded and abortable, and share cleanup completion across concurrent `close()` calls. Never admit a missing/blank world ID as a session identity.
 - Preserve the distinction between the native Socket.IO document protocol and relay-executed Foundry document APIs. Never replay uncertain writes automatically; report `outcome_unknown` and require inspection.
+- Validate mutation acknowledgement envelopes/results before returning success. Update supported journal-page broadcasts and mark cached changes stale when they cannot be applied safely.
 - Keep system-specific projections in `systems/<system-id>/actor-projection.json` rather than hardcoding them into a generic provider.
 - Add provider, session and protocol regression tests. Live compatibility with a specific Foundry version requires an actual world test; mocked or fake-relay tests cannot establish it.
 
@@ -71,6 +75,12 @@ For resources, update `src/tools/resources.ts` and the corresponding capability/
 4. Expose names as `system_{id}_{operation}` or `module_{id}_{operation}`. Never normalize hyphens, silently overwrite conflicting schemas or expose arbitrary JS execution as an MCP tool.
 5. Probe the actual runtime API, return JSON-safe DTOs, validate inputs/outputs, and only advertise an operation while its target and provider can execute it.
 6. Record upstream source, integration version and actual live-tested version combinations. Keep experimental status until live verification is performed.
+
+Runtime package errors must remain local to their package; keep strict loader
+validation available for development and smoke checks. A closed worker must not
+restart from a delayed callback. Include wrapped-output schema tests for local
+references, recursive roots and nested resource IDs: validation of the unwrapped
+operation result alone does not prove the MCP output contract.
 
 The detailed manifest and binding contract is in [Writing integrations](writing-integrations.md).
 

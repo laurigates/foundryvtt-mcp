@@ -57,6 +57,11 @@ These are illustrative `_meta` values. Integration operations, which are new in
 the overhaul, continue to use their declared structured result wrapper with
 `target_id`, `world_id`, `session_generation` and `result`.
 
+That wrapper now gives the result schema its own resource identity so local
+`$ref` and nested `$id` scopes survive embedding. Only schema metadata changes;
+the structured payload fields remain the same. External schema documents are
+not fetched or registered by the integration loader.
+
 ### Multiple targets
 
 Once two or more targets are configured, pass `target_id` on calls and use
@@ -107,6 +112,11 @@ implementing them. The adapter does not manufacture unsupported transport APIs.
 - **Results stay bound to their original session.** A reconnect between
   execution and response construction discards stale reads; an interrupted write
   can return `outcome_unknown`. Its result is never relabeled as a newer session.
+- **Delayed operations cannot send new steps after invalidation.** The original
+  operation context reaches provider dispatches and Python callbacks. Ordinary
+  work remains queued while tracked local provider requests settle, even if a
+  worker already failed. This does not roll back remote mutations or guarantee
+  their cancellation after a timeout.
 - **Legacy REST identity is rechecked.** Session operations inspect the world
   immediately before dispatch and after successful completion. A mismatch
   withholds the response, marks that target in error and blocks queued work.
@@ -133,7 +143,10 @@ resource aliases, typed errors, refresh output, late reconnects and REST world
 changes. The package smoke check now imports the legacy client from a freshly
 installed consumer and checks the declaration files as well as the Python assets.
 
-Verification on 2026-11-22 used Node 24.22.3 and Python 3.12.14. Exact-source Node
+The initial compatibility verification on 2026-11-22 used Node 24.22.3 and Python
+3.12.14. The subsequent provider-boundary pass is recorded separately in the
+[implementation record](../prps/provider-session-integration-overhaul.md).
+Exact-source Node
 probes execute the changed TypeScript after stripping its types, with external
 I/O, validators and MCP dependencies replaced by test doubles. These probes
 verify the targeted control flow; they do not verify dependency behavior or

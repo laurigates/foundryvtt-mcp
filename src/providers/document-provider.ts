@@ -35,7 +35,7 @@ import type {
 } from '../foundry/types.js';
 import { VISIBILITY_LEVELS } from '../foundry/types.js';
 import {
-  applyDocumentBroadcast,
+  applyDocumentBroadcastWithStatus,
   applyUserActivity,
   parseDocumentBroadcast,
   parseUserActivity,
@@ -43,6 +43,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { searchWorldDocuments, type WorldSearchResults } from '../foundry/world-search.js';
 import { ProviderError } from './errors.js';
+import { assertOperationCurrent, trackOperation } from './operation-context.js';
 import { projectActor, projectItem, validateSystemPatch } from './projections.js';
 import type {
   AttributePatch,
@@ -204,18 +205,23 @@ const WorldDataSchema = z.object({
   folders: z.array(z.unknown()),
 });
 
-/** Minimal shape of FoundryVTT's `modifyDocument` Socket.IO acknowledgement. */
-interface DocumentSocketResponse {
-  /** Created/updated data objects, or deleted ids, on success. */
-  result?: unknown[];
-  /** Present when the server rejects the operation. */
-  error?: { message?: string } | null;
-  userId?: string;
+/** Identity is mandatory even when optional snapshot fields vary by Foundry version. */
+function requireWorldIdentity(snapshot: unknown): string {
+  if (
+    !isRecord(snapshot) ||
+    !isRecord(snapshot.world) ||
+    typeof snapshot.world.id !== 'string' ||
+    !snapshot.world.id.trim()
+  ) {
+    throw new ProviderError('invalid_response', 'The world snapshot did not identify a world');
+  }
+  return snapshot.world.id;
 }
 
 export class DocumentProvider implements FoundryProvider {
   protected http: AxiosInstance;
   private socket: Socket | null = null;
+  private authentication: AbortController | undefined;
   protected config: FoundryClientConfig;
   protected _isConnected = false;
   protected worldData: WorldData | null = null;
@@ -241,11 +247,14 @@ export class DocumentProvider implements FoundryProvider {
     }
 
     this.config = {
-      timeout: 10000,
       retryAttempts: 3,
       retryDelay: 1000,
       socketPath: '/socket.io/',
       ...config,
+      timeout:
+        config.timeout !== undefined && Number.isFinite(config.timeout) && config.timeout > 0
+          ? config.timeout
+          : 10000,
     };
 
     this.http = axios.create({
@@ -316,10 +325,17 @@ export class DocumentProvider implements FoundryProvider {
     if (!this.isConnected()) {
       throw new ProviderError('target_offline', 'The target is disconnected');
     }
+    // getWorldInfo retains its disconnected display defaults for compatibility;
+    // those defaults must never become the identity of a provider session.
+    const snapshotWorldId = this.config.apiKey ? undefined : requireWorldIdentity(this.worldData);
     const world = await this.getWorldInfo();
+    const worldId = snapshotWorldId ?? world.id;
+    if (typeof worldId !== 'string' || !worldId.trim()) {
+      throw new ProviderError('invalid_response', 'The provider did not identify a world');
+    }
     const modules = this.worldData?.modules ?? world.modules ?? [];
     return {
-      world: { id: world.id, title: world.title },
+      world: { id: worldId, title: world.title },
       system: { id: world.system, version: world.systemVersion },
       foundryVersion: String(world.coreVersion),
       ready: !this.isWorldDataStale(),
@@ -360,7 +376,12 @@ export class DocumentProvider implements FoundryProvider {
    * Socket.IO mode: authenticates and loads full worldData.
    */
   async connect(): Promise<void> {
+    assertOperationCurrent();
     const epoch = ++this.generation;
+    this.authentication?.abort(
+      new ProviderError('session_changed', 'Authentication was replaced by a new connection'),
+    );
+    this.authentication = undefined;
     if (this.config.apiKey) {
       try {
         await probeRestModule((url) => this.http.get(url));
@@ -387,29 +408,55 @@ export class DocumentProvider implements FoundryProvider {
       );
     }
 
-    const { session } = await authenticateFoundry(
-      this.config.baseUrl,
-      user,
-      this.config.password,
-      this.config.socketPath,
-    );
+    const authentication = new AbortController();
+    this.authentication = authentication;
+    this._isConnected = false;
+    this.worldDataStale = this.worldData !== null;
+    this.detachSocket();
+    try {
+      const { session } = await authenticateFoundry(
+        this.config.baseUrl,
+        user,
+        this.config.password,
+        this.config.socketPath,
+        { timeout: this.config.timeout ?? 10000, signal: authentication.signal },
+      );
 
-    if (epoch !== this.generation) {
-      throw new ProviderError('session_changed', 'The connection changed during authentication');
+      if (epoch !== this.generation) {
+        throw new ProviderError('session_changed', 'The connection changed during authentication');
+      }
+      // A late authentication/snapshot response cannot revive a closed session.
+      const snapshot = await this.connectAndLoadWorld(session);
+      assertOperationCurrent();
+      if (epoch !== this.generation) {
+        throw new ProviderError('session_changed', 'Discarded an expired world snapshot');
+      }
+      requireWorldIdentity(snapshot);
+      this.worldData = snapshot;
+      this.worldDataStale = false;
+      this._isConnected = true;
+      logger.info('Connected to FoundryVTT via Socket.IO', {
+        actors: snapshot.actors.length,
+        scenes: snapshot.scenes.length,
+        items: snapshot.items.length,
+      });
+    } catch (error) {
+      if (epoch === this.generation) {
+        this.detachSocket();
+        this._isConnected = false;
+        this.worldDataStale = this.worldData !== null;
+      }
+      if (authentication.signal.aborted) {
+        throw new ProviderError('session_changed', 'The connection closed during authentication', {
+          cause: error,
+        });
+      }
+      throw error;
+    } finally {
+      if (this.authentication === authentication) {
+        this.authentication = undefined;
+      }
     }
-    // A late authentication/snapshot response cannot revive a closed session.
-    const snapshot = await this.connectAndLoadWorld(session);
-    if (epoch !== this.generation) {
-      throw new ProviderError('session_changed', 'Discarded an expired world snapshot');
-    }
-    this.worldData = snapshot;
-    this.worldDataStale = false;
-    this._isConnected = true;
-    logger.info('Connected to FoundryVTT via Socket.IO', {
-      actors: this.worldData.actors.length,
-      scenes: this.worldData.scenes.length,
-      items: this.worldData.items.length,
-    });
   }
 
   /**
@@ -444,9 +491,9 @@ export class DocumentProvider implements FoundryProvider {
           new ProviderError('session_changed', 'The connection closed before world data arrived'),
         );
       const timeout = setTimeout(() => {
-        fail(new Error('Timeout waiting for world data (15s)'));
+        fail(new Error('Timeout waiting for world data'));
         socket.disconnect();
-      }, 15000);
+      }, this.config.timeout ?? 15000);
       const onSession = (data: { userId?: string } | null) => {
         if (settled) {
           return;
@@ -456,7 +503,7 @@ export class DocumentProvider implements FoundryProvider {
           socket.disconnect();
           return;
         }
-        socket.emit('world', (worldData: WorldData) => {
+        const onWorld = (worldData: WorldData) => {
           if (settled) {
             return;
           }
@@ -464,8 +511,13 @@ export class DocumentProvider implements FoundryProvider {
             cancel();
             return;
           }
-          settled = true;
-          cleanup();
+          try {
+            requireWorldIdentity(worldData);
+          } catch (error) {
+            fail(error instanceof Error ? error : new Error(String(error)));
+            socket.disconnect();
+            return;
+          }
           const parsed = WorldDataSchema.safeParse(worldData);
           if (!parsed.success) {
             logger.warn('WorldData failed schema validation — proceeding with raw data', {
@@ -474,12 +526,21 @@ export class DocumentProvider implements FoundryProvider {
               ),
             });
           }
+          settled = true;
+          cleanup();
           socket.on('modifyDocument', this.onDocumentBroadcast);
           socket.on('userActivity', this.onUserActivity);
           socket.on('connect', this.onSocketConnect);
           socket.on('disconnect', this.onSocketDisconnect);
           resolve(worldData);
-        });
+        };
+        try {
+          assertOperationCurrent();
+          socket.emit('world', onWorld);
+        } catch (error) {
+          fail(error instanceof Error ? error : new Error(String(error)));
+          socket.disconnect();
+        }
       };
       const onConnectError = (error: Error) =>
         fail(new Error(`Socket.IO connection failed: ${error.message}`));
@@ -503,17 +564,26 @@ export class DocumentProvider implements FoundryProvider {
 
     const broadcast = parseDocumentBroadcast(payload);
     if (!broadcast) {
+      // Explicit rejection does not represent a world mutation. An unknown
+      // payload does: we cannot promise that this snapshot remains current.
+      if (!isRecord(payload) || !payload.error) {
+        this.worldDataStale = true;
+      }
       return;
     }
 
     try {
-      const applied = applyDocumentBroadcast(this.worldData, broadcast);
-      logger.debug(
-        applied
-          ? `Applied ${broadcast.action} ${broadcast.type} broadcast to cached worldData`
-          : `Ignored ${broadcast.action} ${broadcast.type} broadcast (not cached)`,
-      );
+      const status = applyDocumentBroadcastWithStatus(this.worldData, broadcast);
+      if (status === 'unhandled') {
+        this.worldDataStale = true;
+      }
+      logger.debug('Document broadcast processed', {
+        type: broadcast.type,
+        action: broadcast.action,
+        status,
+      });
     } catch (error) {
+      this.worldDataStale = true;
       logger.warn('Failed to apply document broadcast to cached worldData', {
         type: broadcast.type,
         action: broadcast.action,
@@ -630,6 +700,10 @@ export class DocumentProvider implements FoundryProvider {
 
   async disconnect(): Promise<void> {
     this.generation++;
+    this.authentication?.abort(
+      new ProviderError('session_changed', 'The connection closed during authentication'),
+    );
+    this.authentication = undefined;
     this.detachSocket();
     this.worldData = null;
     this.worldDataStale = false;
@@ -692,12 +766,13 @@ export class DocumentProvider implements FoundryProvider {
    * refreshes over a long-running session do not leak listener handles.
    */
   async refreshWorldData(): Promise<void> {
+    assertOperationCurrent();
     const socket = this.socket;
     if (!socket?.connected) {
       throw new Error('Not connected — cannot refresh world data');
     }
     const epoch = this.generation;
-    const snapshot = await new Promise<WorldData>((resolve, reject) => {
+    const request = new Promise<WorldData>((resolve, reject) => {
       let settled = false;
       const cleanup = () => {
         clearTimeout(timeout);
@@ -728,20 +803,33 @@ export class DocumentProvider implements FoundryProvider {
         }
         settled = true;
         cleanup();
-        const parsed = WorldDataSchema.safeParse(data);
-        if (!parsed.success) {
-          logger.warn('WorldData refresh failed schema validation — proceeding with raw data', {
-            issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
-          });
-        }
         resolve(data);
       };
       this.pendingSocketRequests.add(cancel);
       socket.once('world', onWorld);
-      socket.emit('world');
+      try {
+        assertOperationCurrent();
+        socket.emit('world');
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
+      }
     });
+    const snapshot = await trackOperation(request);
+    assertOperationCurrent();
     if (epoch !== this.generation) {
       throw new ProviderError('session_changed', 'Discarded an expired world refresh');
+    }
+    try {
+      requireWorldIdentity(snapshot);
+    } catch (error) {
+      this.worldDataStale = this.worldData !== null;
+      throw error;
+    }
+    const parsed = WorldDataSchema.safeParse(snapshot);
+    if (!parsed.success) {
+      logger.warn('WorldData refresh failed schema validation — proceeding with raw data', {
+        issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
+      });
     }
     this.worldData = snapshot;
     this.worldDataStale = false;
@@ -989,7 +1077,7 @@ export class DocumentProvider implements FoundryProvider {
    * the `world` event in {@link connectAndLoadWorld}/{@link refreshWorldData}.
    */
   private emitWithAck<T>(event: string, payload: unknown): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
+    const request = new Promise<T>((resolve, reject) => {
       const socket = this.socket;
       if (!socket?.connected) {
         reject(new ProviderError('target_offline', 'Socket.IO is not connected'));
@@ -1022,6 +1110,14 @@ export class DocumentProvider implements FoundryProvider {
       const timeout = setTimeout(cancel, this.config.timeout || 10000);
       this.pendingSocketRequests.add(cancel);
       try {
+        assertOperationCurrent();
+      } catch (error) {
+        settled = true;
+        cleanup();
+        reject(error);
+        return;
+      }
+      try {
         socket.emit(event, payload, (response: T) => {
           if (settled) {
             return;
@@ -1038,6 +1134,7 @@ export class DocumentProvider implements FoundryProvider {
         cancel();
       }
     });
+    return trackOperation(request);
   }
 
   /**
@@ -1062,13 +1159,39 @@ export class DocumentProvider implements FoundryProvider {
       action,
       operation: { broadcast: true, pack: null, modifiedTime: Date.now(), ...operation },
     };
-    const response = await this.emitWithAck<DocumentSocketResponse>('modifyDocument', request);
-    if (response?.error) {
-      throw new Error(
-        `FoundryVTT rejected ${action} ${type}: ${response.error.message || 'unknown error'}`,
+    const epoch = this.generation;
+    const response = await this.emitWithAck<unknown>('modifyDocument', request);
+    if (isRecord(response) && isRecord(response.error)) {
+      throw new ProviderError(
+        'execution_rejected',
+        `FoundryVTT rejected ${action} ${type}: ${
+          typeof response.error.message === 'string' ? response.error.message : 'unknown error'
+        }`,
       );
     }
-    return Array.isArray(response?.result) ? response.result : [];
+    // Public create/update methods return a document or confirmed values. An
+    // empty result cannot substantiate that contract, even if the server used
+    // it for a no-op. Empty delete results remain valid for idempotent deletion.
+    if (
+      !isRecord(response) ||
+      (response.error !== undefined && response.error !== null) ||
+      !Array.isArray(response.result) ||
+      (action !== 'delete' && response.result.length === 0) ||
+      !response.result.every((value) =>
+        action === 'delete'
+          ? typeof value === 'string' && value.length > 0
+          : isRecord(value) && typeof value._id === 'string' && value._id.length > 0,
+      )
+    ) {
+      if (epoch === this.generation && this.worldData !== null) {
+        this.worldDataStale = true;
+      }
+      throw new ProviderError(
+        'outcome_unknown',
+        `Malformed ${action} ${type} acknowledgement; the operation may have completed`,
+      );
+    }
+    return response.result;
   }
 
   // ==========================================================================
@@ -1699,11 +1822,11 @@ export class DocumentProvider implements FoundryProvider {
         throw alphabetViolation(formula);
       }
 
+      assertOperationCurrent();
       try {
-        const response = await this.http.post('/api/dice/roll', {
-          formula,
-          flavor: reason,
-        });
+        const response = await trackOperation(
+          this.http.post('/api/dice/roll', { formula, flavor: reason }),
+        );
 
         const rolled = RestDiceRollSchema.parse(response.data);
 
@@ -1790,8 +1913,9 @@ export class DocumentProvider implements FoundryProvider {
     const baseDelay = this.config.retryDelay || 1000;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      assertOperationCurrent();
       try {
-        return await operation();
+        return await trackOperation(operation());
       } catch (error) {
         lastError = error as Error;
 
@@ -1824,7 +1948,8 @@ export class DocumentProvider implements FoundryProvider {
     data?: unknown,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<T>> {
-    return this.http.post(url, data, config);
+    assertOperationCurrent();
+    return trackOperation(this.http.post(url, data, config));
   }
 
   async put<T = unknown>(
@@ -1832,11 +1957,13 @@ export class DocumentProvider implements FoundryProvider {
     data?: unknown,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<T>> {
-    return this.http.put(url, data, config);
+    assertOperationCurrent();
+    return trackOperation(this.http.put(url, data, config));
   }
 
   async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.http.delete(url, config);
+    assertOperationCurrent();
+    return trackOperation(this.http.delete(url, config));
   }
 }
 

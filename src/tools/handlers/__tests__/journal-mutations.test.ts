@@ -185,9 +185,9 @@ describe('FoundryClient journal mutations (modifyDocument)', () => {
       writeEnabled: opts.writeEnabled ?? true,
     });
     const emit = vi.fn(((_event, payload, cb) => {
-      const op = (payload as { operation?: { data?: unknown[] } }).operation;
+      const op = (payload as { operation?: { data?: Record<string, unknown>[] } }).operation;
       const echoed = op?.data?.[0];
-      cb({ result: echoed ? [echoed] : [] });
+      cb({ result: echoed ? [{ _id: sampleJournal._id, ...echoed }] : [] });
     }) as SocketEmitMock);
     if (opts.connected !== false) {
       (client as unknown as { socket: { connected: boolean; emit: SocketEmitMock } }).socket = {

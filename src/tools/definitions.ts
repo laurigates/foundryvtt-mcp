@@ -8,13 +8,12 @@
 /**
  * Shared write-safety clause appended to every mutation tool description.
  *
- * Both halves are enforced in code by `assertWriteable()`
- * (`src/foundry/client.ts`): the `FOUNDRY_WRITE_ENABLED` opt-in (default
- * `false`, see `src/config/index.ts`) and a live authenticated Socket.IO
- * session. Foundry itself enforces the GM/owner permission (ADR-010).
+ * ToolCatalog checks the selected target's writeEnabled setting and core.write
+ * capability; providers also enforce their connection and dispatch guards.
+ * Foundry itself enforces the GM/owner permission (ADR-010 and ADR-011).
  */
 const WRITE_GATE =
-  'WRITE: mutates the live world. Requires FOUNDRY_WRITE_ENABLED=true (default false) and an active Socket.IO connection, and is refused otherwise; Foundry additionally enforces GM/owner permission on the document.';
+  'WRITE: mutates the selected target world. Requires that target\'s writeEnabled=true (default false), core.write capability and a connected provider; Foundry additionally enforces GM/owner permission on the document. In environment-only single-target configuration, the opt-in is FOUNDRY_WRITE_ENABLED=true. Socketio/composite use native document writes; rest-api uses the paired runtime; legacy-rest does not provide core writes. An interrupted write can return outcome_unknown: inspect the world before retrying.';
 
 /**
  * Extra clause for destructive tools (data removal that this server cannot undo).
@@ -31,7 +30,7 @@ const CONFIRM_FIRST =
  * *listed*, so a divergence would be invisible.
  */
 export const ROLL_DICE_DESCRIPTION =
-  'Roll dice and return the total with a per-term breakdown. Dice terms and whole numbers joined by + or -, with whitespace allowed anywhere ("1d20+5", "1d20 + 5", "1d20+5+3", "2d6 + 1d4", "3d6"; a count-less "d20" means one die), always work and every term counts towards the total - that is the portable grammar, safe on either transport. Multiplication and Foundry modifier syntax such as "4d6kh3" or "1d20r1" are rejected on both transports, with an error naming the offending character and its position, never dropped from the total in silence. Parentheses are the one difference: with FOUNDRY_API_KEY set the formula goes to FoundryVTT\'s own Roll engine, which evaluates them, while the default Socket.IO transport rolls locally and rejects them by name - and a REST roll that cannot reach the server falls back to that same local roller, so a parenthesised formula can still fail there. The result\'s Source line says which roller produced it: "FoundryVTT server" or the local roller. Prefer the expanded form when it matters. Use when: the user asks for a check, save, attack, damage, or any random result.';
+  'Roll dice and return the total with a per-term breakdown. Portable syntax uses dice terms and whole numbers joined by + or -, with optional whitespace ("1d20+5", "2d6 + 1d4", "3d6"; "d20" means one die). Multiplication and Foundry modifiers such as "4d6kh3" or "1d20r1" are rejected. Socketio and composite core rolls use the local roller, which rejects parentheses. The rest-api provider evaluates in the paired Foundry runtime and allows parentheses, without a local fallback. The historical legacy-rest provider (FOUNDRY_API_KEY in environment configuration) first asks the bridge to roll remotely, then falls back to the local roller if that fails; parentheses can therefore fail on its fallback. The result\'s Source line identifies "FoundryVTT server" or the local roller. Use when: the user asks for a check, save, attack, damage, or any random result.';
 
 /**
  * Dice rolling tool definitions
@@ -64,7 +63,7 @@ export const actorTools = [
   {
     name: 'search_actors',
     description:
-      "Search actors (player characters, NPCs) by name, optionally filtered by type. Returns a summary line per match: name, type, level and current/max HP. Use when: checking whether an actor exists, or getting a quick roster with HP. Do not use when: you already have the actorId and want that actor's ability scores - use get_actor_details; or you need the actorId itself, which this tool does not print - read the foundry://actors resource, whose JSON lists up to the first 100 actors with their _id (not exhaustive in larger worlds).",
+      "Search actors (player characters, NPCs) by name, optionally filtered by type. Returns a summary line per match: name, type, level and current/max HP. Use when: checking whether an actor exists, or getting a quick roster with HP. For one actor's ability scores, use get_actor_details. This tool does not print actorId: read foundry://targets/<target_id>/actors for up to the first 100 actors with their _id (not exhaustive in larger worlds). The foundry://actors alias is available only with one configured target.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,7 +86,7 @@ export const actorTools = [
   {
     name: 'get_actor_details',
     description:
-      'Get details for one actor by id: type, level, current/max HP, AC and ability scores; no biography or description text is returned (the description line always reads "No description available."). Use when: you have an actorId and need its current HP or ability scores - notably as the read-before-write step for update_actor_attributes. Do not use when: you only have a name - run search_actors first; or you need the ids of items the actor owns, which this tool does not return (no tool in this server lists owned-item ids - ask the user for the itemId).',
+      'Get details for one actor by id: type, level, current/max HP, AC and ability scores; no biography or description text is returned (the description line always reads "No description available."). Fields depend on the selected system projection. Use when: you have an actorId and need its current HP or ability scores, including before update_actor_attributes. With only a name, run search_actors and read the target actor resource for IDs. Owned-item IDs are not returned here; module_item-piles_get_items can supply them when that integration is available, otherwise obtain the exact itemId from the user.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -104,14 +103,13 @@ export const actorTools = [
 /**
  * Actor attribute mutation tool definitions (#143)
  *
- * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active
- * Socket.IO connection (mutations use the core `modifyDocument` protocol).
+ * WRITE operations require the selected target's write opt-in and core.write.
  */
 export const actorMutationTools = [
   {
     name: 'update_actor_attributes',
     description:
-      'Update fields on an actor\'s system data. Patch keys are dot-paths into actor.system (e.g. "attributes.hp.value", "attributes.hp.temp", "currency.gp", "resources.primary.value", "spells.spell1.value", "attributes.exhaustion") and values are absolute target values, never relative deltas. Validates HP <= max + temp, spell slots <= max, and exhaustion within 0-10 (2024) or 0-6 (2014), and returns the post-update value for every patched path. Use when: applying damage or healing, spending a spell slot or resource, or adjusting currency on a known actorId. Do not use when: changing an item the actor owns (use update_actor_item) or only reading current values (use get_actor_details). ' +
+      'Update fields on an actor\'s system data. Patch keys are dot-paths into actor.system and values are absolute target values, never relative deltas. Paths and bounds depend on the selected system projection. D&D 5e examples include "attributes.hp.value", "attributes.hp.temp", "currency.gp", "resources.primary.value", "spells.spell1.value" and "attributes.exhaustion"; its validation checks HP <= max + temp, spell slots <= max, and exhaustion within 0-10 (2024) or 0-6 (2014). Returns the post-update value for every patched path. Use when: applying damage or healing, spending a resource, or adjusting currency on a known actorId. For owned-item changes use update_actor_item; for current values use get_actor_details. ' +
       WRITE_GATE,
     inputSchema: {
       type: 'object',
@@ -142,7 +140,7 @@ export const itemTools = [
   {
     name: 'search_items',
     description:
-      'Search item documents in the world by name, optionally filtered by type. Returns name, type and rarity per match (rarity shows "Common" when the system records none); price is not available and always prints "Unknown price", and the rarity filter is ignored unless the REST API module is configured (FOUNDRY_API_KEY). Item ids are not printed - read the foundry://items resource, whose JSON lists up to the first 100 items with their _id (not exhaustive in larger worlds). Use when: checking whether an item exists in the world. Do not use when: searching compendium packs (use search_compendium) or listing what one actor carries (this searches world items, not owned items).',
+      'Search item documents in the world by name, optionally filtered by type. Returns name, type and rarity per match (rarity shows "Common" when the system records none); price always prints "Unknown price". The rarity filter is passed to the historical legacy-rest bridge and is ignored by socketio, rest-api and composite snapshot searches. Item IDs are not printed: read foundry://targets/<target_id>/items for up to the first 100 items with their _id (not exhaustive in larger worlds). The foundry://items alias is available only with one configured target. Use when: checking whether an item exists in the world. For compendium packs use search_compendium; for an actor inventory use an available integration such as module_item-piles_get_items.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -157,7 +155,7 @@ export const itemTools = [
         rarity: {
           type: 'string',
           description:
-            'Item rarity filter (common, uncommon, rare, etc.). Applied only in REST API mode (FOUNDRY_API_KEY); ignored on the default Socket.IO path.',
+            'Item rarity filter (common, uncommon, rare, etc.). Passed only to the historical legacy-rest bridge; ignored by the other providers.',
         },
         limit: {
           type: 'number',
@@ -176,7 +174,7 @@ export const compendiumTools = [
   {
     name: 'search_compendium',
     description:
-      'Search FoundryVTT compendium packs by name and metadata; searches all enabled packs unless compendiumId scopes it to one pack. Use when: looking up spells, monsters, or equipment that are not yet present in the world. Do not use when: the document already exists in the world - use search_items or search_world. Requires the REST API module (FOUNDRY_API_KEY); without it the search returns no results instead of failing.',
+      'Search FoundryVTT compendium packs by name and metadata; searches all enabled packs unless compendiumId scopes it to one pack. Use when: looking up spells, monsters, or equipment that are not yet present in the world. For world documents use search_items or search_world. Requires compendium.read on the selected target, currently supplied only by the historical legacy-rest bridge. The catalog withholds this tool when no ready target has that capability and rejects calls on an unsupported target.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -227,8 +225,7 @@ export const compendiumTools = [
 ];
 
 /**
- * Actor item mutation tool definitions (WRITE — require FOUNDRY_WRITE_ENABLED
- * and an active Socket.IO connection; mutations use `modifyDocument`)
+ * Actor item mutation tool definitions (WRITE — target write opt-in and core.write)
  *
  * The canonical mutation target is the D&D 5e v4+ activity schema. Item
  * `system` patches honour JSON-merge-patch semantics on nested paths.
@@ -237,7 +234,7 @@ export const itemMutationTools = [
   {
     name: 'create_actor_item',
     description:
-      'Create an item on an actor from an inline item document (type, name, system). Use when: adding a new weapon, spell, feature, or piece of equipment to a known actorId. Do not use when: editing an item the actor already owns - use update_actor_item. Replacing an item is not atomic: create the replacement first and delete the old one second, so a mid-sequence failure leaves the actor with a duplicate rather than nothing. Compendium-source create is not yet supported over Socket.IO (see issue #159). Canonical target: D&D 5e v4+ activity schema. ' +
+      'Create an item on an actor from an inline item document (type, name, system). Use when: adding a new weapon, spell, feature, or piece of equipment to a known actorId. For an existing owned item use update_actor_item. Replacing an item is not atomic: create the replacement first and delete the old one second, so a mid-sequence failure leaves the actor with a duplicate rather than nothing. Compendium-source create is not implemented by the current core providers. Supply item data appropriate to the selected game system; D&D 5e activity examples target v4+. ' +
       WRITE_GATE,
     inputSchema: {
       type: 'object',
@@ -249,7 +246,7 @@ export const itemMutationTools = [
         source: {
           type: 'object',
           description:
-            'Item source. Use { type: "inline", item: { type, name, system } } to create the item directly. The { type: "compendium", compendiumId, itemId } shape is accepted by the schema but rejected at call time - compendium-source create is not yet supported over Socket.IO.',
+            'Item source. Use { type: "inline", item: { type, name, system } } to create the item directly. The { type: "compendium", compendiumId, itemId } shape is accepted by the schema but rejected at call time by the current core providers.',
           properties: {
             type: {
               type: 'string',
@@ -304,7 +301,7 @@ export const itemMutationTools = [
   {
     name: 'delete_actor_item',
     description:
-      "Permanently remove an item owned by an actor. Use when: the user explicitly asks to delete or discard a specific owned item, and has given you the itemId - no tool in this server lists owned-item ids, so never guess one. Do not use when: only the item's data needs to change - use update_actor_item. In a replacement or migration flow, run create_actor_item first and this second: the two calls are not atomic, and failing after the delete loses the item. Echo the actorId and itemId back to the user and get their confirmation before calling. " +
+      "Permanently remove an item owned by an actor. Use when: the user explicitly asks to delete or discard a specific owned item and you have its exact actorId and itemId. An available module_item-piles_get_items integration can return owned-item IDs; otherwise obtain them from the user. Never guess an ID. For data changes use update_actor_item. In a replacement or migration flow, run create_actor_item first and this second: the calls are not atomic, and failing after the delete loses the item. Confirm the actorId, itemId and selected target with the user before calling. " +
       CONFIRM_FIRST +
       ' ' +
       WRITE_GATE,
@@ -423,7 +420,7 @@ export const diagnosticsTools = [
   {
     name: 'get_recent_logs',
     description:
-      'Get recent FoundryVTT server log entries, optionally filtered by level or since a timestamp. Use when: investigating an error or recent server behaviour. Do not use when: you have a specific term to look for - use search_logs. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
+      'Get recent FoundryVTT server log entries, optionally filtered by level or since a timestamp. Use when: investigating an error or recent server behaviour. For a specific term use search_logs. Requires diagnostics.read on the selected target, currently supplied only by the historical legacy-rest bridge. The paired rest-api relay does not provide this diagnostics endpoint.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -449,7 +446,7 @@ export const diagnosticsTools = [
   {
     name: 'search_logs',
     description:
-      'Search the FoundryVTT server logs for a query string and list the matching entries. Use when: hunting a specific error message, stack trace, or module name. Do not use when: you just want the latest entries - use get_recent_logs. The reported match count is the server\'s total for the query, while limit caps how many of those entries are rendered (default 50, hard cap 1000). Level filtering accepts info, warn and error; "debug" is not a level this log store records, so it is reported back as unsupported and no level filter is applied. Requires the REST API module (FOUNDRY_API_KEY); fails without it.',
+      'Search the FoundryVTT server logs for a query string and list matching entries. Use when: hunting a specific error message, stack trace, or module name. For the latest entries use get_recent_logs. The reported match count is the server\'s total for the query, while limit caps rendered entries (default 50, hard cap 1000). Level filtering accepts info, warn and error; unsupported "debug" is reported and no level filter is applied. Requires diagnostics.read on the selected target, currently supplied only by the historical legacy-rest bridge; the paired rest-api relay does not provide this endpoint.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -475,7 +472,7 @@ export const diagnosticsTools = [
   {
     name: 'get_system_health',
     description:
-      "Get the FoundryVTT server's health report: the overall status (healthy, warning, or critical), FoundryVTT and game-system versions, world id and uptime, active/total user counts with the number of GMs, active/installed module counts, connected clients, heap and RSS memory, and the log buffer size with recent error/warning counts and error rate. CPU and disk are not reported - the diagnostics response models no such fields - and the uptime and memory lines are omitted when the server does not supply them. Use when: you want the server's own view of its health. Do not use when: you also want connection and world status - use get_health_status. Requires the REST API module (FOUNDRY_API_KEY); fails without it.",
+      "Get the historical bridge's server health report: overall status, FoundryVTT and system versions, world id, uptime, user/module/client counts, heap/RSS memory and recent log statistics. CPU and disk are not reported; uptime and memory are omitted when absent from the response. Requires diagnostics.read on the selected target, currently supplied only by legacy-rest. The paired rest-api relay does not provide this endpoint. For connection and world status use get_health_status.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -498,7 +495,7 @@ export const diagnosticsTools = [
   {
     name: 'get_health_status',
     description:
-      "Get a combined health report: MCP-to-FoundryVTT connection state, world title/system/core version, and the server's health status with its active/total user counts, uptime, heap memory and recent error/warning counts. The world section is prefixed with a stale marker when the cached snapshot stopped following live document changes - typically a dropped connection, whose missed updates are never replayed - and refresh_world_data resyncs it. The connection line is a live read of the socket on the default Socket.IO transport, so it follows a link that drops or comes back in both directions; with FOUNDRY_API_KEY set there is no socket and it reports the outcome of the last REST request instead, not a live probe, so a server that went away between requests still reads as connected until the next request fails. Uptime and memory are omitted when the server does not report them; CPU, disk and playtime are not reported at all. Degrades gracefully - sections that need the REST API module (FOUNDRY_API_KEY) report as unavailable rather than failing. Use when: first checking which world is loaded and whether the server reports itself healthy.",
+      "Get the selected target's provider connection state, world title/system/core version and any available legacy diagnostics. Socketio follows the native link; composite requires both its native and relay connections; HTTP provider status reflects observed requests rather than a continuous remote probe. Socketio/composite caches follow supported native updates, while rest-api snapshots need refresh_world_data for changes made elsewhere. Known stale caches are refreshed before ordinary core calls; explicit refresh also rebuilds the session integration context. Diagnostics sections report unavailable when the provider lacks the historical bridge API. Uptime and memory are omitted when absent; CPU, disk and playtime are not reported. Use when: checking the loaded world and available health information; get_target_status adds session and integration failure details.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -513,7 +510,7 @@ export const combatTools = [
   {
     name: 'get_combat_state',
     description:
-      "Get the active combat encounter: initiative order with each combatant's name, initiative, HP and AC, plus the current round and which combatant is up. Use when: reporting whose turn it is, or checking whether a combat is already running before start_combat. Do not use when: you need a combatantId for set_initiative - this prints names and ordinals, not ids; read the foundry://combat resource, whose JSON includes each combatant's _id and lists combatants in this same initiative order, so the Nth entry printed here is that resource's combatants[N-1] and combat.turn indexes it directly.",
+      "Get the active combat encounter: initiative order with each combatant's name, initiative, HP and AC, plus the current round and combatant. Use when: reporting whose turn it is, or checking for an existing combat before start_combat. This prints names and ordinals; for combatantId read foundry://targets/<target_id>/combat. Its combatants include _id in the same initiative order, and combat.turn indexes that array. The foundry://combat alias is available only with one configured target.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -524,9 +521,8 @@ export const combatTools = [
 /**
  * Combat control mutation tool definitions (FR-018)
  *
- * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active Socket.IO
- * connection (mutations use the core `modifyDocument` protocol). All operate on
- * the *active* combat; the connected user needs GM/owner permission.
+ * WRITE operations require the selected target's write opt-in and core.write.
+ * All operate on the active combat; the remote user needs GM/owner permission.
  */
 export const combatMutationTools = [
   {
@@ -607,9 +603,8 @@ export const combatMutationTools = [
 /**
  * Token manipulation mutation tool definitions (FR-019)
  *
- * WRITE operations — require FOUNDRY_WRITE_ENABLED=true and an active Socket.IO
- * connection (mutations use the core `modifyDocument` protocol). The connected
- * user needs GM/owner permission.
+ * WRITE operations require the selected target's write opt-in and core.write.
+ * The remote user needs GM/owner permission.
  */
 export const tokenMutationTools = [
   {
@@ -702,7 +697,7 @@ export const userTools = [
   {
     name: 'get_users',
     description:
-      "List the world's users with their roles and online status. Online status is live while the Socket.IO connection is up: FoundryVTT's userActivity broadcasts are applied to the cached presence list as users connect and disconnect. It stops tracking if that connection drops and the missed changes are not replayed - get_health_status shows the snapshot as stale, and refresh_world_data resyncs it. Use when: you need to know which user holds the GM role, or who is connected right now.",
+      "List the selected world's users with their roles and observed online status. Socketio and composite apply native userActivity broadcasts to their presence cache; missed broadcasts after disconnection require resynchronization. Standalone rest-api reports presence from its last snapshot, so use refresh_world_data for changes made elsewhere. Known stale caches are refreshed before core reads. Use when: checking roles or the latest available presence information.",
     inputSchema: {
       type: 'object',
       properties: {},
@@ -809,7 +804,7 @@ export const worldTools = [
   {
     name: 'search_world',
     description:
-      'Search the world snapshot across actor, item, scene and journal names as well as their available descriptive text: actor biographies, item descriptions, scene notes/drawings/token names and journal page text. Results are grouped by collection; content matches include a short plain-text excerpt and a field path. Case- and accent-insensitive phrase matching. A blank query, or one that reduces to nothing once markup is stripped (e.g. "<b>"), returns no documents (it is not match-all). Requires a loaded Socket.IO world snapshot; does not search compendiums, attached files or arbitrary system fields. This tool does not print document ids - read the foundry://actors, foundry://items and foundry://journals resources, whose JSON lists documents with their _id (not exhaustive in larger worlds). Use when: you do not know where a name or narrative phrase occurs. Do not use when: you already know the collection - use search_actors, search_items or search_journals.',
+      'Search the selected world snapshot across actor, item, scene and journal names and available descriptive text: biographies, item descriptions, scene annotations/token names and journal page text. Results are grouped by collection; content matches include a plain-text excerpt and field path. Phrase matching ignores case and accents. A blank query, including markup-only text, returns no documents. Requires core.cache, supplied by socketio, rest-api and composite; does not search compendiums, attached files or arbitrary system fields. For document IDs read foundry://targets/<target_id>/actors, foundry://targets/<target_id>/items or foundry://targets/<target_id>/journals; actor/item resources are capped at 100 results. Unqualified foundry:// aliases are available only with one configured target. Use when: locating a name or narrative phrase across collections; for a known collection use search_actors, search_items or search_journals.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -838,7 +833,7 @@ export const worldTools = [
   {
     name: 'refresh_world_data',
     description:
-      'Force a re-fetch of the cached world data from the FoundryVTT server. Reads are normally served from a cache that follows live document changes for as long as the connection holds, so this is rarely needed. Use when: the connection dropped and came back - the cache stopped following changes while it was down and nothing replays them, so it stays a point-in-time copy until this runs, and get_health_status flags it as stale until then; or a read still looks stale after an out-of-band change - notably edits to unlinked (synthetic) token actors, which the live update feed does not cover. Refreshes the cache only; it does not modify the world.',
+      'Re-fetch the selected target\'s world snapshot and rebuild its session/integration context. Explicit refresh invalidates pending work from the previous session generation. Socketio/composite follow supported native broadcasts; rest-api needs explicit refresh for changes made elsewhere in Foundry. Use after changes not represented by the cache, including synthetic token actors, or to recheck runtime/integration availability. Routine refresh of a known stale cache already occurs before core calls without replacing the session. This operation does not mutate the remote world.',
     inputSchema: {
       type: 'object',
       properties: {},

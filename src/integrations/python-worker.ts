@@ -46,6 +46,7 @@ export class PythonWorker {
   private reader: Interface | undefined;
   private pending = new Map<string, PendingRequest>();
   private stopped = false;
+  private closing: Promise<void> | undefined;
   private stderr = '';
 
   constructor(private readonly options: PythonWorkerOptions) {}
@@ -72,7 +73,9 @@ export class PythonWorker {
         );
       }
     });
-    this.child.stdin.on('error', (error) => this.fail(error));
+    this.child.stdin.on('error', (error) =>
+      this.fail(new IntegrationError('worker_protocol', error.message)),
+    );
     this.child.stderr.on('data', (chunk: Buffer) => {
       this.stderr = `${this.stderr}${chunk.toString('utf8')}`.slice(-4096);
     });
@@ -81,16 +84,29 @@ export class PythonWorker {
       crlfDelay: Number.POSITIVE_INFINITY,
     });
     this.reader.on('line', (line) => {
-      void this.receive(line).catch((error: unknown) =>
-        this.fail(error instanceof Error ? error : new Error(String(error))),
-      );
+      void this.receive(line).catch((error: unknown) => this.fail(this.protocolError(error)));
     });
-    const result = await this.request('handshake', {
-      version: 1,
-      targetId: this.options.targetId,
-      packageRoot: this.options.packageRoot,
-    });
-    z.object({ version: z.literal(1), targetId: z.literal(this.options.targetId) }).parse(result);
+    try {
+      const result = await this.request('handshake', {
+        version: 1,
+        targetId: this.options.targetId,
+        packageRoot: this.options.packageRoot,
+      });
+      z.object({ version: z.literal(1), targetId: z.literal(this.options.targetId) }).parse(result);
+    } catch (error) {
+      const failure = this.protocolError(error);
+      this.fail(failure);
+      throw failure;
+    }
+  }
+
+  isRunning(): boolean {
+    return (
+      this.child !== undefined &&
+      !this.stopped &&
+      this.child.exitCode === null &&
+      this.child.signalCode === null
+    );
   }
 
   async load(key: string, root: string, entrypoint: string): Promise<void> {
@@ -106,10 +122,14 @@ export class PythonWorker {
     return this.request('call', { integration: key, operation, arguments: args, callToken });
   }
 
-  async close(): Promise<void> {
-    if (this.stopped) {
-      return;
+  close(): Promise<void> {
+    if (!this.closing) {
+      this.closing = this.shutdown();
     }
+    return this.closing;
+  }
+
+  private async shutdown(): Promise<void> {
     this.stopped = true;
     this.rejectPending(new IntegrationError('session_closed', 'Integration session closed'));
     this.reader?.close();
@@ -147,7 +167,7 @@ export class PythonWorker {
   }
 
   private request(method: string, params: Record<string, unknown>): Promise<unknown> {
-    if (!this.child || this.stopped) {
+    if (!this.isRunning()) {
       return Promise.reject(
         new IntegrationError('worker_unavailable', 'Python worker is unavailable'),
       );
@@ -158,13 +178,20 @@ export class PythonWorker {
         this.fail(new IntegrationError('worker_timeout', `Python ${method} request timed out`));
       }, this.options.timeoutMs ?? 30000);
       this.pending.set(id, { resolve: resolveRequest, reject, timer });
-      this.write({ type: 'request', id, generation: this.options.generation, method, params });
+      try {
+        this.write({ type: 'request', id, generation: this.options.generation, method, params });
+      } catch (error) {
+        this.fail(this.protocolError(error));
+      }
     });
   }
 
   private write(message: Record<string, unknown>): void {
-    if (this.stopped || !this.child || this.child.stdin.destroyed) {
+    if (this.stopped) {
       return;
+    }
+    if (!this.child || this.child.stdin.destroyed) {
+      throw new IntegrationError('worker_protocol', 'Python worker input is closed');
     }
     this.child.stdin.write(`${JSON.stringify(message)}\n`);
   }
@@ -227,8 +254,17 @@ export class PythonWorker {
       return;
     }
     this.rejectPending(error);
-    this.options.onFailure?.(error);
     void this.close();
+    this.options.onFailure?.(error);
+  }
+
+  private protocolError(error: unknown): IntegrationError {
+    return error instanceof IntegrationError
+      ? error
+      : new IntegrationError(
+          'worker_protocol',
+          error instanceof Error ? error.message : String(error),
+        );
   }
 
   private rejectPending(error: Error): void {

@@ -43,6 +43,10 @@ Provider composition assigns operations to components deterministically. It is
 not retry-based failover. A transport's capabilities are explicit; sharing an
 interface does not imply that every backend implements every operation.
 
+A composite target is ready only while both components are connected and their
+identities agree. Degraded native-only operation is deliberately outside this
+contract; independent native access requires a separately configured target.
+
 ### 2. Targets and sessions are the unit of isolation
 
 `target_id` is a stable local configuration identifier, distinct from the remote
@@ -65,6 +69,19 @@ or refreshing a pre-write snapshot and treating it as current. Explicit lifecycl
 refresh/reconnect still invalidates work from the previous generation. A queued
 write cancelled before dispatch is distinguished from an in-flight unknown
 outcome.
+
+The session's operation context also guards every individual provider dispatch,
+including later steps in a multi-step core method and Python callbacks. Rejecting
+an old public result alone is insufficient: an old continuation must not acquire
+a replacement connection and send another mutation. Ordinary queue ownership
+lasts until tracked local provider work settles, even when a worker reports an
+earlier error. Generation replacement fences future sends; it neither rolls back
+completed steps nor guarantees remote cancellation after a timeout.
+
+Native authentication is abortable and bounded per HTTP/join stage. Session close
+is idempotent in completion as well as state: concurrent callers await the same
+cleanup. Native world identity must contain a valid nonempty world ID; display
+fallbacks cannot establish a session identity.
 
 ### 3. Explicit routing instead of mutable global selection
 
@@ -89,6 +106,11 @@ The manifest discriminates `kind: system | module`. The integration manager,
 protocol, loader, validation, catalog registration, and lifecycle are shared.
 The adapter matching the world's system is selected independently from adapters
 for its active modules.
+
+Runtime package validation isolates malformed packages and withholds all
+participants in a name collision. Unrelated valid packages remain available;
+development/package checks can use the loader's strict mode to reject the whole
+load. Errors stay visible in per-target integration status.
 
 Systems own system-specific API and data interpretation. Modules own their own
 public API bindings. The provider owns the execution mechanism and contains no
@@ -119,6 +141,13 @@ than silently normalized.
 input contract across targets. Incompatible schemas are reported and withheld,
 not replaced by whichever session loaded last.
 
+The integration result schema is embedded as its own JSON Schema resource inside
+the provenance wrapper. Preserve local references, recursion and nested `$id`
+scope; do not rewrite reference strings indiscriminately. Synthetic resource
+IDs are deterministic for equivalent tool/schema contracts and require no remote
+schema resolution. External schema registration remains outside the loader's
+current contract.
+
 ### 6. Python adapters with a private process protocol
 
 One optional Python worker belongs to each target and hosts all its active
@@ -130,6 +159,10 @@ adapter invokes its bound operation through a proxy; Node executes the packaged
 binding and returns JSON. IDs, generation checks, timeouts, and call tokens keep
 requests correlated. Python logs use stderr; worker stdout is private and never
 inherited by the MCP stdout transport.
+
+Closing a worker is terminal. A delayed request cannot restart it after the
+owning manager has invalidated its calls. Call tokens preserve the originating
+operation context across the subprocess callback boundary.
 
 No Python interpreter is needed by targets without executable Python integrations.
 Dependencies are not installed automatically. The worker environment excludes
@@ -166,6 +199,12 @@ Reads and writes carry their actual operation classification. Unknown write
 outcomes are surfaced without automatic retry, transport fallback, or movement
 to another target. Correlation IDs alone do not provide deduplication or atomic
 transactions across documents/worlds.
+
+Native success acknowledgements must contain valid result data; malformed
+acknowledgements produce an unknown outcome and invalidate the cache. Explicit
+remote rejection remains a distinct error. Worker loss after a mutating runtime
+callback began is also potentially unknown; a worker timeout alone cannot prove
+that the remote write failed.
 
 ### 10. Version information describes evidence
 

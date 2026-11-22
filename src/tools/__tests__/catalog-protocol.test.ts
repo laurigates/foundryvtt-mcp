@@ -62,12 +62,15 @@ function targetFixture(id: string) {
     },
     outputSchema: {
       type: 'array',
-      items: {
-        type: 'object',
-        properties: { name: { type: 'string' }, actor_uuid: { type: 'string' } },
-        required: ['name', 'actor_uuid'],
-        additionalProperties: false,
+      $defs: {
+        ActorSummary: {
+          type: 'object',
+          properties: { name: { type: 'string' }, actor_uuid: { type: 'string' } },
+          required: ['name', 'actor_uuid'],
+          additionalProperties: false,
+        },
       },
+      items: { $ref: '#/$defs/ActorSummary' },
     },
   };
   const integrations: SessionIntegrations = {

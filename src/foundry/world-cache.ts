@@ -55,9 +55,18 @@ const TOP_LEVEL_COLLECTIONS: Record<string, keyof WorldData> = {
 const EMBEDDED_COLLECTIONS: Record<string, Record<string, string>> = {
   Actor: { Item: 'items', ActiveEffect: 'effects' },
   Scene: { Token: 'tokens', AmbientLight: 'lights', Wall: 'walls', Drawing: 'drawings' },
+  JournalEntry: { JournalEntryPage: 'pages' },
   Combat: { Combatant: 'combatants' },
   Item: { ActiveEffect: 'effects' },
 };
+
+/** Unhandled events may affect cached data and require a fresh snapshot. */
+export type DocumentBroadcastStatus = 'applied' | 'irrelevant' | 'unhandled';
+
+interface BroadcastApplication {
+  changed: boolean;
+  unhandled: boolean;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -93,6 +102,13 @@ export function parseDocumentBroadcast(payload: unknown): DocumentBroadcast | nu
   const broadcast: DocumentBroadcast = { type, action, result };
 
   const parentUuid = isRecord(operation) ? operation.parentUuid : undefined;
+  if (
+    parentUuid !== undefined &&
+    parentUuid !== null &&
+    (typeof parentUuid !== 'string' || !parentUuid.trim())
+  ) {
+    return null;
+  }
   if (typeof parentUuid === 'string' && parentUuid) {
     broadcast.parentUuid = parentUuid;
   }
@@ -153,19 +169,21 @@ function mergePatch(target: Record<string, unknown>, patch: Record<string, unkno
 /**
  * Applies one broadcast to a document array in place.
  *
- * @returns true if the collection changed
+ * Tracks partial application too: one valid entry cannot hide an unhandled entry.
  */
 function applyToCollection(
   collection: Array<Record<string, unknown>>,
   action: DocumentBroadcast['action'],
   result: unknown[],
-): boolean {
+): BroadcastApplication {
   let changed = false;
+  let unhandled = false;
 
   if (action === 'delete') {
     // `result` is an array of deleted document ids.
     for (const id of result) {
-      if (typeof id !== 'string') {
+      if (typeof id !== 'string' || !id) {
+        unhandled = true;
         continue;
       }
       const index = collection.findIndex((doc) => doc._id === id);
@@ -174,11 +192,12 @@ function applyToCollection(
         changed = true;
       }
     }
-    return changed;
+    return { changed, unhandled };
   }
 
   for (const doc of result) {
-    if (!isRecord(doc) || typeof doc._id !== 'string') {
+    if (!isRecord(doc) || typeof doc._id !== 'string' || !doc._id) {
+      unhandled = true;
       continue;
     }
     const existing = collection.find((d) => d._id === doc._id);
@@ -198,10 +217,13 @@ function applyToCollection(
     if (existing) {
       mergePatch(existing, doc);
       changed = true;
+    } else {
+      // A diff cannot reconstruct a document missing from this snapshot.
+      unhandled = true;
     }
   }
 
-  return changed;
+  return { changed, unhandled };
 }
 
 /**
@@ -210,8 +232,8 @@ function applyToCollection(
  * Handles the simple `<Type>.<id>` form. The synthetic-token-actor form
  * (`Scene.<sid>.Token.<tid>.Actor.<aid>`, used for unlinked tokens) is **not**
  * resolved: that actor is a per-token delta rather than a document in any cached
- * collection, so those broadcasts are dropped and the affected token actor stays
- * stale until `refresh_world_data`.
+ * collection, so those broadcasts require `refresh_world_data` and are reported
+ * as unhandled to the owning provider.
  */
 function resolveParent(
   worldData: WorldData,
@@ -251,35 +273,40 @@ function resolveParent(
 /**
  * Applies a validated broadcast to the cached world state, in place.
  *
- * @returns true if the cache changed; false when the broadcast targets something
- *   not cached (an unmodelled document type, an unknown parent, a synthetic
- *   token actor), in which case the cache is left untouched.
+ * Reports changes separately from unhandled data so partial batches preserve
+ * the historical boolean API without concealing a freshness gap.
  */
-export function applyDocumentBroadcast(
+function applyBroadcast(
   worldData: WorldData,
   broadcast: DocumentBroadcast,
-): boolean {
+): BroadcastApplication {
   const { type, action, result, parentUuid } = broadcast;
   if (result.length === 0) {
-    return false;
+    return { changed: false, unhandled: false };
   }
 
   if (parentUuid) {
     const resolved = resolveParent(worldData, parentUuid);
     if (!resolved) {
-      return false;
+      // Unknown root types are not cached; an unresolved cached parent (also a
+      // synthetic token actor) means this snapshot may have missed a mutation.
+      const parentType = parentUuid.split('.')[0] ?? '';
+      return { changed: false, unhandled: Object.hasOwn(TOP_LEVEL_COLLECTIONS, parentType) };
     }
 
     const field = EMBEDDED_COLLECTIONS[resolved.parentType]?.[type];
     if (!field) {
-      return false;
+      return { changed: false, unhandled: true };
     }
 
     // The field is optional on several world types (an actor with no effects
     // omits `effects` entirely), so materialize it before a create.
     if (!Array.isArray(resolved.parent[field])) {
+      if (resolved.parent[field] !== undefined && resolved.parent[field] !== null) {
+        return { changed: false, unhandled: true };
+      }
       if (action !== 'create') {
-        return false;
+        return { changed: false, unhandled: action !== 'delete' };
       }
       resolved.parent[field] = [];
     }
@@ -293,15 +320,38 @@ export function applyDocumentBroadcast(
 
   const collectionKey = TOP_LEVEL_COLLECTIONS[type];
   if (!collectionKey) {
-    return false;
+    const embedded = Object.values(EMBEDDED_COLLECTIONS).some((types) =>
+      Object.hasOwn(types, type),
+    );
+    return { changed: false, unhandled: embedded };
   }
 
   const collection = worldData[collectionKey];
   if (!Array.isArray(collection)) {
-    return false;
+    return { changed: false, unhandled: true };
   }
 
   return applyToCollection(collection as Array<Record<string, unknown>>, action, result);
+}
+
+/**
+ * Applies an event and distinguishes irrelevant traffic from a cache gap.
+ * `unhandled` takes precedence when only part of a result could be applied.
+ */
+export function applyDocumentBroadcastWithStatus(
+  worldData: WorldData,
+  broadcast: DocumentBroadcast,
+): DocumentBroadcastStatus {
+  const result = applyBroadcast(worldData, broadcast);
+  return result.unhandled ? 'unhandled' : result.changed ? 'applied' : 'irrelevant';
+}
+
+/** Compatibility API: whether any cached document changed. */
+export function applyDocumentBroadcast(
+  worldData: WorldData,
+  broadcast: DocumentBroadcast,
+): boolean {
+  return applyBroadcast(worldData, broadcast).changed;
 }
 
 // ============================================================================

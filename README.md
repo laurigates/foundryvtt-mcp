@@ -22,6 +22,12 @@ operations. Their READMEs distinguish runtime probes and local tests from live
 compatibility verification. Python 3.10+ is optional for the core and required for
 active Python integrations.
 
+Provider lifecycles keep delayed multi-step calls bound to their original
+session; interrupted mutations can still have unknown remote outcomes and are
+never replayed automatically. A composite target requires both its native and
+relay connections. See the provider guide for freshness, shutdown and failure
+semantics, and the dated verification record for the checks actually performed.
+
 [![npm version](https://img.shields.io/npm/v/foundryvtt-mcp)](https://www.npmjs.com/package/foundryvtt-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -30,12 +36,12 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 ## Features
 
 - **Dice Rolling** — dice terms and numeric modifiers; available syntax depends on the provider
-- **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
+- **Data Querying** — actors, world items, scenes, journals, users and combat; optional compendium search through the historical `legacy-rest` bridge.
 - **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (target-local write enablement, provider capability and Foundry permissions required; the native and relay write paths differ).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
 - **World Search** — searches names and selected narrative content in actors, items, scenes and journals, with plain-text match excerpts
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
-- **MCP Resources** — `foundry://` URIs for direct reads.
+- **MCP Resources** — target-qualified `foundry://targets/<target_id>/...` URIs; unqualified aliases remain available with one configured target.
 - **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).

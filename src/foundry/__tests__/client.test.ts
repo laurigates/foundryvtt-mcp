@@ -941,6 +941,7 @@ describe('FoundryClient', () => {
       expect(handler).toBeDefined();
       handler?.({
         userId: 'test-user',
+        world: { id: 'world-1' },
         actors: [],
         scenes: [],
         items: [],
@@ -1176,6 +1177,7 @@ describe('FoundryClient', () => {
         'gm',
         'secret',
         '/foundry/socket.io/',
+        { timeout: 10000, signal: expect.any(AbortSignal) },
       );
     });
 

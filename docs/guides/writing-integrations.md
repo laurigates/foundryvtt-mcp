@@ -46,6 +46,29 @@ silently normalized. The registry rejects invalid names and collisions, includin
 collisions between differently split identifiers. The runtime stores the original
 identity fields separately rather than splitting the public tool name.
 
+### Output schemas and reference scope
+
+An operation's `outputSchema` describes its own return value. MCP advertises a
+wrapper with `target_id`, `world_id`, `session_generation` and `result`, where
+`result` contains that value. The catalog embeds the operation schema as a
+separate JSON Schema resource: root-local references such as `#/$defs/Value`
+and recursive `#` still address the operation result, not the MCP wrapper.
+
+Existing absolute or relative `$id` values and nested resource scopes are
+preserved. Anonymous, empty-ID and fragment-only roots receive a synthetic
+absolute resource base. These IDs use a reserved `.invalid` host and a stable
+hash of the tool name and canonical schema; they are identifiers, not addresses
+to fetch. No `$ref` strings or result data are rewritten. Equivalent object-key
+ordering across targets therefore does not create a catalog conflict.
+
+Keep schemas self-contained and compatible with the repository's Ajv validator.
+The loader does not register external schema documents or provide a network
+schema loader; an external `$ref` is not supported merely because it has an
+absolute URL. Test both operation validation and the wrapped schema through the
+MCP client, including invalid data, recursion and any nested `$id` resources.
+
+### Version filters
+
 An empty `foundryVersions` or `integrationVersions` filter imposes no exact-version
 restriction; it is not a compatibility guarantee. `compatibility.tested` records
 actual live combinations and stays empty until they are verified. Optional
@@ -91,12 +114,27 @@ by the MCP caller. Do not claim a write is read-only to bypass target policy. A
 read may still trigger upstream logging or notifications; document upstream
 behavior accurately. Runtime execution permission remains an upstream setting.
 
+The Node host binds Python callback tokens to the operation's original session
+context. Each provider send rechecks that context, and a callback arriving after
+its call or worker has closed cannot start a replacement operation. Worker
+failure does not cancel a runtime request already sent: ordinary work on that
+target waits for the locally tracked request to settle. A failed mutating
+operation that already invoked the provider is reported as `outcome_unknown`
+unless the provider explicitly rejected execution. Never retry it automatically.
+The currently shipped adapters contain only read operations.
+
 ## Systems and modules in one session
 
 The system matching the world's identity is selected independently from active
 modules. A missing system adapter leaves core document access and independent
 module integrations available. Each world has separate adapter instances and a
 separate optional Python process; the package code itself is shared on disk.
+
+Runtime loading records a malformed package as an integration error and keeps
+unrelated valid packages usable. Every package involved in a public-name
+collision is withheld; load order never selects a winner. Direct
+`loadIntegrations(packageRoot)` calls remain strict for development and package
+smoke checks. The runtime explicitly selects the error-reporting loader mode.
 
 If a future operation needs a system capability, declare that dependency when it
 is implemented. Avoid imports between every module and every system. Introduce a

@@ -1,6 +1,12 @@
 import { legacyConfigForTarget, type TargetConfig } from '../config/targets.js';
 import { DiagnosticsClient } from '../diagnostics/client.js';
 import { IntegrationManager, type IntegrationManagerOptions } from '../integrations/manager.js';
+import {
+  assertOperationCurrent,
+  ProviderOperationContext,
+  trackOperation,
+  withOperationContext,
+} from '../providers/operation-context.js';
 import type { FoundryEnvironment, FoundryProvider } from '../providers/types.js';
 import { DiagnosticSystem } from '../utils/diagnostics.js';
 
@@ -65,6 +71,7 @@ export class FoundrySession {
   private boundWorldId: string | undefined;
   private boundOrigin: string | undefined;
   private closed = false;
+  private closing: Promise<void> | undefined;
   private monitor: ReturnType<typeof setInterval> | undefined;
   private lifecycle: Promise<void> = Promise.resolve();
   private lifecycleBusy = false;
@@ -189,45 +196,55 @@ export class FoundrySession {
     const generation = this.generation;
     const providerGeneration = this.providerGeneration;
     let started = false;
-    const work = this.dispatch.then(async () => {
-      // Work submitted before a reconnect must never migrate into the new session.
+    const context = new ProviderOperationContext(() => {
       this.requireCurrent(generation, providerGeneration, false);
       this.requireReady();
-      if (
-        options.refreshCache &&
-        this.provider.capabilities.has('core.cache') &&
-        this.provider.isWorldDataStale()
-      ) {
-        await this.refreshCache(generation, providerGeneration);
-      }
-      if (this.provider.kind === 'legacy-rest') {
-        await this.verifyLegacyIdentity(generation, providerGeneration);
-      }
-      this.requireCurrent(generation, providerGeneration, false);
-      this.requireReady();
-      started = true;
-      const value = await operation(this.provider);
-      if (this.provider.kind === 'legacy-rest') {
-        await this.verifyLegacyIdentity(generation, providerGeneration, options.write === true);
-      }
-      return value;
     });
+    const work = this.dispatch.then(() =>
+      withOperationContext(context, async () => {
+        // Work submitted before a reconnect must never migrate into the new session.
+        this.requireCurrent(generation, providerGeneration, false);
+        this.requireReady();
+        if (
+          options.refreshCache &&
+          this.provider.capabilities.has('core.cache') &&
+          this.provider.isWorldDataStale()
+        ) {
+          await this.refreshCache(generation, providerGeneration);
+        }
+        if (this.provider.kind === 'legacy-rest') {
+          await this.verifyLegacyIdentity(generation, providerGeneration);
+        }
+        this.requireCurrent(generation, providerGeneration, false);
+        this.requireReady();
+        started = true;
+        const value = await operation(this.provider);
+        if (this.provider.kind === 'legacy-rest') {
+          await this.verifyLegacyIdentity(generation, providerGeneration, options.write === true);
+        }
+        return value;
+      }),
+    );
     const result = this.scoped(
       () => work,
       generation,
       providerGeneration,
       () => options.write === true && started,
     );
-    this.dispatch = result.then(
-      () => {},
-      () => {},
-    );
+    // A worker can fail before a provider request it dispatched settles. The
+    // caller receives the error promptly, but ordinary work must not overlap
+    // that request. Closing/replacing a generation fences old continuations.
+    const settle = async () => {
+      context.finish();
+      await context.drain();
+    };
+    this.dispatch = work.then(settle, settle);
     return result;
   }
 
-  async close(): Promise<void> {
-    if (this.closed) {
-      return;
+  close(): Promise<void> {
+    if (this.closing) {
+      return this.closing;
     }
     this.closed = true;
     this.advanceGeneration();
@@ -237,10 +254,13 @@ export class FoundrySession {
     }
     this.monitor = undefined;
     this.options.onChange?.();
-    await Promise.allSettled([this.integrations.close(), this.provider.disconnect()]);
-    // A connect already in progress must not resurrect a provider after close().
-    await this.lifecycle;
-    await this.provider.disconnect();
+    this.closing = (async () => {
+      await Promise.allSettled([this.integrations.close(), this.provider.disconnect()]);
+      // A connect already in progress must not resurrect a provider after close().
+      await this.lifecycle;
+      await this.provider.disconnect();
+    })();
+    return this.closing;
   }
 
   private createIntegrations(): SessionIntegrations {
@@ -274,7 +294,10 @@ export class FoundrySession {
           );
         }
         return this.scoped(
-          () => this.provider.execute(script, args, { readOnly }),
+          () => {
+            assertOperationCurrent();
+            return trackOperation(this.provider.execute(script, args, { readOnly }));
+          },
           generation,
           providerGeneration,
           !readOnly,
@@ -354,6 +377,9 @@ export class FoundrySession {
 
   private advanceGeneration(): number {
     this.generation++;
+    // Old callbacks may never settle. They retain their original operation
+    // context, which rejects future sends; new sessions get an independent queue.
+    this.dispatch = Promise.resolve();
     for (const cancel of this.pending) {
       cancel();
     }
@@ -434,7 +460,7 @@ export class FoundrySession {
 
   private assertIdentity(environment: FoundryEnvironment): void {
     const expectedWorld = this.config.expectedWorldId ?? this.boundWorldId;
-    if (!environment.world.id) {
+    if (typeof environment.world.id !== 'string' || !environment.world.id.trim()) {
       throw new SessionError(
         'world_unidentified',
         `Provider for target ${this.config.id} did not identify a world`,
@@ -471,6 +497,14 @@ export class FoundrySession {
     this.options.onChange?.();
     try {
       await this.integrations.close();
+      // close() may run while optional worker cleanup is pending. Its first
+      // disconnect must not be followed by a newly started authentication.
+      if (this.closed) {
+        throw new SessionError('session_closed', `Target ${this.config.id} is closed`);
+      }
+      if (generation !== this.generation) {
+        throw new SessionError('session_changed', 'The connection attempt was superseded');
+      }
       if (mode === 'connect') {
         await this.provider.connect();
       } else {
@@ -515,17 +549,19 @@ export class FoundrySession {
   }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
-    const next = this.lifecycle.then(async () => {
-      if (this.closed) {
-        throw new SessionError('session_closed', `Target ${this.config.id} is closed`);
-      }
-      this.lifecycleBusy = true;
-      try {
-        return await operation();
-      } finally {
-        this.lifecycleBusy = false;
-      }
-    });
+    const next = this.lifecycle.then(() =>
+      withOperationContext(undefined, async () => {
+        if (this.closed) {
+          throw new SessionError('session_closed', `Target ${this.config.id} is closed`);
+        }
+        this.lifecycleBusy = true;
+        try {
+          return await operation();
+        } finally {
+          this.lifecycleBusy = false;
+        }
+      }),
+    );
     this.lifecycle = next.then(
       () => {},
       () => {},

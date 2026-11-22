@@ -28,6 +28,10 @@ The static catalog defines **33 core tools** (22 read/query/utility tools and 11
 
 Capabilities used for the core include `core.read`, `core.cache`, `core.write`, `compendium.read` and `diagnostics.read`. `runtime.execute` is required for executable system/module integrations; operations may additionally depend on a specific active system or module. A write needs a target-local opt-in **and** suitable provider/runtime/Foundry permissions.
 
+A `composite` is ready only when both connections are available. Its core tools
+are also withheld if the relay fails; no degraded native-only mode is provided.
+Configure an independent `socketio` target for separately available native access.
+
 ## Core read, query and utility tools (22)
 
 | Tool | What is implemented | Availability/limits |
@@ -77,6 +81,12 @@ All core writes require `core.write`, the selected target's `writeEnabled: true`
 
 Destructive operations have no general undo. An interrupted write may return `outcome_unknown` even if it was applied. **Inspect the selected world before retrying; never assume retries are safe.**
 
+Operation context checks stop unsent steps from continuing after a refresh,
+reconnect, shutdown or completed call. Ordinary same-target work waits for
+locally tracked provider requests even if a Python worker fails first. A local
+timeout still cannot establish whether a remote mutation completed. Invalid
+native acknowledgement data is also an unknown outcome, not success.
+
 ## Management and dynamic integration tools
 
 | Tool | Purpose |
@@ -87,6 +97,11 @@ Destructive operations have no general undo. An interrupted write may return `ou
 | `reconnect_target` | Explicitly reconnect just the selected target |
 
 Initial experimental integration examples include `system_dnd5e_get_actor_data`, `system_pf2e_get_actor_data` and `module_item-piles_get_items`. Names preserve exact upstream IDs. These require the applicable runtime API and the target's `runtime.execute` capability; a manifest alone does not make a tool usable. The initial adapters are not claimed live-verified. See [Writing integrations](writing-integrations.md).
+
+All currently shipped operations are read-only. Malformed packages are reported
+in target integration status without suppressing unrelated valid packages.
+Integration structured results retain their provenance wrapper; the advertised
+schema preserves the result's local references and nested resource scope.
 
 ## MCP resources: 9 base definitions, target-qualified URLs
 
