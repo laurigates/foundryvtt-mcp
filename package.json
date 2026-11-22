@@ -97,7 +97,7 @@
   "overrides": {
     "@hono/node-server": "2.1.9",
     "hono": "4.13.19",
-    "express-rate-limit": "8.7.4",
+    "express-rate-limit": "8.7.5",
     "ip-address": "10.7.6",
     "path-to-regexp": "8.4.2",
     "fast-uri": "3.1.9",
