@@ -65,6 +65,23 @@ use separate `FOUNDRY_REST_*` settings. `USE_REST_MODULE` remains a no-op.
 provider interfaces. See [ADR-011](docs/adrs/0011-provider-session-integration-overhaul.md)
 and the [configuration guide](docs/guides/providers-and-targets.md).
 
+**The exposed tool list depends on the mode** (`src/tools/availability.ts`):
+`tools/list` is filtered by transport, and the same rules gate `CallTool`.
+
+- **Shared** tools (e.g. `roll_dice`, `search_actors`, `get_health_status`) are
+  offered in both modes.
+- **Socket-only** tools (e.g. `search_world`, `get_combat_state`,
+  `get_journal`) are offered only in Socket.IO mode.
+- **REST-only** tools (`search_compendium`, `get_recent_logs`, `search_logs`,
+  `get_system_health`) are offered only in REST mode — they are **hidden** in
+  Socket.IO mode, not served as empty results.
+- **Write** tools (the 11 mutating tools, e.g. `move_token`, `end_combat`) are
+  offered **only** in Socket.IO mode **and** with `FOUNDRY_WRITE_ENABLED=true`.
+
+A direct `CallTool` for a hidden tool is rejected with a reason naming the
+actual cause (writes disabled vs REST mode vs Socket.IO mode); a name absent
+from the table falls through to the router's "Unknown tool" error.
+
 ## Environment Variables
 
 | Variable | Required | Description |

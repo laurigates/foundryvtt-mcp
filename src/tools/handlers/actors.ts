@@ -34,7 +34,7 @@ export async function handleSearchActors(
     const actorList = result.actors
       .map(
         (actor) =>
-          `- **${actor.name}** (${actor.type}) - Level ${actor.level || 'Unknown'} - HP: ${actor.hp?.value || 'Unknown'}/${actor.hp?.max || 'Unknown'}`,
+          `- **${actor.name}** (${actor.type}) - Level ${actor.level ?? 'Unknown'} - HP: ${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}`,
       )
       .join('\n');
 
@@ -89,9 +89,9 @@ export async function handleGetActorDetails(
           type: 'text',
           text: `🎭 **Actor Details: ${actor.name}**
 **Type:** ${actor.type}
-**Level:** ${actor.level || 'Unknown'}
-**Hit Points:** ${actor.hp?.value || 'Unknown'}/${actor.hp?.max || 'Unknown'}
-**Armor Class:** ${actor.ac?.value || 'Unknown'}
+**Level:** ${actor.level ?? 'Unknown'}
+**Hit Points:** ${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}
+**Armor Class:** ${actor.ac?.value ?? 'Unknown'}
 
 **Ability Scores:**
 ${abilities}

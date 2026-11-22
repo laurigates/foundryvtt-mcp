@@ -81,6 +81,119 @@ describe('FoundryClient', () => {
     });
   });
 
+  describe('testConnection authentication', () => {
+    it('probes /api/world for a valid REST key without username/password', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World' },
+      });
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+      expect(client.isConnected()).toBe(true);
+    });
+
+    it.each([401, 403])('rejects REST API key failures (HTTP %i)', async (status) => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'invalid-key' });
+      mockAxiosInstance.get.mockRejectedValue(
+        Object.assign(new Error('Unauthorized'), {
+          response: { status, data: { error: 'Unauthorized' } },
+        }),
+      );
+
+      await expect(client.testConnection()).rejects.toThrow('FOUNDRY_API_KEY was rejected');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('rejects a 200 HTML response instead of treating it as a valid REST API', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: '<html>Foundry Virtual Tabletop</html>',
+      });
+
+      await expect(client.testConnection()).rejects.toThrow(
+        'REST module did not answer /api/world with JSON',
+      );
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('does not fall back to the public root page when the REST route is missing', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        if (url === '/') {
+          return { status: 200, data: '<html>Foundry</html>' };
+        }
+        throw Object.assign(new Error('HTTP 404'), { response: { status: 404 } });
+      });
+
+      await expect(client.testConnection()).rejects.toThrow('HTTP 404');
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('prefers REST authentication when both an API key and credentials are configured', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        apiKey: 'test-api-key',
+        username: 'gm',
+        password: 'gm-password',
+      });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('requires credentials in Socket.IO mode instead of testing the public root page', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: '<html>Foundry</html>' });
+
+      await expect(client.testConnection()).rejects.toThrow(
+        'Socket.IO mode requires username/userId and password',
+      );
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
+    });
+
+    it('continues to use the authenticated Socket.IO connect path', async () => {
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        username: 'gm',
+        password: 'gm-password',
+      });
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(connect).toHaveBeenCalledOnce();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+
+    it('authenticates via connect() for the userId + password path instead of GET /', async () => {
+      // This config used to fall through to the unauthenticated GET /; it now
+      // routes through the authenticated connect() path (#288).
+      client = new FoundryClient({
+        baseUrl: 'http://localhost:30000',
+        userId: 'gm-user-id',
+        password: 'gm-password',
+      });
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+      expect(connect).toHaveBeenCalledOnce();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/');
+    });
+  });
+
   describe('REST API mode (with apiKey)', () => {
     beforeEach(() => {
       client = new FoundryClient({
@@ -910,7 +1023,10 @@ describe('FoundryClient', () => {
       folders: [],
     };
 
-    async function connectWithMockSocket(existing?: FoundryClient) {
+    async function connectWithMockSocket(
+      existing?: FoundryClient,
+      worldData?: Record<string, unknown>,
+    ) {
       const { io } = await import('socket.io-client');
       const { authenticateFoundry } = await import('../auth.js');
       // afterEach's resetAllMocks() clears the module-factory resolved value.
@@ -918,7 +1034,7 @@ describe('FoundryClient', () => {
         session: 'test-session',
         userId: 'test-user-id',
       });
-      const harness = buildHandshakeSocket(structuredClone(WORLD_DATA));
+      const harness = buildHandshakeSocket(structuredClone(worldData ?? WORLD_DATA));
       vi.mocked(io).mockReturnValue(harness.socket as never);
 
       const connected =
@@ -942,6 +1058,58 @@ describe('FoundryClient', () => {
     it('reports connected after a successful handshake', async () => {
       const { client: connected } = await connectWithMockSocket();
       expect(connected.isConnected()).toBe(true);
+    });
+
+    it('searchWorld returns a content match from a loaded snapshot', async () => {
+      const journal = {
+        _id: 'journal1',
+        name: 'Campaign Timeline',
+        pages: [
+          {
+            _id: 'page1',
+            name: 'Chapter One',
+            type: 'text',
+            text: { content: '<p>Ask about the <strong>silver key</strong>.</p>', format: 1 },
+          },
+        ],
+      };
+      const { client: connected } = await connectWithMockSocket(undefined, {
+        ...WORLD_DATA,
+        journal: [journal],
+      });
+      expect(connected.hasWorldData()).toBe(true);
+      const snapshot = structuredClone(connected.getWorldData());
+
+      const result = connected.searchWorld('SILVER KEY');
+
+      expect(result.journals).toEqual([journal]);
+      expect(result.actors).toEqual([]);
+      expect(result.items).toEqual([]);
+      expect(result.scenes).toEqual([]);
+      expect(result.matchDetails.journals.journal1).toEqual({
+        field: 'pages[0].text.content',
+        excerpt: 'Ask about the silver key.',
+      });
+      expect(connected.getWorldData()).toEqual(snapshot);
+      await connected.disconnect();
+    });
+
+    it('maps a null HP maximum to an absent max, not 0 (#289)', async () => {
+      const wounded = {
+        _id: 'actor0000000000a',
+        name: 'Wounded',
+        type: 'character',
+        system: { attributes: { hp: { value: 20, max: null } } },
+      };
+      const { client: connected } = await connectWithMockSocket(
+        undefined,
+        structuredClone({ ...WORLD_DATA, actors: [wounded] }),
+      );
+
+      const actor = await connected.getActor('actor0000000000a');
+
+      expect(actor.hp?.value).toBe(20);
+      expect(actor.hp?.max).toBeUndefined();
     });
 
     it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
@@ -1215,6 +1383,16 @@ describe('FoundryClient', () => {
 
       await restClient.connect();
       expect(restClient.isConnected()).toBe(true);
+    });
+  });
+
+  describe('searchWorld', () => {
+    it('delegates to the world search and returns empty results without a snapshot', () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      const results = client.searchWorld('silver key');
+      expect(results.actors).toEqual([]);
+      expect(results.journals).toEqual([]);
+      expect(results.matchDetails.actors).toEqual({});
     });
   });
 });

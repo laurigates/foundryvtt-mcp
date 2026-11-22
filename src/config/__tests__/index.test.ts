@@ -183,6 +183,22 @@ describe('Config', () => {
 
       expect(() => config.nodeEnv).toThrow();
     });
+    it.each([
+      ['zero', '0'],
+      ['a negative value', '-5'],
+      ['a non-numeric value', 'lots'],
+    ])('should reject CACHE_MAX_SIZE set to %s', async (_label, value) => {
+      process.env = {
+        FOUNDRY_URL: 'http://localhost:30000',
+        NODE_ENV: 'test',
+        CACHE_MAX_SIZE: value,
+      };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+
+      expect(() => config.cache).toThrow(/CACHE_MAX_SIZE must be an integer of at least 1/);
+    });
   });
 
   describe('type conversion', () => {

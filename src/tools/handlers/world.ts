@@ -13,33 +13,41 @@ export async function handleSearchWorld(
     const results = provider.searchWorld(args.query);
     const limit = args.limit || 5;
 
+    // Keep name-only search output backward compatible; content matches add a short context.
+    const matchContext = (category: 'actors' | 'items' | 'scenes' | 'journals', id: string) => {
+      const match = results.matchDetails?.[category]?.[id];
+      return match && match.field !== 'name'
+        ? ` — match in ${match.field}: "${match.excerpt}"`
+        : '';
+    };
+
     const sections: string[] = [];
 
     if (results.actors.length > 0) {
       const items = results.actors
         .slice(0, limit)
-        .map((a) => `  - ${a.name} (${a.type})`)
+        .map((a) => `  - ${a.name} (${a.type})${matchContext('actors', a._id)}`)
         .join('\n');
       sections.push(`**Actors** (${results.actors.length})\n${items}`);
     }
     if (results.items.length > 0) {
       const items = results.items
         .slice(0, limit)
-        .map((i) => `  - ${i.name} (${i.type})`)
+        .map((i) => `  - ${i.name} (${i.type})${matchContext('items', i._id)}`)
         .join('\n');
       sections.push(`**Items** (${results.items.length})\n${items}`);
     }
     if (results.scenes.length > 0) {
       const items = results.scenes
         .slice(0, limit)
-        .map((s) => `  - ${s.name}${s.active ? ' [ACTIVE]' : ''}`)
+        .map((s) => `  - ${s.name}${s.active ? ' [ACTIVE]' : ''}${matchContext('scenes', s._id)}`)
         .join('\n');
       sections.push(`**Scenes** (${results.scenes.length})\n${items}`);
     }
     if (results.journals.length > 0) {
       const items = results.journals
         .slice(0, limit)
-        .map((j) => `  - ${j.name}`)
+        .map((j) => `  - ${j.name}${matchContext('journals', j._id)}`)
         .join('\n');
       sections.push(`**Journals** (${results.journals.length})\n${items}`);
     }

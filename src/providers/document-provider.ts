@@ -28,7 +28,6 @@ import type {
   WorldCombat,
   WorldData,
   WorldEffect,
-  WorldItem,
   WorldJournal,
   WorldMessage,
   WorldScene,
@@ -42,6 +41,7 @@ import {
   parseUserActivity,
 } from '../foundry/world-cache.js';
 import { logger } from '../utils/logger.js';
+import { searchWorldDocuments, type WorldSearchResults } from '../foundry/world-search.js';
 import { ProviderError } from './errors.js';
 import { projectActor, projectItem, validateSystemPatch } from './projections.js';
 import type {
@@ -1632,24 +1632,8 @@ export class DocumentProvider implements FoundryProvider {
   // Cross-collection search
   // ==========================================================================
 
-  searchWorld(query: string): {
-    actors: WorldActor[];
-    items: WorldItem[];
-    scenes: WorldScene[];
-    journals: WorldJournal[];
-  } {
-    if (!this.worldData) {
-      return { actors: [], items: [], scenes: [], journals: [] };
-    }
-
-    const q = query.toLowerCase();
-
-    return {
-      actors: this.worldData.actors.filter((a) => a.name.toLowerCase().includes(q)),
-      items: this.worldData.items.filter((i) => i.name.toLowerCase().includes(q)),
-      scenes: this.worldData.scenes.filter((s) => s.name.toLowerCase().includes(q)),
-      journals: this.worldData.journal.filter((j) => j.name.toLowerCase().includes(q)),
-    };
+  searchWorld(query: string): WorldSearchResults {
+    return searchWorldDocuments(this.worldData, query);
   }
 
   // ==========================================================================
@@ -1774,15 +1758,16 @@ export class DocumentProvider implements FoundryProvider {
   // Connection test
   // ==========================================================================
 
+  /**
+   * Verify the configured transport using an authenticated connection.
+   * A public HTTP response alone does not prove access to the selected world.
+   */
   async testConnection(): Promise<boolean> {
     try {
-      if (this.config.username && this.config.password) {
-        await this.connect();
-        return true;
-      }
-
-      const response = await this.http.get('/');
-      logger.debug('Connection test successful', { status: response.status });
+      await this.connect();
+      logger.debug('Authenticated connection test successful', {
+        transport: this.config.apiKey ? 'REST API' : 'Socket.IO',
+      });
       return true;
     } catch (error) {
       logger.error('Failed to connect to FoundryVTT:', error);

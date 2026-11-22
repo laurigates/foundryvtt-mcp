@@ -108,6 +108,40 @@ describe('handleSearchWorld', () => {
     expect(listedActors).toHaveLength(2);
   });
 
+  it('displays plain-text field context for matches inside document text', async () => {
+    const client = {
+      searchWorld: vi.fn().mockReturnValue({
+        actors: [],
+        items: [buildItem('Old Brooch')],
+        scenes: [],
+        journals: [buildJournal('Campaign Notes')],
+        matchDetails: {
+          actors: {},
+          items: {
+            'i-Old Brooch': {
+              field: 'system.description.value',
+              excerpt: 'Carved from amber and moonstone.',
+            },
+          },
+          scenes: {},
+          journals: {
+            'j-Campaign Notes': {
+              field: 'pages[0].text.content',
+              excerpt: 'The innkeeper knows the silver key.',
+            },
+          },
+        },
+      }),
+    } as unknown as FoundryClient;
+
+    const result = await handleSearchWorld({ query: 'moonstone' }, client);
+    const output = getText(result);
+    expect(output).toContain('Old Brooch (weapon) — match in system.description.value:');
+    expect(output).toContain('Carved from amber and moonstone.');
+    expect(output).toContain('Campaign Notes — match in pages[0].text.content:');
+    expect(output).toContain('The innkeeper knows the silver key.');
+  });
+
   it('returns a "no results" message when all collections are empty', async () => {
     const client = {
       searchWorld: vi.fn().mockReturnValue({ actors: [], items: [], scenes: [], journals: [] }),

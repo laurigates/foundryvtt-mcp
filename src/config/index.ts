@@ -69,7 +69,12 @@ const ConfigSchema = z.object({
   cache: z.object({
     enabled: z.boolean().default(true),
     ttlSeconds: z.number().default(300), // 5 minutes
-    maxSize: z.number().default(1000),
+    // A bound below 1 lets CacheService.set() insert past it (#267).
+    maxSize: z
+      .number({ error: 'CACHE_MAX_SIZE must be an integer of at least 1' })
+      .int({ error: 'CACHE_MAX_SIZE must be an integer of at least 1' })
+      .min(1, { error: 'CACHE_MAX_SIZE must be an integer of at least 1' })
+      .default(1000),
   }),
 });
 

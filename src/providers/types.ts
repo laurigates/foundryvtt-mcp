@@ -1,5 +1,6 @@
 /** Transport-independent provider contracts. Every instance belongs to one target session. */
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { WorldSearchResults } from '../foundry/world-search.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -17,7 +18,6 @@ import type {
   WorldCombat,
   WorldData,
   WorldEffect,
-  WorldItem,
   WorldJournal,
   WorldMessage,
   WorldScene,
@@ -115,12 +115,7 @@ export interface FoundryCore {
     folder?: string,
     visibility?: DocumentVisibility,
   ): Promise<WorldJournal>;
-  searchWorld(query: string): {
-    actors: WorldActor[];
-    items: WorldItem[];
-    scenes: WorldScene[];
-    journals: WorldJournal[];
-  };
+  searchWorld(query: string): WorldSearchResults;
   getWorldSummary(): Record<string, number>;
   rollDice(formula: string, reason?: string): Promise<DiceRoll>;
   testConnection(): Promise<boolean>;

@@ -35,6 +35,20 @@ export async function testConnection(): Promise<void> {
           console.log(`Actor read failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
+      // The historical REST transport must roll on the authenticated server.
+      // A local fallback indicates the REST dice endpoint was unavailable.
+      if (session.config.provider.kind === 'legacy-rest') {
+        try {
+          const roll = await session.run((provider) => provider.rollDice('1d20'));
+          if (roll.source !== 'server') {
+            failures++;
+            console.log('REST dice roll failed: the provider fell back to local rolling');
+          }
+        } catch (error) {
+          failures++;
+          console.log(`REST dice roll failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
       console.log(`Integration status: ${JSON.stringify(status.integrations)}`);
       if (status.integrationError) {
         console.log(`Optional integrations unavailable: ${status.integrationError}`);

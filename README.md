@@ -1,5 +1,7 @@
 # FoundryVTT MCP Server
 
+![FoundryVTT MCP — AI assistants at your virtual tabletop](docs/assets/banner.webp)
+
 ## Provider and integration overhaul
 
 This branch introduces target-scoped providers for all MCP access, independent
@@ -26,14 +28,16 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 
 ## Features
 
-- **Dice Rolling** — standard RPG notation with any formula
-- **Data Querying** — search and inspect actors, items, scenes, journals
-- **Game State** — combat tracking, chat messages, user presence
-- **Content Generation** — NPCs, loot tables, rule lookups
-- **World Search** — full-text search across all game entities
-- **Live Connection** — Socket.IO loads complete world state on connect
-- **MCP Resources** — `foundry://` URIs for direct data access
-- **Diagnostics** — optional server health monitoring (requires REST API module)
+- **Dice Rolling** — dice terms and numeric modifiers; available syntax depends on the provider
+- **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
+- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
+- **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
+- **World Search** — searches names and selected narrative content in actors, items, scenes and journals, with plain-text match excerpts
+- **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
+- **MCP Resources** — `foundry://` URIs for direct reads.
+- **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
+
+See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
 ## Quick Start
 
@@ -117,7 +121,7 @@ Add to your VS Code MCP settings:
 
 ### Development Setup
 
-For local development or contributing:
+For local development or contributing (this example clones the upstream source; see [Running a fork checkout](docs/guides/integration.md#running-a-fork-checkout) to use your own branch):
 
 ```bash
 git clone https://github.com/laurigates/foundryvtt-mcp.git
@@ -155,9 +159,9 @@ providers, relay credentials, and several worlds, use the
 Ask your AI assistant things like:
 
 - "Roll 1d20+5 for an attack roll"
-- "Show me all the NPCs in this scene"
+- "Find actors named goblin"
 - "What's the current combat initiative order?"
-- "Search the world for anything related to dragons"
+- "Find actors, items or scenes with dragon in their name"
 - "Generate a random NPC merchant"
 
 ## Available Tools
@@ -172,6 +176,7 @@ availability; `reconnect_target` recovers an individual configured connection.
 - `search_actors` — find characters, NPCs, monsters
 - `get_actor_details` — detailed character information
 - `search_items` — find equipment, spells, consumables
+- `search_compendium` — search enabled compendium packs by name/metadata (**requires REST mode with `FOUNDRY_API_KEY`**)
 - `get_scene_info` — current scene details
 - `search_journals` — search notes and handouts
 - `get_journal` — retrieve a specific journal entry
@@ -205,7 +210,7 @@ The selected connection/runtime user needs the appropriate permissions. Set
 
 ### World
 
-- `search_world` — full-text search across all game entities
+- `search_world` — search names and selected narrative fields across actors, items, scenes and journals
 - `get_world_summary` — overview of the current world state
 - `refresh_world_data` — reload world data from FoundryVTT; needed after a dropped
   connection, whose missed updates are never replayed into the cache
@@ -224,7 +229,7 @@ These existing demonstration helpers are advertised for D&D 5e targets only.
 They do not implement the system's rules API.
 
 - `generate_npc` — generate NPC text (not written to the world)
-- `generate_loot` — generate treasure text for a level (not written to the world)
+- `generate_loot` — generate treasure text from a challenge rating (not written to the world)
 
 ### Diagnostics (requires REST API module)
 
@@ -243,8 +248,8 @@ With multiple targets, use `foundry://targets/<target_id>/<path>`, for example
 exactly one target is configured. Resource availability follows provider
 capabilities.
 
-- `foundry://actors` — all actors in the world
-- `foundry://items` — all items in the world
+- `foundry://actors` — up to 100 actor summaries and IDs, plus the total count
+- `foundry://items` — up to 100 item summaries and IDs, plus the total count
 - `foundry://scenes` — all scenes
 - `foundry://scenes/current` — current active scene
 - `foundry://journals` — all journal entries
