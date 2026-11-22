@@ -7,8 +7,8 @@
 This branch introduces target-scoped providers for all MCP access, independent
 connections to multiple Foundry worlds, and Python integrations in separate
 `systems/` and `modules/` directories. Exact upstream IDs are preserved in tool
-names, including `module_item-piles_get_items`. Existing environment configuration
-is converted into one target; explicit multi-target calls use `target_id`.
+names: `system_{id}_{operation}` and `module_{id}_{operation}`. Existing environment
+configuration is converted into one target; explicit multi-target calls use `target_id`.
 
 - [Providers and target configuration](docs/guides/providers-and-targets.md)
 - [Backward compatibility and migration boundaries](docs/guides/backward-compatibility.md)
@@ -17,15 +17,16 @@ is converted into one target; explicit multi-target calls use `target_id`.
 - [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
 - [Example target configuration](examples/targets.example.json)
 
-The D&D 5e and PF2e adapters provide experimental actor-data reads. The
-[Item Piles package](modules/item-piles/README.md) adds explicit inventory,
-currency, transfer, merchant, pile and vault operations, including target-enabled
-mutations restricted to a GM runtime. Its original `get_items` read remains
-available through capability probes. New operations require the inspected Item
-Piles 3.3.4 contract, Foundry generation 13 or 14 and active dependencies.
-These gates are not live compatibility verification: all adapters remain
-experimental and their tested-version matrices remain empty. Python 3.10+ is
-optional for the core and required for active Python integrations.
+Available integrations are listed in the [module bridge catalog](docs/bridges/modules.md)
+and [system bridge catalog](docs/bridges/systems.md). These catalogs record adapter
+versions, upstream source references, Foundry requirements and verification
+status, and link to each package's README for installation, operations and examples.
+The integration support and maintenance scope starts at **Foundry VTT 13,
+inclusive**; earlier generations are outside that scope. This policy does not
+establish compatibility with every later generation or add a shared runtime
+version check. Individual package gates and actually tested combinations are
+documented separately. Python 3.10+ is optional for the core and required for
+active Python integrations.
 
 Provider lifecycles keep delayed multi-step calls bound to their original
 session; interrupted mutations can still have unknown remote outcomes and are
@@ -48,7 +49,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — target-qualified `foundry://targets/<target_id>/...` URIs; unqualified aliases remain available with one configured target.
 - **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
-- **Item Piles integration** — fixed API operations and JSON results, with a package-local registry, shared helpers and checked-in generated bindings as an example for other module integrations.
+- **System and module bridges** — optional packages with fixed API operations, JSON results, target-scoped activation and package-specific compatibility checks.
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
@@ -240,8 +241,9 @@ The selected connection/runtime user needs the appropriate permissions. Set
 
 ### Content Generation
 
-These existing demonstration helpers are advertised for D&D 5e targets only.
-They do not implement the system's rules API.
+These existing demonstration helpers are available only for selected game
+systems. The [system bridge catalog](docs/bridges/systems.md#core-text-demonstrations)
+records their availability and limitations. They do not implement game rules.
 
 - `generate_npc` — generate NPC text (not written to the world)
 - `generate_loot` — generate treasure text from a challenge rating (not written to the world)

@@ -1,8 +1,12 @@
 # Module integrations
 
+For the list of included modules, adapter/upstream versions, Foundry requirements
+and verification status, see the [module bridge catalog](../docs/bridges/modules.md).
+Installation and API details belong in each package's README.
+
 Each directory preserves the exact Foundry module ID and contains a manifest,
 Python adapter, README, fixed runtime bindings, and tests. Tool names follow
-`module_{id}_{operation}`, for example `module_item-piles_get_items`.
+`module_{id}_{operation}`.
 
 The session activates integrations only when the remote module is active and its
 operation probes succeed. Module state, installed versions and adapter instances
@@ -22,28 +26,20 @@ not require a local system adapter. Version lists are exact-match restrictions
 when nonempty; empty lists leave compatibility to runtime probes and must not be
 presented as tested support. Record actual live verification separately.
 
-## Complete package example
+The support and maintenance scope starts at **Foundry VTT 13, inclusive**.
+Earlier generations remain outside that scope even if an existing runtime probe
+succeeds; this policy does not add a shared version guard. Each package can have
+narrower requirements, and later generations are not automatically verified.
 
-[`item-piles/`](item-piles/README.md) demonstrates a larger integration without
-provider-specific code. Its `src/registry.mjs` collects explicit operations from
-domain files, each with input/output schemas, API requirements and a `readOnly`
-classification. `src/runtime.mjs` contains shared document, permission and DTO
-helpers. `build.mjs` embeds that factory and one fixed handler into each runtime
-script, and generates the manifest and per-operation probes.
+## Upstream source references
 
-The generated files are checked in. The production loader reads them as ordinary
-bindings; it does not bundle modules, install dependencies or resolve imports at
-runtime. Callers cannot supply JavaScript, an API function name or another
-operation to the Python callback. The Python adapter allowlist comes from the
-local manifest and remains bound to the host's operation token.
+Keep the adapter version/update separate from the upstream code used. Select the
+latest official release; if there are no releases, select the latest tag; if
+neither exists, use the default-branch commit and its full hash as the upstream
+version. Record the resolved commit and source inspection date in the package
+README, independently of live verification. An unexamined newer release is a
+pending synchronization target, not an established source baseline.
 
-Run `npm run generate:item-piles` after editing its sources, then
-`npm run check:item-piles` and `npm run test:item-piles`. The ordinary build and
-test commands reject stale generated output. Node tests cover the fixed bindings
-and probe policy; `npm run test:python` also discovers the package's adapter tests.
-
-New Item Piles operations use the inspected 3.3.4 API contract on Foundry 13/14.
-They require active `socketlib` and `lib-wrapper`; writes additionally require
-the selected target's write flag and a GM runtime. Read operations check document
-access. The earlier `get_items` read retains its capability-based version policy.
-These restrictions describe what may be advertised, not a performed live test.
+Follow the [upstream source reference policy](../docs/guides/writing-integrations.md#upstream-source-references)
+and [integration authoring guide](../docs/guides/writing-integrations.md) for
+package structure, runtime bindings, shared helpers and validation.

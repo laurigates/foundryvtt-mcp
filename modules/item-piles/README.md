@@ -11,14 +11,28 @@ transport and write policy remain in the shared host.
 | Upstream module ID | `item-piles` |
 | Adapter version / update | `0.2.0` / `2026-11-22` |
 | Status | **Experimental** |
-| Inspected upstream | [Item Piles 3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4), commit `85ab971406623fb1c5d01eb1f093fe4855ede6e4` |
-| Upstream update / source inspection | `2026-07-18` / `2026-11-22` |
+| Upstream repository | [fantasycalendar/FoundryVTT-ItemPiles](https://github.com/fantasycalendar/FoundryVTT-ItemPiles) |
+| Upstream source version / kind | **Release [3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4)** |
+| Upstream source commit | [`85ab971406623fb1c5d01eb1f093fe4855ede6e4`](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/commit/85ab971406623fb1c5d01eb1f093fe4855ede6e4) |
+| Upstream release date | `2026-07-18` |
+| Source inspected on | `2026-11-22` |
+| Latest reference checked on | `2026-11-22`; latest release **3.3.4**, same as the inspected baseline |
+| Project Foundry scope | **13 or later**, including 13; narrower operation gates below still apply |
 | New-operation runtime gate | Item Piles **3.3.4**, Foundry generation **13 or 14**, required public methods and active dependencies |
 | Actually tested live combinations | **None**; `compatibility.tested: []`, `upstream.verifiedAt: null` |
+
+Release **3.3.4** is the upstream code to keep this adapter synchronized with;
+**0.2.0** is this repository's adapter version. Reference selection follows the
+[release → tag → commit policy](../../docs/guides/writing-integrations.md#upstream-source-references).
+Foundry 12 and earlier are outside the project's support and maintenance scope,
+even if the legacy `get_items` capability probe succeeds. The minimum of 13 is a
+support policy; it does not add a shared runtime guard or validate future versions.
 
 Source inspection and local tests do not establish live Foundry, game-system or
 relay compatibility. [UPSTREAM.md](UPSTREAM.md) records the exact primary sources,
 implemented boundaries and observed upstream behavior.
+See the [module bridge catalog](../../docs/bridges/modules.md) for other packages
+and their source/version records.
 
 ## Install and connect
 

@@ -30,7 +30,7 @@ live compatibility.
 | `adapterVersion`, `updatedAt` | Our adapter version and last update date |
 | `entrypoint` | Python entrypoint relative to this directory |
 | `status` | `experimental` or `supported` |
-| `upstream` | Repository, reference, update date and verification date; unknowns use `null` |
+| `upstream` | Official repository, inspected source reference, upstream date and live verification date; unknowns use `null` (see [source references](#upstream-source-references)) |
 | `compatibility` | Exact version filters and actually tested combinations |
 | `operations` | One or more operation definitions |
 
@@ -76,6 +76,13 @@ restriction; it is not a compatibility guarantee. `compatibility.tested` records
 actual live combinations and stays empty until they are verified. Optional
 `compatibility.systems` restricts a module to named systems. This restriction
 does not require that our corresponding system adapter is installed.
+
+The integration support and maintenance scope starts at **Foundry VTT 13,
+inclusive**. Foundry 12 and earlier are outside that scope even if an existing
+probe succeeds. This is a support policy, not a shared runtime version guard;
+document the actual per-operation checks separately. A minimum of 13 does not
+establish support for every later generation. Do not put major numbers or range
+expressions into exact-match manifest arrays to represent this policy.
 
 ## Python adapter
 
@@ -182,11 +189,75 @@ The optional `actor-projection.json` used by the core provider belongs in the
 system package. It declares data paths and existing validation bounds; unknown
 systems keep raw document data and are not assigned D&D-specific fields.
 
+## Upstream source references
+
+The adapter version identifies our package. The upstream source baseline identifies
+the external module or system code inspected and used to align that package.
+Record both: an adapter update date alone cannot identify its upstream contract.
+
+Choose the synchronization reference in this order:
+
+1. **Latest official published release**, when available. Record its version/tag
+   and a link to that specific release; label a prerelease explicitly if selected.
+2. **Latest official tag**, only when upstream has no releases. Record the tag and
+   its source link, resolving annotated tags to the underlying commit.
+3. **Current default-branch commit**, only when upstream has neither releases nor
+   tags. Use the **full commit hash as the upstream version**, with an immutable
+   commit link. Do not invent a release number or use the branch name as a version.
+
+For all three cases, record the full resolved commit SHA. A release/tag URL alone
+does not pin the source if the reference later moves. Select a release rather than
+newer untagged branch work while a release exists; when choosing among tags, check
+the upstream version/date convention rather than relying on lexical tag ordering.
+An unavailable repository or failed lookup does not prove that releases or tags
+are absent: leave the reference unknown or record the check as incomplete.
+
+"Latest" means latest when checked, so record that date. The reference selected
+for synchronization becomes the **used source baseline** only after its relevant
+code has been inspected and the adapter aligned with its contract. If the latest
+reference is ahead of the inspected baseline, list both and mark synchronization
+as pending. Do not advance the baseline merely because a newer release exists.
+
+Each package README records these fields separately:
+
+| Field | Required documentation |
+|---|---|
+| Adapter version / update | `adapterVersion` and `updatedAt` from this package |
+| Upstream repository | Official source repository |
+| Upstream source version / kind | Used release version, tag name, or full commit hash; identify which kind it is |
+| Upstream source commit | Full resolved SHA and immutable source link |
+| Upstream release / commit date | Publication date for a release; commit date for a tag or commit baseline |
+| Source inspected on | Date the relevant upstream code was examined |
+| Latest reference checked on | Check date and latest reference found; identify any pending alignment |
+| Foundry scope / runtime checks | Minimum project scope of 13, package restrictions and actual operation gates |
+| Live verification / tested combinations | Only performed live checks, separately from source inspection and fixtures |
+
+Unknown source fields stay explicitly unrecorded. Missing provenance is not a
+commit-only fallback. When a baseline is established, use the existing manifest
+fields without changing the schema:
+
+- `upstream.repository`: official repository URL.
+- `upstream.reference`: `<release-or-tag>@<full-commit-SHA>` for a release/tag,
+  or just `<full-commit-SHA>` when neither releases nor tags exist.
+- `upstream.updatedAt`: the documented upstream release/commit date.
+- `upstream.verifiedAt`: date of an actual live verification; keep `null` after
+  source inspection alone. Record checked combinations in `compatibility.tested`.
+
+Source-inspection and latest-reference-check dates belong in the README. A
+documentation-only check does not require an adapter version bump. If metadata
+is generated, update its authored source and regenerate the checked-in manifest.
+
+Keep the [module bridge catalog](../bridges/modules.md) and
+[system bridge catalog](../bridges/systems.md) aligned with package metadata and
+README source records. The root README links to these catalogs and stays generic;
+installation instructions, specific APIs and usage examples belong in individual
+package READMEs.
+
 ## Documentation and tests
 
-Each README records adapter version/update, upstream reference/update, last
-verification, actually tested combinations, exposed operations, and limitations.
-The installed upstream version is a session observation, not the adapter version.
+Each README follows the source-reference record above and documents exposed
+operations and limitations. The installed upstream version is a session
+observation, separate from the adapter version and the inspected source baseline.
 
 Test input validation, DTO results, incorrect system/module context, API absence,
 and Python callback behavior. Verify two targets cannot share mutable adapter

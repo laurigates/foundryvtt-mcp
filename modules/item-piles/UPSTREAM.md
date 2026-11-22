@@ -4,12 +4,17 @@
 
 | Field | Value |
 |---|---|
-| Official project | `fantasycalendar/FoundryVTT-ItemPiles` |
+| Official project | [fantasycalendar/FoundryVTT-ItemPiles](https://github.com/fantasycalendar/FoundryVTT-ItemPiles) |
 | Release | [3.3.4](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/releases/tag/3.3.4), published 2026-07-18 |
-| Commit | `85ab971406623fb1c5d01eb1f093fe4855ede6e4` |
+| Commit | [`85ab971406623fb1c5d01eb1f093fe4855ede6e4`](https://github.com/fantasycalendar/FoundryVTT-ItemPiles/commit/85ab971406623fb1c5d01eb1f093fe4855ede6e4) |
 | Source inspection | 2026-11-22 |
+| Latest reference check | 2026-11-22: release 3.3.4 remains the latest published release and matches the inspected baseline |
 | Adapter | 0.2.0, experimental |
 | Live verification | None; `compatibility.tested` remains empty and `upstream.verifiedAt` remains null |
+
+The release and resolved commit are the synchronization reference for the
+upstream module code. The adapter has its own version and update history.
+Selection follows the [release → tag → commit policy](../../docs/guides/writing-integrations.md#upstream-source-references).
 
 The tag and default branch pointed to the same commit when inspected. All links
 below pin the commit rather than following a moving branch. The source manifest

@@ -6,11 +6,22 @@
 | Adapter version | `0.1.0` |
 | Adapter updated | 2026-11-19 |
 | Status | Experimental |
-| Upstream version / commit | Not pinned; no live compatibility claim |
-| Upstream last update | Not verified |
+| Upstream repository / source version / kind | Not yet recorded |
+| Upstream source commit / date | Not yet recorded |
+| Source inspection / latest reference check | Not yet recorded |
+| Project Foundry scope | **13 or later**, including 13; exact compatible combinations not established |
+| Runtime checks | System identity and Actor API probes; no shared minimum-generation guard |
 | Last live verification | Not performed |
 | Tested live combinations | None |
 | Worker protocol | 1 |
+
+No upstream source baseline is recorded for this adapter yet. This does not mean
+the official system has no releases or tags. Establish the baseline by inspecting
+the latest release, otherwise the latest tag, otherwise the default-branch commit,
+following the [upstream source reference policy](../../docs/guides/writing-integrations.md#upstream-source-references).
+Keep that source version and resolved commit separate from adapter version `0.1.0`
+and from live verification. See the [system bridge catalog](../../docs/bridges/systems.md)
+for the integration list and version status.
 
 ## Operation
 
@@ -24,6 +35,8 @@ are explicit errors.
 
 ## Requirements and limits
 
+- Foundry **13 or later** is the support and maintenance scope. Earlier versions
+  remain outside it even if a probe succeeds; later versions still need validation.
 - A provider with `runtime.execute` and an active Foundry client runtime.
 - The selected target must use `pf2e` and pass its runtime probe.
 - No additional Python packages are required.
@@ -36,5 +49,7 @@ are explicit errors.
 ## Validation
 
 Local tests cover adapter dispatch, separate per-target state, plain-data
-results and rejection of unsupported operations. Record an actual Foundry and
-PF2e version pair in `compatibility.tested` only after live verification.
+results and rejection of unsupported operations. Record the inspected source in
+`upstream.repository`, `upstream.reference` and `upstream.updatedAt` when establishing
+or updating the adapter's baseline. Record actual Foundry/PF2e version pairs in
+`compatibility.tested` and update `upstream.verifiedAt` only after live verification.
