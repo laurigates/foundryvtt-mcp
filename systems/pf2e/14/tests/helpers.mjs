@@ -26,7 +26,9 @@ export function fixture() {
     const value = { total: 24, formula: '1d20+7', naturalResult: 17, degreeOfSuccess: 2, options: { degreeOfSuccess: 2 } };
     const mode = world.blind ? 'blind' : (params.messageMode ?? 'public');
     const message = { id: params.createMessage === false ? null : 'message',
-      uuid: params.createMessage === false ? null : 'ChatMessage.message', flags: { pf2e: { context: { messageMode: mode } } } };
+      uuid: params.createMessage === false ? null : 'ChatMessage.message', blind: mode === 'blind',
+      flags: { pf2e: { context: { messageMode: mode } } } };
+    if (params.createMessage !== false) message.isContentVisible = mode !== 'blind' || game.user.isGM === true;
     await params.callback?.(value, 'success', message, null); return value;
   };
   const makeStatistic = (slug, type = 'skill-check') => ({ slug, label: slug, attribute: 'dex', rank: 2, proficient: true,

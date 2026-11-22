@@ -9,7 +9,7 @@ package does not expose the complete system API or every sheet interaction.
 |---|---|
 | Package Foundry generation | **14**; `foundryGeneration: 14` |
 | Foundry system ID | `pf2e` |
-| Adapter version / update | **0.2.0** / `2026-11-22` |
+| Adapter version / update | **0.2.1** / `2026-11-22` |
 | Status | **Experimental** |
 | Upstream repository | [foundryvtt/pf2e](https://github.com/foundryvtt/pf2e) |
 | Upstream system version | **8.7.1** |
@@ -23,7 +23,7 @@ package does not expose the complete system API or every sheet interaction.
 | Actually tested live combinations | **None**; `compatibility.tested: []`, `upstream.verifiedAt: null` |
 | Worker protocol | `1` |
 
-**8.7.1 is the game system version; 0.2.0 is this adapter's version.** The upstream
+**8.7.1 is the game system version; 0.2.1 is this adapter's version.** The upstream
 repository publishes several systems: its generic latest-release endpoint can
 identify Starfinder or Anachronism. This adapter pins the release for **`pf2e`**.
 See [UPSTREAM.md](UPSTREAM.md) for source analysis and
@@ -130,9 +130,16 @@ target-relative defenses, action traits and incapacitation context are not
 inferred for a generic save or skill check.
 
 Results include total, formula, natural d20/substitution, degree of success,
-message UUID and actual visibility when available. Upstream secret-check policy
-can override requested visibility; non-GMs receive redacted roll values for blind
-checks or an unconfirmed effective visibility.
+message UUID and effective visibility when confirmed. For a non-GM, roll values
+are returned only when the callback's actual ChatMessage reports
+`isContentVisible === true`, is not blind, and has a recognized non-blind PF2e
+message mode. System secret-check policy and later module hooks can override
+requested visibility; PF2e context flags alone do not authorize disclosure.
+Visible `gm` and `self` messages remain available to their authorized runtime user.
+Blind checks or unconfirmed visibility redact every roll value; `message_mode`
+is `blind` when known, otherwise `null`. In particular, `create_message: false`
+does not prove that a non-GM may see the result. A GM retains access to roll values.
+Redaction never repeats the roll or falls back to another operation.
 
 ### Strikes and mutations
 

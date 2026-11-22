@@ -51,7 +51,9 @@ FOUNDRY_WRITE_ENABLED=false
 
 `FOUNDRY_PROVIDER=composite` combines the direct Socket.IO settings with the relay
 settings. It requires an expected world ID and verifies that both components
-identify the same world, origin, and system. The execution runtime's user may
+identify the same world, origin, and system. Known Foundry generations must also
+match: different builds within one generation are accepted, while an unknown
+generation is not inferred from the other connection. The execution runtime's user may
 have different permissions from the core connection; inspect the configured
 accounts and runtime permissions before enabling writes.
 

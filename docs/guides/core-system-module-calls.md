@@ -51,9 +51,12 @@ or probed. `list_systems` and `list_modules` include the selected
 `foundryGeneration`, valid `availableGenerations` and any `variantErrors`.
 
 Core Actor/Item projections also live within the system's generation directory.
-Without matching generation metadata and a descriptor, core reads keep generic
-identity and raw data; they do not reuse another generation's system fields or
-validation bounds. Providers remain responsible for generic document operations.
+They apply the manifest's exact Foundry and system version filters, including
+when a descriptor is already cached for another target. A missing required
+version, an incompatible manifest or an absent descriptor keeps generic identity,
+raw data and generic patch validation; core does not reuse another generation's
+system fields or bounds. Providers remain responsible for generic document
+operations.
 
 This selects an implementation of an explicitly named tool. It does not establish
 priority between different core, system or module workflows. The public tool
@@ -140,8 +143,10 @@ The transport also changes what code runs:
 In a composite target the native user and paired runtime user may differ.
 Permission to use one path does not establish permission on the other. The
 composite checks that both connections identify the same origin, world and
-system. The binding still needs its own document permissions, API checks and
-version restrictions.
+system, and rejects different Foundry generations when both can be identified.
+Different build strings within one generation are accepted; an unknown generation
+is not inferred. The binding still needs its own document permissions, API checks
+and version restrictions.
 
 Sources: [provider contracts](../../src/providers/types.ts),
 [relay document/runtime execution](../../src/providers/rest-api.ts), and

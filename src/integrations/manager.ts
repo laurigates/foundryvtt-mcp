@@ -21,6 +21,7 @@ import {
   IntegrationError,
   type IntegrationStatus,
   type IntegrationTool,
+  matchesIntegrationCompatibility,
   parseFoundryGeneration,
 } from './types.js';
 
@@ -637,12 +638,11 @@ export class IntegrationManager {
         status.state = 'inactive';
         status.reason = `${manifest.id} is inactive on this target`;
       } else if (
-        (manifest.compatibility.systems &&
-          !manifest.compatibility.systems.includes(environment.system.id)) ||
-        (manifest.compatibility.foundryVersions.length > 0 &&
-          !manifest.compatibility.foundryVersions.includes(environment.foundryVersion)) ||
-        (manifest.compatibility.integrationVersions.length > 0 &&
-          !manifest.compatibility.integrationVersions.includes(installed.version))
+        !matchesIntegrationCompatibility(manifest.compatibility, {
+          systemId: environment.system.id,
+          foundryVersion: environment.foundryVersion,
+          integrationVersion: installed.version,
+        })
       ) {
         status.state = 'incompatible';
         status.reason = 'The installed versions or system do not match the declared compatibility';

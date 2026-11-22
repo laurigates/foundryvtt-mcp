@@ -156,15 +156,18 @@ const runtime = await (function createRuntime({ readOnly = true, requirements = 
       callback: (...values) => { message = values[2] ?? null; if (callback) return callback(...values); },
       result: (roll) => {
         if (!roll || !Number.isFinite(roll.total)) unknown('The roll did not return a confirmed numeric result');
-        const mode = message?.flags?.pf2e?.context?.messageMode ?? null;
-        // System secret-check policy may override the requested chat visibility.
-        const hidden = game.user.isGM !== true && (!mode || mode === 'blind');
+        const contextMode = message?.flags?.pf2e?.context?.messageMode;
+        const mode = message?.blind === true ? 'blind'
+          : ['public', 'gm', 'blind', 'self'].includes(contextMode) ? contextMode : null;
+        // Hooks can change ChatMessage visibility without updating PF2e context flags.
+        // A recognized mode alone never proves that this runtime user can see the roll.
+        const hidden = game.user.isGM !== true && (message?.isContentVisible !== true || !mode || mode === 'blind');
         return {
           total: hidden ? null : roll.total, formula: hidden ? null : text(roll.formula),
           natural: hidden ? null : number(roll.naturalResult),
           degree_of_success: hidden ? null : number(roll.degreeOfSuccess ?? roll.options?.degreeOfSuccess),
           message_uuid: typeof message?.uuid === 'string' && message.id ? message.uuid : null,
-          message_mode: mode, hidden,
+          message_mode: hidden && mode !== 'blind' ? null : mode, hidden,
         };
       },
     };

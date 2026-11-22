@@ -12,6 +12,7 @@ names: `system_{id}_{operation}` and `module_{id}_{operation}`. Existing environ
 configuration is converted into one target; explicit multi-target calls use `target_id`.
 
 - [Providers and target configuration](docs/guides/providers-and-targets.md)
+- [Development guide and project handoff](docs/guides/development.md)
 - [Backward compatibility and migration boundaries](docs/guides/backward-compatibility.md)
 - [Writing system and module integrations](docs/guides/writing-integrations.md)
 - [Choosing core, system and module calls](docs/guides/core-system-module-calls.md)

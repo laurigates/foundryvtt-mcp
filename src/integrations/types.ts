@@ -10,6 +10,32 @@ export function parseFoundryGeneration(version: string): number | undefined {
   return Number.isSafeInteger(generation) ? generation : undefined;
 }
 
+/** Exact manifest filters shared by runtime adapters and core projections. */
+export interface IntegrationCompatibility {
+  systems?: readonly string[] | undefined;
+  foundryVersions: readonly string[];
+  integrationVersions: readonly string[];
+}
+
+export function matchesIntegrationCompatibility(
+  compatibility: IntegrationCompatibility,
+  observed: {
+    systemId: string;
+    foundryVersion?: string | undefined;
+    integrationVersion?: string | undefined;
+  },
+): boolean {
+  return (
+    (!compatibility.systems || compatibility.systems.includes(observed.systemId)) &&
+    (compatibility.foundryVersions.length === 0 ||
+      (observed.foundryVersion !== undefined &&
+        compatibility.foundryVersions.includes(observed.foundryVersion))) &&
+    (compatibility.integrationVersions.length === 0 ||
+      (observed.integrationVersion !== undefined &&
+        compatibility.integrationVersions.includes(observed.integrationVersion)))
+  );
+}
+
 export interface IntegrationEnvironment {
   foundryVersion: string;
   system: { id: string; version: string };

@@ -90,8 +90,10 @@ explicit error. Move the complete package and add matching metadata to migrate.
 See the [installation and authoring guide](writing-integrations.md#install-a-third-party-adapter).
 
 System projection descriptors move inside each generation package as well.
-Unknown or missing generations retain generic document identity/raw data and
+Unknown or missing generations, unmet manifest version filters and missing
+versions required by those filters retain generic document identity/raw data and
 generic patch validation, without borrowing another variant's fields or bounds.
+The version filters are rechecked for every target, including cached descriptors.
 
 ### Multiple targets
 

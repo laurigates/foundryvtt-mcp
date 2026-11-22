@@ -118,6 +118,66 @@ test('secret-check visibility chosen by PF2e is respected in MCP results', async
   const result = plain(await invoke(world, 'roll_perception', args));
   assert.equal(result.hidden, true); assert.equal(result.total, null); assert.equal(result.formula, null);
   assert.equal(result.natural, null); assert.equal(result.degree_of_success, null); assert.equal(result.message_mode, 'blind');
+  assert.equal(world.calls.length, 1);
+});
+
+for (const mode of ['public', 'gm', 'self']) test(`non-GM receives a visible ${mode} check once`, async () => {
+  const world = fixture(); world.game.user.isGM = false;
+  const result = plain(await invoke(world, 'roll_perception', { ...args, message_mode: mode }));
+  assert.equal(result.hidden, false); assert.equal(result.total, 24); assert.equal(result.formula, '1d20+7');
+  assert.equal(result.natural, 17); assert.equal(result.degree_of_success, 2); assert.equal(result.message_mode, mode);
+  assert.equal(result.message_uuid, 'ChatMessage.message'); assert.equal(world.calls.length, 1);
+});
+
+for (const [label, message, expectedMode] of [
+  ['actual blind message overrides public context and visible flag',
+    { blind: true, isContentVisible: true, flags: { pf2e: { context: { messageMode: 'public' } } } }, 'blind'],
+  ['inaccessible content overrides public context',
+    { blind: false, isContentVisible: false, flags: { pf2e: { context: { messageMode: 'public' } } } }, null],
+  ['blind PF2e context remains hidden despite a visible non-blind message',
+    { blind: false, isContentVisible: true, flags: { pf2e: { context: { messageMode: 'blind' } } } }, 'blind'],
+  ['missing actual visibility cannot be inferred from public context',
+    { blind: false, flags: { pf2e: { context: { messageMode: 'public' } } } }, null],
+  ['missing message leaves visibility unconfirmed', null, null],
+  ['missing PF2e context leaves effective mode unconfirmed',
+    { blind: false, isContentVisible: true }, null],
+  ['unknown PF2e context cannot authorize disclosure',
+    { blind: false, isContentVisible: true, flags: { pf2e: { context: { messageMode: 'custom-private' } } } }, null],
+]) test(`non-GM redaction: ${label}`, async () => {
+  const world = fixture(); world.game.user.isGM = false; let calls = 0;
+  world.stats.perception.roll = async (params) => {
+    calls++;
+    const roll = { total: 24, formula: '1d20+7', naturalResult: 17, degreeOfSuccess: 2 };
+    await params.callback(roll, 'success', message && { id: 'message', uuid: 'ChatMessage.message', ...message }, null);
+    return roll;
+  };
+  const result = plain(await invoke(world, 'roll_perception', args));
+  assert.equal(result.hidden, true); assert.equal(result.total, null); assert.equal(result.formula, null);
+  assert.equal(result.natural, null); assert.equal(result.degree_of_success, null); assert.equal(result.message_mode, expectedMode);
+  assert.equal(calls, 1);
+});
+
+test('non-GM check without a created message redacts unconfirmed visibility without retrying', async () => {
+  const world = fixture(); world.game.user.isGM = false;
+  const result = plain(await invoke(world, 'roll_perception', { ...args, create_message: false, message_mode: 'self' }));
+  assert.equal(result.hidden, true); assert.equal(result.total, null); assert.equal(result.formula, null);
+  assert.equal(result.natural, null); assert.equal(result.degree_of_success, null); assert.equal(result.message_mode, null);
+  assert.equal(result.message_uuid, null); assert.equal(world.calls.length, 1);
+});
+
+test('GM receives blind check values despite visibility flags without retrying', async () => {
+  const world = fixture(); let calls = 0;
+  world.stats.perception.roll = async (params) => {
+    calls++;
+    const roll = { total: 24, formula: '1d20+7', naturalResult: 17, degreeOfSuccess: 2 };
+    await params.callback(roll, 'success', { id: 'message', uuid: 'ChatMessage.message', blind: true,
+      isContentVisible: false, flags: { pf2e: { context: { messageMode: 'public' } } } }, null);
+    return roll;
+  };
+  const result = plain(await invoke(world, 'roll_perception', args));
+  assert.equal(result.hidden, false); assert.equal(result.total, 24); assert.equal(result.formula, '1d20+7');
+  assert.equal(result.natural, 17); assert.equal(result.degree_of_success, 2); assert.equal(result.message_mode, 'blind');
+  assert.equal(calls, 1);
 });
 
 test('roll exceptions and null results are uncertain and never retried', async () => {

@@ -390,3 +390,82 @@ required in an environment with the declared dependencies.
 Source inspection, generated-file checks, local fixtures and packaging checks
 are separate from live system/module compatibility verification.
 
+## Final review and development handoff — 2026-11-22
+
+This pass follows published generation-package commit
+`742751dfd89ab604eed00ac2ce3fd154a35b82f0`. The preceding sections retain their
+historical versions and results. The changes below supersede the PF2e
+generation-14 adapter version and the final local test count for this pass.
+
+### Corrections integrated
+
+1. **Use the same manifest compatibility policy for adapters and core projections.**
+   A shared exact-filter predicate checks the active system ID, observed Foundry
+   version and observed system/module version. Core Actor/Item projections and
+   patch bounds now receive the target's system version and recheck compatibility
+   on cache hits. An incompatible or insufficiently identified target keeps
+   generic data and generic patch validation instead of inheriting another
+   target's cached system descriptor. Empty version arrays retain their existing
+   unrestricted-filter meaning; they are not evidence of tested compatibility.
+2. **Reject known generation disagreement in composite targets.** Core and relay
+   inspections still validate origin, world and system. They now also reject
+   different known Foundry generations with `identity_mismatch`. Different builds
+   within one generation remain acceptable. Missing generation information keeps
+   the legacy identity behavior without inferring a value from the other path.
+3. **Respect actual PF2e chat visibility.** A non-GM result cannot expose total,
+   formula, natural result or degree of success when the actual message is hidden
+   or visibility cannot be established. Actual blindness takes precedence over
+   a contradictory public system flag; a system blind mode also remains hidden.
+   Missing messages and `create_message: false` do not establish player access.
+   GM access is retained. The change does not retry or redispatch the roll.
+
+The PF2e generation-14 adapter advances from **0.2.0 to 0.2.1**. Its 22 operations,
+upstream `pf2e-8.7.1` pin and Foundry-14 build requirement remain unchanged.
+Authored sources, generated bindings/probes, manifest, fixtures, package README,
+source notes and the system catalog are aligned. No other adapter version or
+upstream source pin changes in this pass.
+
+### Checks actually performed
+
+Environment: Node **24.22.3**, Python **3.12.14**, with a writable workspace
+`TMPDIR`. No project dependency installation or live Foundry connection was used.
+
+| Check | Observed result |
+|---|---|
+| `npm run test:bindings` | **646 passed, 0 failed, 0 skipped** across 15 files; all 6 package/generator checks passed |
+| PF2e generation-14 subset | **46 passed**, including 12 additional actual-message visibility cases |
+| `npm run test:python` | **46 passed** |
+| Draft 7 validation with external retrieval disabled | **258 schemas**, **168 recipes**, all **129 package-operation entries** covered |
+| Invalid recipe inputs | **168 unknown-property** and **280 missing-required-field** cases rejected |
+| Changed host source/test syntax | **7 files** parsed successfully with Node 24; not a TypeScript typecheck |
+| Shared pure compatibility/version helpers | Direct assertions passed for exact filters, missing versions and generation parsing |
+| Changed-document links | **99 relative links** checked in 12 documents; root README remains generic |
+| Offline npm pack dry-run | **355 files** listed; all **335 required variant runtime/doc/example and handoff/draft files** present, with tests/cache artifacts excluded |
+
+Host regressions were added for version-filter propagation, target changes with
+cached projections and composite generation mismatches. They were reviewed and
+syntax-checked, but **their Vitest execution was not performed**. The workspace
+still has no project `node_modules` or built `dist`; full TypeScript, Vitest,
+Biome, strict Ajv and installed-runtime smoke remain uncompleted gates. The pack
+dry-run checks file inclusion, not a compiled or installed distribution.
+
+Earlier isolated-copy checks, workflow checks and the 47 recorded-output checks
+remain historical evidence above; they are not claimed as newly repeated here.
+No live compatibility matrix was populated and no source pin was refreshed.
+
+### Documentation delivered
+
+The canonical [development guide](../guides/development.md) now starts with a
+dated handoff, the implementation map, six-package inventory, invariants,
+verification limits and unresolved architectural choices. Related provider,
+authoring, compatibility and call-selection guides describe the corrected
+boundaries consistently.
+
+The [expansion discussion draft](../discussions/provider-integration-expansion-draft.md)
+explains the design, per-generation packages, contribution workflow, explicit
+core/system/module semantics, tradeoffs and proposed validation stages. It was
+assembled from the development discussion as text for a possible future PR;
+no PR was opened or consulted. It explicitly asks for architectural discussion
+and does not present the experimental code as production-validated or ready to
+merge. Both handoff and draft documents are included in the package file list.
+

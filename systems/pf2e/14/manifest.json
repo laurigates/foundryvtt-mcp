@@ -4,7 +4,7 @@
   "kind": "system",
   "foundryGeneration": 14,
   "id": "pf2e",
-  "adapterVersion": "0.2.0",
+  "adapterVersion": "0.2.1",
   "updatedAt": "2026-11-22",
   "entrypoint": "adapter.py",
   "status": "experimental",

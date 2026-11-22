@@ -287,9 +287,13 @@ module-specific compatibility binding only when a real API difference requires i
 
 The optional `actor-projection.json` used by the core provider belongs in the
 selected generation package. It declares data paths and existing validation
-bounds. Projection lookup uses the target's Foundry generation too; unknown
-systems and missing generations keep raw document data rather than borrowing
-another version's fields or validation bounds.
+bounds. Projection lookup uses the target's Foundry generation and applies the
+manifest's `systems`, `foundryVersions` and `integrationVersions` filters. Cached
+descriptors are checked against each target's observed versions on every use.
+Unknown systems, missing generations and unmet version filters keep raw document
+data and generic patch validation rather than borrowing another version's fields
+or bounds. Empty version-filter arrays impose no exact-version restriction;
+nonempty filters require a known, matching observed version.
 
 For choosing an operation, follow [core, system and module call selection](core-system-module-calls.md).
 Invoke current runtime document methods so participating wrappers can run; do

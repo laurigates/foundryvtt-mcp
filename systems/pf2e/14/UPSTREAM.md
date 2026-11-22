@@ -16,7 +16,7 @@ capability-based. No build or runtime import requires another generation.
 | Resolved source commit | [`397f125aea87e6d6fa36e878c9c07d0e672826cf`](https://github.com/foundryvtt/pf2e/commit/397f125aea87e6d6fa36e878c9c07d0e672826cf) |
 | Source inspection / release check | `2026-11-22` |
 | Upstream Foundry declaration | Minimum **14.361**, verified **14.370**, maximum generation **14** |
-| Adapter version / update | `0.2.0` / `2026-11-22` |
+| Adapter version / update | `0.2.1` / `2026-11-22` |
 | Live compatibility verification | None; `compatibility.tested: []`, `upstream.verifiedAt: null` |
 
 This upstream repository publishes PF2e, Starfinder 2e and Anachronism releases.
@@ -73,10 +73,19 @@ active. They are non-targeted checks. They do not infer a spell origin, a target
 DC, incapacitation level, action traits or attack number from conversational text.
 
 Checks are writes even with `create_message: false`: roll hooks can change state.
-The trusted callback reads the actual message context because secret-check policy
-may override the requested visibility. A non-GM receives redacted totals,
-formula and degree for a blind result or an unconfirmed visibility context.
-PF2e 8.7.1 uses `messageMode` values `public`, `gm`, `blind` and `self`.
+The callback supplies message context, but its PF2e flags alone do not prove
+visibility: secret-check policy and module hooks can alter the actual
+ChatMessage. Adapter **0.2.1** requires `isContentVisible === true`, a non-blind
+message and a recognized non-blind PF2e mode before returning roll values to a
+non-GM. An actual blind message overrides contradictory public context; a blind
+PF2e context remains redacted even if another flag says the content is visible.
+PF2e 8.7.1 uses `messageMode` values `public`, `gm`, `blind` and `self`; authorized
+visible `gm` and `self` results remain available. Missing or conflicting
+visibility information redacts total, formula, natural result and degree of
+success without repeating the operation. The visibility gate also applies when
+`create_message: false` leaves no actual visibility confirmation. GM roll access
+is unchanged. This adapter correction keeps the same inspected **8.7.1** source
+pin and does not add a live compatibility result.
 
 ### Strike execution needs a controlled client context
 

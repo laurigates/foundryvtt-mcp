@@ -410,6 +410,43 @@ describe('Provider execution boundary', () => {
     await expect(provider.connect()).rejects.toMatchObject({ code: 'identity_mismatch' });
   });
 
+  it.each([
+    ['13.350', '14.370', false],
+    ['14.370', '13.350', false],
+    ['14.370', '15.400', false],
+    ['14', '14.370', true],
+    ['14.370', '14', true],
+    ['14.370', '14.371', true],
+    ['unknown', '14.370', true],
+    ['14.370', 'unknown', true],
+    ['unknown', 'unknown', true],
+  ])('checks composite generation identity for core %s and relay %s', async (coreVersion, runtimeVersion, compatible) => {
+    const identity = {
+      world: { id: 'world-a', title: 'A' },
+      system: { id: 'dnd5e', version: 'test' },
+      modules: [], ready: true, origin: 'https://foundry.example',
+    };
+    vi.spyOn(SocketIOProvider.prototype, 'inspect').mockResolvedValue({
+      ...identity, foundryVersion: coreVersion,
+    });
+    vi.spyOn(RestApiProvider.prototype, 'inspect').mockResolvedValue({
+      ...identity, foundryVersion: runtimeVersion,
+    });
+    const provider = new CompositeProvider({
+      kind: 'composite',
+      core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
+      execution: {
+        kind: 'rest-api', relayUrl: 'http://localhost:30001',
+        apiKey: 'test-key', clientId: 'paired-a',
+      },
+    });
+    if (compatible) {
+      await expect(provider.inspect()).resolves.toMatchObject({ foundryVersion: runtimeVersion });
+    } else {
+      await expect(provider.inspect()).rejects.toMatchObject({ code: 'identity_mismatch' });
+    }
+  });
+
   it('discards a native snapshot that arrives after disconnect', async () => {
     const provider = new SocketIOProvider({ kind: 'socketio', baseUrl: 'http://localhost:30000' });
     let response: ((data: unknown) => void) | undefined;

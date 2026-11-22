@@ -1,13 +1,20 @@
 import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorldActor, WorldItem } from '../../foundry/types.js';
+import * as manifests from '../../integrations/manifest.js';
+import {
+  type IntegrationCompatibility,
+  matchesIntegrationCompatibility,
+} from '../../integrations/types.js';
 import { projectActor, projectItem, validateSystemPatch } from '../projections.js';
+import { SocketIOProvider } from '../socketio.js';
 
 const roots: string[] = [];
 const systemId = 'projection-fixture';
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -17,7 +24,11 @@ async function fixtureRoot(): Promise<string> {
   return root;
 }
 
-function manifest(generation?: number, id = systemId): Record<string, unknown> {
+function manifest(
+  generation?: number,
+  id = systemId,
+  compatibility: Partial<IntegrationCompatibility> = {},
+): Record<string, unknown> {
   return {
     schemaVersion: 1,
     protocolVersion: 1,
@@ -29,7 +40,7 @@ function manifest(generation?: number, id = systemId): Record<string, unknown> {
     entrypoint: 'adapter.py',
     status: 'experimental',
     upstream: { repository: null, reference: null, updatedAt: null, verifiedAt: null },
-    compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
+    compatibility: { foundryVersions: [], integrationVersions: [], tested: [], ...compatibility },
     operations: [{
       id: 'read',
       description: 'Read fixture data',
@@ -54,14 +65,26 @@ function descriptor(field: 'old' | 'current', maximum: number) {
 async function fixture(
   root: string,
   generation?: number,
-  { field = generation === 14 ? 'current' : 'old', maximum = generation === 14 ? 10 : 6,
-    id = systemId }: { field?: 'old' | 'current'; maximum?: number; id?: string } = {},
+  {
+    field = generation === 14 ? 'current' : 'old',
+    maximum = generation === 14 ? 10 : 6,
+    id = systemId,
+    compatibility = {},
+  }: {
+    field?: 'old' | 'current';
+    maximum?: number;
+    id?: string;
+    compatibility?: Partial<IntegrationCompatibility>;
+  } = {},
 ): Promise<string> {
   const identity = join(root, 'systems', id);
   const directory = generation === undefined ? identity : join(identity, String(generation));
   await mkdir(directory, { recursive: true });
   await Promise.all([
-    writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest(generation, id))),
+    writeFile(
+      join(directory, 'manifest.json'),
+      JSON.stringify(manifest(generation, id, compatibility)),
+    ),
     writeFile(join(directory, 'actor-projection.json'), JSON.stringify(descriptor(field, maximum))),
     writeFile(join(directory, 'README.md'), 'Projection fixture\n'),
     writeFile(join(directory, 'adapter.py'), 'class Adapter: pass\n'),
@@ -92,32 +115,144 @@ function item(): WorldItem {
   };
 }
 
-function validate(root: string, version: string | undefined, value: number): void {
+function validate(
+  root: string,
+  version: string | undefined,
+  value: number,
+  systemVersion?: string,
+): void {
   const raw = actor();
   validateSystemPatch(
     { 'attributes.resource': value },
-    projectActor(raw, systemId, version, root),
+    projectActor(raw, systemId, version, root, systemVersion),
     raw.system,
     systemId,
     version,
     root,
+    systemVersion,
   );
 }
 
-function expectRaw(root: string, version: string | undefined): void {
+function expectRaw(root: string, version: string | undefined, systemVersion?: string): void {
   const raw = actor();
-  expect(projectActor(raw, systemId, version, root)).toEqual({
+  expect(projectActor(raw, systemId, version, root, systemVersion)).toEqual({
     _id: raw._id, name: raw.name, type: raw.type, img: raw.img, data: raw.system,
   });
   const rawItem = item();
-  expect(projectItem(rawItem, systemId, version, root)).toEqual({
+  expect(projectItem(rawItem, systemId, version, root, systemVersion)).toEqual({
     _id: rawItem._id, name: rawItem.name, type: rawItem.type, data: rawItem.system,
   });
-  expect(() => validate(root, version, 999)).not.toThrow();
-  expect(() => validate(root, version, Number.NaN)).toThrow(/finite scalar/);
+  expect(() => validate(root, version, 999, systemVersion)).not.toThrow();
+  expect(() => validate(root, version, Number.NaN, systemVersion)).toThrow(/finite scalar/);
 }
 
 describe('generation-specific Actor and Item projections', () => {
+  it('shares exact compatibility filters with runtime adapter selection', () => {
+    const compatible = {
+      systems: [systemId], foundryVersions: ['14.370'], integrationVersions: ['1.0'],
+    };
+    const observed = { systemId, foundryVersion: '14.370', integrationVersion: '1.0' };
+    expect(matchesIntegrationCompatibility(compatible, observed)).toBe(true);
+    for (const changed of [
+      { systemId: 'another-system' },
+      { foundryVersion: '14.371' },
+      { foundryVersion: undefined },
+      { integrationVersion: '2.0' },
+      { integrationVersion: undefined },
+    ]) {
+      expect(matchesIntegrationCompatibility(compatible, { ...observed, ...changed })).toBe(false);
+    }
+    expect(
+      matchesIntegrationCompatibility(
+        { foundryVersions: [], integrationVersions: [] },
+        { systemId },
+      ),
+    ).toBe(true);
+    expect(matchesIntegrationCompatibility({ ...compatible, systems: [] }, observed)).toBe(false);
+  });
+
+  it('withholds pinned fields and bounds for a different or missing system version, including cache hits', async () => {
+    const root = await fixtureRoot();
+    await fixture(root, 14, { compatibility: { integrationVersions: ['1.0'] } });
+    for (const systemVersion of ['2.0', undefined, '2.0']) {
+      expectRaw(root, '14.370', systemVersion);
+      expect(projectActor(actor(), systemId, '14.370', root, '1.0').hp?.value).toBe(14);
+      expect(projectItem(item(), systemId, '14.370', root, '1.0').rarity).toBe('rare');
+      expect(() => validate(root, '14.370', 11, '1.0')).toThrow(/between 0 and 10/);
+    }
+  });
+
+  it('rechecks the exact Foundry build after caching a descriptor for that generation', async () => {
+    const root = await fixtureRoot();
+    await fixture(root, 14, { compatibility: { foundryVersions: ['14.370'] } });
+    expect(projectActor(actor(), systemId, '14.370', root).hp?.value).toBe(14);
+    for (const version of ['14.371', '14', '14.370-preview']) {
+      expectRaw(root, version);
+      expect(projectActor(actor(), systemId, '14.370', root).hp?.value).toBe(14);
+    }
+  });
+
+  it('honors a systems filter and missing build identity for flat packages', async () => {
+    const root = await fixtureRoot();
+    const directory = await fixture(root, undefined, {
+      compatibility: { systems: [systemId], foundryVersions: ['14.370'] },
+    });
+    expect(projectActor(actor(), systemId, '14.370', root).hp?.value).toBe(13);
+    expectRaw(root, undefined);
+    await writeFile(
+      join(directory, 'manifest.json'),
+      JSON.stringify(manifest(undefined, systemId, { systems: ['different-system'] })),
+    );
+    expectRaw(root, '14.370');
+  });
+
+  it('uses the observed system version consistently for core actor reads, item reads and patch bounds', async () => {
+    const root = await fixtureRoot();
+    await fixture(root, 14, { compatibility: { integrationVersions: ['1.0'] } });
+    vi.spyOn(manifests, 'defaultPackageRoot').mockReturnValue(root);
+    const provider = new SocketIOProvider({
+      kind: 'socketio', baseUrl: 'https://foundry.example', writeEnabled: true,
+    });
+    const raw = { ...actor(), _id: 'aaaaaaaaaaaaaaaa' };
+    const worldData = {
+      world: { id: 'world', title: 'World' },
+      release: { version: '14.370' },
+      system: { id: systemId, version: '1.0' }, actors: [raw], items: [item()],
+    };
+    Reflect.set(provider, 'worldData', worldData);
+    Reflect.set(provider, 'socket', { connected: true });
+    const dispatch = vi.fn().mockResolvedValue([]);
+    Reflect.set(provider, 'modifyDocument', dispatch);
+
+    expect((await provider.getWorldInfo()).systemVersion).toBe('1.0');
+    expect((await provider.getActor(raw._id)).hp?.value).toBe(14);
+    expect((await provider.searchActors({})).actors[0]?.hp?.value).toBe(14);
+    expect((await provider.searchItems({})).items[0]?.rarity).toBe('rare');
+    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }))
+      .rejects.toThrow(/between 0 and 10/);
+    expect(dispatch).not.toHaveBeenCalled();
+
+    worldData.system.version = '2.0';
+    expect((await provider.getWorldInfo()).systemVersion).toBe('2.0');
+    expect((await provider.getActor(raw._id)).hp).toBeUndefined();
+    expect((await provider.searchActors({})).actors[0]?.hp).toBeUndefined();
+    expect((await provider.searchItems({})).items[0]?.rarity).toBeUndefined();
+    await provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith('Actor', 'update', {
+      updates: [{ _id: raw._id, 'system.attributes.resource': 11 }],
+      diff: true, recursive: true,
+    });
+    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': Number.NaN }))
+      .rejects.toThrow(/finite scalar/);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+
+    worldData.system.version = '1.0';
+    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }))
+      .rejects.toThrow(/between 0 and 10/);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
   it('selects distinct fields and validation bounds for the exact generation', async () => {
     const root = await fixtureRoot();
     await fixture(root, 13);

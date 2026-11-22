@@ -4,7 +4,11 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { FoundryActor, FoundryItem, WorldActor, WorldItem } from '../foundry/types.js';
 import { defaultPackageRoot, IntegrationManifestSchema } from '../integrations/manifest.js';
-import { parseFoundryGeneration } from '../integrations/types.js';
+import {
+  type IntegrationCompatibility,
+  matchesIntegrationCompatibility,
+  parseFoundryGeneration,
+} from '../integrations/types.js';
 import type { AttributePatch } from './types.js';
 
 const BoundSchema = z.object({
@@ -32,12 +36,16 @@ const ProjectionSchema = z.object({
   bounds: z.array(BoundSchema).default([]),
 });
 type Projection = z.infer<typeof ProjectionSchema>;
-const descriptors = new Map<string, { stamp: string; projection: Projection }>();
+const descriptors = new Map<
+  string,
+  { stamp: string; projection: Projection; compatibility: IntegrationCompatibility }
+>();
 
 function descriptor(
   systemId: string,
   foundryVersion: string | undefined,
   packageRoot = defaultPackageRoot(),
+  systemVersion?: string,
 ): Projection | null {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(systemId)) {
     return null;
@@ -92,9 +100,13 @@ function descriptor(
     const stat = statSync(path, { bigint: true });
     const manifestStat = statSync(manifestPath, { bigint: true });
     const stamp = `${stat.ino}:${stat.mtimeNs}:${stat.size}:${manifestStat.ino}:${manifestStat.mtimeNs}:${manifestStat.size}`;
+    const observed = { systemId, foundryVersion, integrationVersion: systemVersion };
     const cached = descriptors.get(path);
     if (cached?.stamp === stamp) {
-      return cached.projection;
+      // The same package may serve targets with different Foundry builds or system versions.
+      return matchesIntegrationCompatibility(cached.compatibility, observed)
+        ? cached.projection
+        : null;
     }
     // A missing or misidentified manifest cannot contribute system-specific fields
     // or validation bounds to a different generation.
@@ -113,8 +125,15 @@ function descriptor(
     ) {
       return null;
     }
+    if (!matchesIntegrationCompatibility(manifest.data.compatibility, observed)) {
+      return null;
+    }
     const parsed = ProjectionSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
-    descriptors.set(path, { stamp, projection: parsed });
+    descriptors.set(path, {
+      stamp,
+      projection: parsed,
+      compatibility: manifest.data.compatibility,
+    });
     return parsed;
   } catch (error) {
     if (
@@ -148,12 +167,13 @@ export function projectActor(
   systemId: string,
   foundryVersion?: string,
   packageRoot?: string,
+  systemVersion?: string,
 ): FoundryActor {
   const actor: FoundryActor = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
   if (raw.img) {
     actor.img = raw.img;
   }
-  const config = descriptor(systemId, foundryVersion, packageRoot);
+  const config = descriptor(systemId, foundryVersion, packageRoot, systemVersion);
   if (!config) {
     return actor;
   }
@@ -211,12 +231,13 @@ export function projectItem(
   systemId: string,
   foundryVersion?: string,
   packageRoot?: string,
+  systemVersion?: string,
 ): FoundryItem {
   const item: FoundryItem = { _id: raw._id, name: raw.name, type: raw.type, data: raw.system };
   if (raw.img) {
     item.img = raw.img;
   }
-  const config = descriptor(systemId, foundryVersion, packageRoot);
+  const config = descriptor(systemId, foundryVersion, packageRoot, systemVersion);
   if (!config) {
     return item;
   }
@@ -238,8 +259,9 @@ export function validateSystemPatch(
   systemId: string,
   foundryVersion?: string,
   packageRoot?: string,
+  systemVersion?: string,
 ): void {
-  const config = descriptor(systemId, foundryVersion, packageRoot);
+  const config = descriptor(systemId, foundryVersion, packageRoot, systemVersion);
   for (const [path, value] of Object.entries(patch)) {
     const parts = path.split('.');
     if (

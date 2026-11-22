@@ -93,7 +93,9 @@
     "docs/guides/providers-and-targets.md",
     "docs/guides/backward-compatibility.md",
     "docs/guides/writing-integrations.md",
+    "docs/guides/development.md",
     "docs/guides/core-system-module-calls.md",
+    "docs/discussions/provider-integration-expansion-draft.md",
     "docs/bridges/",
     "examples/targets.example.json"
   ],

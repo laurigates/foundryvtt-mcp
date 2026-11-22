@@ -321,6 +321,11 @@ export class DocumentProvider implements FoundryProvider {
     return typeof id === 'string' ? id : '';
   }
 
+  protected systemVersion(): string | undefined {
+    const version = this.worldData?.system.version;
+    return typeof version === 'string' && version ? version : undefined;
+  }
+
   protected foundryVersion(): string | undefined {
     const release = this.worldData?.release;
     const version = release?.version;
@@ -894,7 +899,9 @@ export class DocumentProvider implements FoundryProvider {
     const limit = params.limit || 10;
     const actors: FoundryActor[] = results
       .slice(0, limit)
-      .map((actor) => projectActor(actor, this.systemId(), this.foundryVersion()));
+      .map((actor) =>
+        projectActor(actor, this.systemId(), this.foundryVersion(), undefined, this.systemVersion()),
+      );
 
     return { actors, total, page: 1, limit };
   }
@@ -919,7 +926,13 @@ export class DocumentProvider implements FoundryProvider {
       throw new Error(`Actor not found: ${actorId}`);
     }
 
-    return projectActor(actor, this.systemId(), this.foundryVersion());
+    return projectActor(
+      actor,
+      this.systemId(),
+      this.foundryVersion(),
+      undefined,
+      this.systemVersion(),
+    );
   }
 
   /**
@@ -964,7 +977,15 @@ export class DocumentProvider implements FoundryProvider {
     // raw actor for the system document the validator needs.
     const actor = await this.getActor(actorId);
     const rawSystem = systemOf(actor) ?? systemOf(this.getRawActor(actorId));
-    validateSystemPatch(patch, actor, rawSystem, this.systemId(), this.foundryVersion());
+    validateSystemPatch(
+      patch,
+      actor,
+      rawSystem,
+      this.systemId(),
+      this.foundryVersion(),
+      undefined,
+      this.systemVersion(),
+    );
 
     // The patch keys are dot-paths into `actor.system`; prefix each with
     // `system.` for the document update. FoundryVTT accepts dot-notation keys
@@ -1022,7 +1043,9 @@ export class DocumentProvider implements FoundryProvider {
     const limit = params.limit || 10;
     const items = results
       .slice(0, limit)
-      .map((item) => projectItem(item, this.systemId(), this.foundryVersion()));
+      .map((item) =>
+        projectItem(item, this.systemId(), this.foundryVersion(), undefined, this.systemVersion()),
+      );
 
     return { items, total, page: 1, limit };
   }
@@ -1638,7 +1661,7 @@ export class DocumentProvider implements FoundryProvider {
       description: (w.description as string) || '',
       system: (s.id as string) || 'unknown',
       coreVersion: this.foundryVersion() ?? 'unknown',
-      systemVersion: (s.version as string) || 'unknown',
+      systemVersion: this.systemVersion() ?? 'unknown',
       playtime: 0,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
