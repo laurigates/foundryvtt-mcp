@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.1...foundryvtt-mcp-v1.6.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* **actors:** compute ability modifiers and level from dnd5e source data ([#309](https://github.com/laurigates/foundryvtt-mcp/issues/309)) ([8ecbdbc](https://github.com/laurigates/foundryvtt-mcp/commit/8ecbdbced98a70bad5fc560623321f9dbc7d4ba0)), closes [#308](https://github.com/laurigates/foundryvtt-mcp/issues/308)
+
 ## [1.6.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.0...foundryvtt-mcp-v1.6.1) (2026-11-23)
 
 
