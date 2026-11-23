@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.0...foundryvtt-mcp-v1.6.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **auth:** send Origin header on POST /join for Foundry 14.369 ([#306](https://github.com/laurigates/foundryvtt-mcp/issues/306)) ([add53ef](https://github.com/laurigates/foundryvtt-mcp/commit/add53ef6a2373619820900434eff4c561a279b03)), closes [#305](https://github.com/laurigates/foundryvtt-mcp/issues/305)
+
 ## [1.6.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.5.5...foundryvtt-mcp-v1.6.0) (2026-11-22)
 
 
