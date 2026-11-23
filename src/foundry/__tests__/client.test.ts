@@ -1112,6 +1112,152 @@ describe('FoundryClient', () => {
       expect(actor.hp?.max).toBeUndefined();
     });
 
+    describe('dnd5e source data without derived values (#308)', () => {
+      /**
+       * A character as the `world` payload carries it under dnd5e 6.x: source
+       * data only. `details.level`, ability `mod`, `attributes.ac.value` and
+       * `attributes.prof` are computed client-side in `prepareData` and absent.
+       */
+      function sourceCharacter(overrides: Record<string, unknown> = {}) {
+        return {
+          _id: 'actor0000000000c',
+          name: 'Source Paladin',
+          type: 'character',
+          system: {
+            details: { level: null },
+            abilities: {
+              str: { value: 18 },
+              dex: { value: 11 },
+              con: { value: 14 },
+              int: { value: 9 },
+              wis: { value: 10 },
+              cha: { value: 1 },
+            },
+            attributes: {
+              ac: { flat: 16, calc: 'default', formula: '' },
+              hp: { value: 51, max: null, temp: 0 },
+            },
+          },
+          items: [
+            { _id: 'class000000000p1', name: 'Paladin', type: 'class', system: { levels: 7 } },
+            { _id: 'class000000000w1', name: 'Warlock', type: 'class', system: { levels: 3 } },
+            { _id: 'weapon0000000001', name: 'Longsword', type: 'weapon', system: {} },
+          ],
+          ...overrides,
+        };
+      }
+
+      async function mapActor(raw: Record<string, unknown>) {
+        const { client: connected } = await connectWithMockSocket(
+          undefined,
+          structuredClone({ ...WORLD_DATA, actors: [raw] }),
+        );
+        return connected.getActor(String(raw._id));
+      }
+
+      it('computes ability modifiers from the score when mod is absent', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.abilities).toEqual({
+          str: { value: 18, mod: 4 },
+          dex: { value: 11, mod: 0 },
+          con: { value: 14, mod: 2 },
+          int: { value: 9, mod: -1 },
+          wis: { value: 10, mod: 0 },
+          cha: { value: 1, mod: -5 },
+        });
+      });
+
+      it('keeps a source-provided ability mod', async () => {
+        const raw = sourceCharacter();
+        raw.system.abilities.str = { value: 18, mod: 7 } as { value: number };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.abilities?.str).toEqual({ value: 18, mod: 7 });
+      });
+
+      it('sums class levels across multiclass items and derives the proficiency bonus', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.level).toBe(10);
+        expect(actor.attributes).toEqual({ prof: 4 });
+      });
+
+      it('keeps a source-provided details.level and does not compute proficiency', async () => {
+        const raw = sourceCharacter();
+        raw.system.details = { level: 5 } as { level: null };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.level).toBe(5);
+        expect(actor.attributes).toBeUndefined();
+      });
+
+      it('shows a flat AC, which dnd5e uses as-is', async () => {
+        const raw = sourceCharacter();
+        raw.system.attributes.ac = { flat: 17, calc: 'flat', formula: '' };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.ac).toEqual({ value: 17 });
+        expect(actor.derivedUnavailable).not.toContain('ac');
+      });
+
+      it('marks a non-flat AC unavailable instead of using the stored flat value', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.ac).toBeUndefined();
+        expect(actor.derivedUnavailable).toContain('ac');
+      });
+
+      it('marks a null HP maximum unavailable', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.hp).toEqual({ value: 51, temp: 0 });
+        expect(actor.derivedUnavailable).toContain('hpMax');
+      });
+
+      it('leaves derivedUnavailable unset when every displayed value is present', async () => {
+        const raw = sourceCharacter();
+        raw.system.attributes = {
+          ac: { value: 15, flat: null, calc: 'default', formula: '' },
+          hp: { value: 51, max: 79, temp: 0 },
+        } as typeof raw.system.attributes;
+
+        const actor = await mapActor(raw);
+
+        expect(actor.ac).toEqual({ value: 15 });
+        expect(actor.hp?.max).toBe(79);
+        expect(actor.derivedUnavailable).toBeUndefined();
+      });
+
+      it('does not invent a level or proficiency bonus for an NPC', async () => {
+        const npc = {
+          _id: 'actor0000000000n',
+          name: 'Source Ogre',
+          type: 'npc',
+          system: {
+            details: { cr: 2 },
+            abilities: { str: { value: 19 }, int: { value: 5 } },
+            attributes: { hp: { value: 59, max: 59 } },
+          },
+          items: [],
+        };
+
+        const actor = await mapActor(npc);
+
+        expect(actor.level).toBeUndefined();
+        expect(actor.attributes).toBeUndefined();
+        expect(actor.hp).toEqual({ value: 59, max: 59 });
+        expect(actor.abilities).toEqual({
+          str: { value: 19, mod: 4 },
+          int: { value: 5, mod: -3 },
+        });
+        expect(actor.derivedUnavailable).toBeUndefined();
+      });
+    });
+
     it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
       const { io } = await import('socket.io-client');
       await connectWithMockSocket();

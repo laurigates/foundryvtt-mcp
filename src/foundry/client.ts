@@ -11,12 +11,19 @@ import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
 import { evaluateDiceFormula } from './dice-formula.js';
+import {
+  abilityModifier,
+  characterClassLevel,
+  flatArmorClass,
+  proficiencyBonus,
+} from './dnd5e-derived.js';
 import { probeRestModule } from './rest-probe.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
   ActorSearchResult,
   CompendiumSearchResult,
+  DerivedActorField,
   DiceRoll,
   DocumentVisibility,
   FoundryActor,
@@ -1759,9 +1766,11 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
     mappedAbilities = {};
     for (const [key, val] of Object.entries(abilitiesRaw)) {
       if (isRecord(val)) {
+        const value = typeof val.value === 'number' ? val.value : 10;
         const entry: { value: number; mod: number; save?: number } = {
-          value: typeof val.value === 'number' ? val.value : 10,
-          mod: typeof val.mod === 'number' ? val.mod : 0,
+          value,
+          // dnd5e source data has no `mod`; it is exact from the score (#308).
+          mod: typeof val.mod === 'number' ? val.mod : abilityModifier(value),
         };
         if (typeof val.save === 'number') {
           entry.save = val.save;
@@ -1795,12 +1804,36 @@ function worldActorToFoundry(a: WorldActor): FoundryActor {
     actor.hp = hpObj;
   }
 
-  if (ac && typeof ac.value === 'number') {
-    actor.ac = { value: ac.value };
+  const derivedUnavailable: DerivedActorField[] = [];
+
+  if (hp && typeof hp.max !== 'number') {
+    derivedUnavailable.push('hpMax');
+  }
+
+  if (ac) {
+    const acValue = typeof ac.value === 'number' ? ac.value : flatArmorClass(ac);
+    if (acValue === undefined) {
+      derivedUnavailable.push('ac');
+    } else {
+      actor.ac = { value: acValue };
+    }
   }
 
   if (typeof details.level === 'number') {
     actor.level = details.level;
+  } else if (a.type === 'character') {
+    // dnd5e source data has no `details.level`; it is the class-item sum (#308).
+    const level = characterClassLevel(a.items);
+    if (level !== undefined) {
+      actor.level = level;
+      const attributes = isRecord(sys.attributes) ? sys.attributes : {};
+      const prof = typeof attributes.prof === 'number' ? attributes.prof : proficiencyBonus(level);
+      actor.attributes = { prof };
+    }
+  }
+
+  if (derivedUnavailable.length > 0) {
+    actor.derivedUnavailable = derivedUnavailable;
   }
 
   if (mappedAbilities) {

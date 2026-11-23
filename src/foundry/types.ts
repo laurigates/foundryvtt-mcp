@@ -71,7 +71,17 @@ export interface FoundryActor {
   currency?: Record<string, number>;
   biography?: string;
   notes?: string;
+  /**
+   * Displayed values the game system computes client-side (dnd5e
+   * `prepareData`) that the source data did not carry, so no exact value
+   * exists. Set only by the Socket.IO mapper; handlers print a label for
+   * these instead of `Unknown` (#308).
+   */
+  derivedUnavailable?: DerivedActorField[];
 }
+
+/** A displayed {@link FoundryActor} value that can be derived-and-absent. */
+export type DerivedActorField = 'ac' | 'hpMax';
 
 /**
  * Represents an item (weapon, armor, spell, etc.) in FoundryVTT
