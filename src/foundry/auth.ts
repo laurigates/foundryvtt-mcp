@@ -62,6 +62,9 @@ export function socketOrigin(baseUrl: string): string {
  */
 async function getSessionCookie(baseUrl: string): Promise<string> {
   const res = await axios.get(`${baseUrl}/join`, {
+    // Matches the POST /join (#305); harmless here, and keeps both requests
+    // looking like the same browser-origin login flow.
+    headers: { Origin: socketOrigin(baseUrl) },
     // Accept 200 (join page) and 302 (redirect after cookie set)
     validateStatus: (status) => status === 200 || status === 302,
     maxRedirects: 0,
@@ -210,12 +213,19 @@ export async function authenticateFoundry(
       headers: {
         'Content-Type': 'application/json',
         Cookie: `session=${session}`,
+        // FoundryVTT 14.369 answers a POST /join without an Origin header with
+        // HTTP 400 {"error":"The request could not be processed."} (#305).
+        // Origin is scheme + host + port only, so a routePrefix in baseUrl
+        // must not be included.
+        Origin: socketOrigin(baseUrl),
       },
-      // Accept 200 (success JSON), 302 (redirect to /game on success) and 401
-      // (bad password). 401 carries FoundryVTT's own explanation in the body;
-      // letting axios throw on it would surface a bare
-      // "Request failed with status code 401" instead (#206).
-      validateStatus: (status) => status === 200 || status === 302 || status === 401,
+      // Accept 200 (success JSON), 302 (redirect to /game on success), 400
+      // (request rejected, e.g. the #305 origin check) and 401 (bad password).
+      // 400 and 401 carry FoundryVTT's own explanation in the body; letting
+      // axios throw on them would surface a bare
+      // "Request failed with status code 4xx" instead (#206, #305).
+      validateStatus: (status) =>
+        status === 200 || status === 302 || status === 400 || status === 401,
     },
   );
 
