@@ -160,6 +160,31 @@ describe('Config', () => {
 
       expect(() => config.cache).toThrow(/CACHE_MAX_SIZE must be an integer of at least 1/);
     });
+
+    // parseInt stops at the first non-digit, so these used to load as 5 and 1 (#293).
+    it.each(
+      [
+        'FOUNDRY_TIMEOUT',
+        'FOUNDRY_RETRY_ATTEMPTS',
+        'FOUNDRY_RETRY_DELAY',
+        'CACHE_TTL_SECONDS',
+        'CACHE_MAX_SIZE',
+      ].flatMap((name) => [
+        [name, '5abc'],
+        [name, '1.9'],
+      ]),
+    )('should reject %s set to %s', async (name, value) => {
+      process.env = {
+        FOUNDRY_URL: 'http://localhost:30000',
+        NODE_ENV: 'test',
+        [name]: value,
+      };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+
+      expect(() => config.foundry).toThrow(new RegExp(`${name} must be an integer`));
+    });
   });
 
   describe('type conversion', () => {
