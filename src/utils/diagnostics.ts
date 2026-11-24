@@ -7,6 +7,7 @@
 
 import { config } from '../config/index.js';
 import { type FoundryClient, probeRestModule } from '../foundry/client.js';
+import { RestKeyRejectedError } from '../foundry/rest-probe.js';
 import { logger } from './logger.js';
 
 /**
@@ -90,6 +91,11 @@ export class DiagnosticSystem {
       return await this.createFeatureSpecificDiagnostic(feature);
     } catch (error) {
       logger.error('Error during diagnosis:', error);
+      // testConnection() throws on a rejected FOUNDRY_API_KEY (#288); that is
+      // an authentication failure, not an unexpected error (#301).
+      if (error instanceof RestKeyRejectedError) {
+        return this.createAuthenticationDiagnostic({ valid: false, error: error.message });
+      }
       return this.createGenericErrorDiagnostic(error);
     }
   }
@@ -250,14 +256,17 @@ export class DiagnosticSystem {
   /**
    * Create diagnostic for authentication issues
    */
-  private createAuthenticationDiagnostic(_authResult: {
+  private createAuthenticationDiagnostic(authResult: {
     valid: boolean;
     error?: string;
   }): DiagnosticResult {
     const isApiKey = !!config.foundry.apiKey;
+    const method = isApiKey ? 'API key' : 'username/password';
 
     return {
-      explanation: `Authentication failed using ${isApiKey ? 'API key' : 'username/password'}.`,
+      explanation: authResult.error
+        ? `Authentication failed using ${method}: ${authResult.error}`
+        : `Authentication failed using ${method}.`,
       suggestions: isApiKey
         ? "• **Check API key** - Verify the key is correct and hasn't expired\n" +
           '• **Regenerate key** - Generate a new API key in FoundryVTT module settings\n' +
