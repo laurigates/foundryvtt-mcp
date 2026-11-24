@@ -50,6 +50,7 @@ import type {
   WorldCombat,
   WorldData,
   WorldEffect,
+  WorldItem,
   WorldJournal,
   WorldMessage,
   WorldScene,
@@ -1122,32 +1123,7 @@ export class FoundryClient {
 
     const total = results.length;
     const limit = params.limit || 10;
-    const items = results.slice(0, limit).map((i) => {
-      const item: {
-        _id: string;
-        name: string;
-        type: string;
-        img?: string;
-        description?: string;
-        rarity?: string;
-      } = {
-        _id: i._id,
-        name: i.name,
-        type: i.type,
-      };
-      if (i.img) {
-        item.img = i.img;
-      }
-      const desc = extractString(i.system, 'description', 'value');
-      if (desc) {
-        item.description = desc;
-      }
-      const rar = extractString(i.system, 'rarity');
-      if (rar) {
-        item.rarity = rar;
-      }
-      return item;
-    });
+    const items = results.slice(0, limit).map(worldItemToFoundry);
 
     return { items, total, page: 1, limit };
   }
@@ -1710,21 +1686,7 @@ export class FoundryClient {
       };
     }
 
-    const w = this.worldData.world as Record<string, unknown>;
-    const s = this.worldData.system as Record<string, unknown>;
-    const r = this.worldData.release as Record<string, unknown>;
-
-    return {
-      id: (w.id as string) || 'unknown',
-      title: (w.title as string) || 'Unknown World',
-      description: (w.description as string) || '',
-      system: (s.id as string) || 'unknown',
-      coreVersion: (r.version as string) || (r.generation as string) || 'unknown',
-      systemVersion: (s.version as string) || 'unknown',
-      playtime: 0,
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-    };
+    return worldInfoToFoundry(this.worldData);
   }
 
   // ==========================================================================
@@ -2088,9 +2050,52 @@ export class FoundryClient {
 
 // ============================================================================
 // Mapping helpers — WorldData raw documents → display interfaces
+//
+// Exported for the transport parity tests (parity-contract.test.ts), which run
+// the same dnd5e scenario through these and through rest-mappers.ts.
 // ============================================================================
 
-function worldActorToFoundry(a: WorldActor): FoundryActor {
+/** A Socket.IO world (or actor-owned) item → {@link FoundryItem}. */
+export function worldItemToFoundry(i: WorldItem): FoundryItem {
+  const item: FoundryItem = {
+    _id: i._id,
+    name: i.name,
+    type: i.type,
+  };
+  if (i.img) {
+    item.img = i.img;
+  }
+  const desc = extractString(i.system, 'description', 'value');
+  if (desc) {
+    item.description = desc;
+  }
+  const rar = extractString(i.system, 'rarity');
+  if (rar) {
+    item.rarity = rar;
+  }
+  return item;
+}
+
+/** The Socket.IO world snapshot's world, system and release data → {@link FoundryWorld}. */
+export function worldInfoToFoundry(worldData: WorldData): FoundryWorld {
+  const w = worldData.world as Record<string, unknown>;
+  const s = worldData.system as Record<string, unknown>;
+  const r = worldData.release as Record<string, unknown>;
+
+  return {
+    id: (w.id as string) || 'unknown',
+    title: (w.title as string) || 'Unknown World',
+    description: (w.description as string) || '',
+    system: (s.id as string) || 'unknown',
+    coreVersion: (r.version as string) || (r.generation as string) || 'unknown',
+    systemVersion: (s.version as string) || 'unknown',
+    playtime: 0,
+    created: new Date().toISOString(),
+    modified: new Date().toISOString(),
+  };
+}
+
+export function worldActorToFoundry(a: WorldActor): FoundryActor {
   const sys = a.system || {};
   const hpRaw = extractNested(sys, 'attributes', 'hp');
   const hp = isRecord(hpRaw) ? hpRaw : undefined;
@@ -2343,7 +2348,7 @@ function validateAttributePatch(
  * stays as Socket.IO reported it. A value the bridge reports as absent leaves
  * the Socket.IO value (or its "not available" label) in place.
  */
-function overlayDerivedValues(base: FoundryActor, prepared: FoundryActor): FoundryActor {
+export function overlayDerivedValues(base: FoundryActor, prepared: FoundryActor): FoundryActor {
   const actor: FoundryActor = { ...base };
   let unavailable = base.derivedUnavailable ?? [];
 
