@@ -13,8 +13,10 @@
  *   number, `abilities.*.modifier`).
  * - Diagnostics routes wrap it as `{ success: true, data: { logs, total, ... } }`
  *   on `feat/v14-port`; the module's `main` answers them unwrapped, so
- *   {@link unwrapOptionalEnvelope} accepts both. Their errors are HTTP 4xx/5xx
- *   with `{ error }` and no `success` field.
+ *   {@link unwrapOptionalEnvelope} accepts both. Through the bridge, their
+ *   errors arrive like every other route's: HTTP 4xx/5xx with
+ *   `{ success: false, error, message }` (a module failure the bridge cannot
+ *   classify is 500 "Failed to communicate with FoundryVTT server").
  *
  * Every body is validated with Zod; a shape that does not match is rejected
  * with {@link RestShapeError} naming the route, rather than read as missing
