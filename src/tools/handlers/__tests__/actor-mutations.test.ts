@@ -137,19 +137,28 @@ describe('Actor mutation handlers', () => {
       connected?: boolean;
       actor?: Record<string, unknown>;
       rawActor?: Record<string, unknown>;
+      // Seeds the socket world cache instead of mocking getActor/getRawActor,
+      // so the real worldActorToFoundry mapping feeds the validator.
+      worldActor?: Record<string, unknown>;
     }) => {
       const client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
         writeEnabled: opts.writeEnabled ?? true,
       });
-      if (opts.actor) {
-        vi.spyOn(client, 'getActor').mockResolvedValue(
-          opts.actor as unknown as Awaited<ReturnType<FoundryClient['getActor']>>,
+      if (opts.worldActor) {
+        (client as unknown as { worldData: { actors: unknown[] } }).worldData = {
+          actors: [opts.worldActor],
+        };
+      } else {
+        if (opts.actor) {
+          vi.spyOn(client, 'getActor').mockResolvedValue(
+            opts.actor as unknown as Awaited<ReturnType<FoundryClient['getActor']>>,
+          );
+        }
+        vi.spyOn(client, 'getRawActor').mockReturnValue(
+          opts.rawActor as unknown as ReturnType<FoundryClient['getRawActor']>,
         );
       }
-      vi.spyOn(client, 'getRawActor').mockReturnValue(
-        opts.rawActor as unknown as ReturnType<FoundryClient['getRawActor']>,
-      );
       // Install a mock Socket.IO socket. The modifyDocument ack echoes the
       // update object back as the server's `result`, mirroring FoundryVTT.
       const emit = vi.fn(((_event, payload, cb) => {
@@ -234,6 +243,37 @@ describe('Actor mutation handlers', () => {
       await expect(
         client.updateActorAttribute(VALID_ID, { 'attributes.hp.value': 25 }),
       ).rejects.toThrow(/exceeds max \+ temp/);
+    });
+
+    // Socket mode through the real world-cache mapping (#300). A stored
+    // hp.max of null used to map to 0, so any HP above temp was rejected with
+    // "exceeds max + temp (0 + …)". The limit applies only when max is numeric.
+    it('accepts HP above temp when the stored hp.max is null (socket world cache)', async () => {
+      const client = buildClient({
+        worldActor: {
+          _id: VALID_ID,
+          name: 'Hero',
+          type: 'character',
+          system: { attributes: { hp: { value: 10, max: null, temp: 0 } } },
+        },
+      });
+      const result = await client.updateActorAttribute(VALID_ID, { 'attributes.hp.value': 25 });
+      expect(result.success).toBe(true);
+      expect(result.updatedAttributes['attributes.hp.value']).toBe(25);
+    });
+
+    it('rejects HP above max + temp when hp.max is numeric (socket world cache)', async () => {
+      const client = buildClient({
+        worldActor: {
+          _id: VALID_ID,
+          name: 'Hero',
+          type: 'character',
+          system: { attributes: { hp: { value: 10, max: 20, temp: 3 } } },
+        },
+      });
+      await expect(
+        client.updateActorAttribute(VALID_ID, { 'attributes.hp.value': 24 }),
+      ).rejects.toThrow('Invalid HP value 24: exceeds max + temp (20 + 3 = 23)');
     });
 
     it('rejects a spell slot above its max', async () => {
