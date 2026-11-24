@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.6.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.2...foundryvtt-mcp-v1.6.3) (2026-11-24)
+
+
+### Bug Fixes
+
+* **combat:** keep AC 0 when initializing combatants ([#320](https://github.com/laurigates/foundryvtt-mcp/issues/320)) ([78ab744](https://github.com/laurigates/foundryvtt-mcp/commit/78ab744fc526a52fed5ec730fdc180175d1c4a70)), closes [#292](https://github.com/laurigates/foundryvtt-mcp/issues/292)
+* **config:** reject numeric env vars with trailing junk or decimals ([#314](https://github.com/laurigates/foundryvtt-mcp/issues/314)) ([4f1e1e1](https://github.com/laurigates/foundryvtt-mcp/commit/4f1e1e17ca0a450a8542420a017530e8d1fb857d)), closes [#293](https://github.com/laurigates/foundryvtt-mcp/issues/293)
+* **diagnostics:** report a rejected FOUNDRY_API_KEY as an authentication failure ([#316](https://github.com/laurigates/foundryvtt-mcp/issues/316)) ([9e1a5b0](https://github.com/laurigates/foundryvtt-mcp/commit/9e1a5b0240f39bf2a99b4bfd687ed2285600e3c8)), closes [#301](https://github.com/laurigates/foundryvtt-mcp/issues/301)
+* **search:** treat header/footer/nav/aside/main as block tags in search_world ([#313](https://github.com/laurigates/foundryvtt-mcp/issues/313)) ([4ba8d30](https://github.com/laurigates/foundryvtt-mcp/commit/4ba8d3029b4b660719d3732ff97199c189cf92e1)), closes [#302](https://github.com/laurigates/foundryvtt-mcp/issues/302)
+* **socket:** handle the v14 side-effect ack and modifyDocumentBatch broadcast ([#326](https://github.com/laurigates/foundryvtt-mcp/issues/326)) ([81452f9](https://github.com/laurigates/foundryvtt-mcp/commit/81452f992f4edd450f9c1566ab3f6f9defc31a4d)), closes [#232](https://github.com/laurigates/foundryvtt-mcp/issues/232)
+
 ## [1.6.2](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.1...foundryvtt-mcp-v1.6.2) (2026-11-23)
 
 
