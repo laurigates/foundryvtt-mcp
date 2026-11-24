@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.3...foundryvtt-mcp-v1.7.0) (2026-11-24)
+
+
+### Features
+
+* **transport:** dual mode, Socket.IO primary with optional REST bridge augment ([#330](https://github.com/laurigates/foundryvtt-mcp/issues/330)) ([72c0208](https://github.com/laurigates/foundryvtt-mcp/commit/72c0208d8e16236f4e988d97cce3394a4c083e77))
+
 ## [1.6.3](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.2...foundryvtt-mcp-v1.6.3) (2026-11-24)
 
 
