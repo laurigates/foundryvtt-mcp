@@ -12,6 +12,8 @@ The project needed a consistent, automated release process to:
 - Create GitHub releases with release notes
 - Support multiple packages in the repository (MCP server + REST API module)
 
+> **Note (2026-11-24):** the REST API module left this repository in #84 (2025-08-21) and now lives at [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api), with its own release process. release-please here releases only the MCP server.
+
 ## Decision
 
 Use [release-please](https://github.com/googleapis/release-please) via a GitHub Actions workflow with a manifest-based configuration (`release-please-config.json` + `.release-please-manifest.json`).

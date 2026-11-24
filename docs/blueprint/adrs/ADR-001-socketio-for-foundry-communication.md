@@ -3,9 +3,12 @@ id: ADR-001
 title: Socket.IO for FoundryVTT Communication
 status: accepted
 created: 2026-03-03
+amended-by: ADR-011
 ---
 
 # ADR-001: Socket.IO for FoundryVTT Communication
+
+> **Amended by [ADR-011](../../adrs/0011-dual-mode-transport.md) (2026-11-24):** the "no custom module required" choice stands for core features. Prepared (derived) dnd5e values, compendium search, logs and system health need the optional REST bridge augment (laurigates/foundryvtt-local-rest-api). The body below is unchanged.
 
 ## Context
 
