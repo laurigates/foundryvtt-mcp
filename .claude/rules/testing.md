@@ -26,7 +26,11 @@ local/CI parity.
   `.env.integration` does nothing, because compose interpolation never reads
   an `env_file:` entry and the `environment:` block overrides it regardless.
 - `tests/integration/global-setup.ts` only **waits** for the container at
-  `:30001` — it does **not** start it.
+  `:30001` — it does **not** start it. It belongs to the `live` project in
+  `vitest.integration.config.ts`; the `parity` project
+  (`parity.integration.test.ts`, against the harness on `:30000`) has no global
+  setup and skips itself unless its environment is complete, so running that
+  file alone never waits for the container.
 - **Running it:** needs (a) `.env.integration` (copy from
   `.env.integration.example` — the file is gitignored and ships only as the
   `.example`) holding a real `FOUNDRY_LICENSE_KEY` and your real foundryvtt.com

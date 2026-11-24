@@ -16,11 +16,11 @@
  * 127.0.0.1 or [::1]), so it never logs in to a remote server.
  *
  * It only reads: one Socket.IO login (dual mode) and REST GETs, no writes.
- * FOUNDRY_URL reaches this file through global-setup.ts (`shellFoundryUrl`),
- * because vitest.integration.config.ts overrides it in the worker env.
+ * vitest.integration.config.ts runs it as its own `parity` project, which keeps
+ * the shell's FOUNDRY_URL and skips the container wait in global-setup.ts.
  */
 
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FoundryClient, worldActorToFoundry, worldInfoToFoundry } from '../../src/foundry/client.js';
 import {
   compareParity,
@@ -49,7 +49,7 @@ function isLocal(url: string | undefined): boolean {
 }
 
 const env = process.env;
-const foundryUrl = inject('shellFoundryUrl') || undefined;
+const foundryUrl = env.FOUNDRY_URL || undefined;
 const missing = [
   ...(isLocal(foundryUrl) ? [] : ['FOUNDRY_URL (a local URL)']),
   ...(env.FOUNDRY_USERNAME || env.FOUNDRY_USER_ID ? [] : ['FOUNDRY_USERNAME or FOUNDRY_USER_ID']),
