@@ -7,8 +7,9 @@
  * the module's route handler passed to `res.json()` (`bridge-server/lib/
  * socket-client.js` `handleApiResponse`, `scripts/socket-handler.js`
  * `createSuccessResponse`). The document routes wrap their payload as
- * `{ success, data, ... }` (`scripts/routes/{actors,items,scenes,world,dice}.js`);
- * the diagnostics routes do not (`scripts/routes/diagnostics.js`).
+ * `{ success, data, ... }` (`scripts/routes/{actors,items,scenes,world,dice}.js`),
+ * and so do `scripts/routes/compendium.js` and `scripts/routes/diagnostics.js`.
+ * The module's `main` still answers the diagnostics routes unwrapped.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -195,14 +196,15 @@ describe('unwrapRestEnvelope', () => {
   });
 });
 
-describe('unwrapOptionalEnvelope (diagnostics routes answer unwrapped)', () => {
-  it('passes a raw diagnostics body through', () => {
+describe('unwrapOptionalEnvelope (diagnostics: wrapped on feat/v14-port, unwrapped on main)', () => {
+  it('passes a raw diagnostics body (module main) through', () => {
     const raw = { logs: [], total: 0, bufferSize: 0, maxBufferSize: 1000 };
     expect(unwrapOptionalEnvelope(raw, '/api/diagnostics/logs')).toBe(raw);
   });
 
-  it('unwraps an envelope if the module ever adds one', () => {
-    expect(unwrapOptionalEnvelope(ok({ logs: [] }), '/api/diagnostics/logs')).toEqual({ logs: [] });
+  it('unwraps the feat/v14-port envelope (`DiagnosticsAPI.getRecentLogs`)', () => {
+    const data = { logs: [], total: 0, bufferSize: 0, maxBufferSize: 1000 };
+    expect(unwrapOptionalEnvelope(ok(data), '/api/diagnostics/logs')).toEqual(data);
   });
 
   it('raises the module error for success: false', () => {
@@ -439,6 +441,24 @@ describe('mapRestCompendiumSearch', () => {
   it('ends paging on the last page', () => {
     const result = mapRestCompendiumSearch(ok([entry], { total: 1 }), { limit: 20, offset: 0 });
     expect(result.nextCursor).toBeNull();
+  });
+
+  it('maps a full `formatCompendiumEntry` entry, dropping source.book', () => {
+    const full = {
+      compendiumId: 'dnd5e.spells',
+      itemId: 'spellbbbbbbbbbbb',
+      name: 'Shield',
+      type: 'spell',
+      img: 'icons/magic/defensive/shield-barrier-blue.webp',
+      system: { level: 1, school: 'abj', source: { rules: '2014', book: 'PHB' } },
+    };
+    const result = mapRestCompendiumSearch(ok([full], { total: 1, query: { query: 'shield' } }), {
+      limit: 20,
+      offset: 0,
+    });
+    expect(result.results).toEqual([
+      { ...full, system: { level: 1, school: 'abj', source: { rules: '2014' } } },
+    ]);
   });
 
   it('rejects an entry without a compendium id', () => {

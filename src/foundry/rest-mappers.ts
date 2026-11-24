@@ -7,10 +7,14 @@
  * route handler produced:
  *
  * - Document routes (`/api/actors`, `/api/items`, `/api/scenes`, `/api/world`,
- *   `/api/dice/roll`) wrap it as `{ success: true, data, ... }`, or
- *   `{ success: false, error, message }`, and use the module's own field
- *   names (`id`, `hp.current`, `ac` as a number, `abilities.*.modifier`).
- * - Diagnostics routes answer unwrapped (`{ logs, total, ... }`).
+ *   `/api/dice/roll`) and `/api/compendium/search` wrap it as
+ *   `{ success: true, data, ... }`, or `{ success: false, error, message }`,
+ *   and use the module's own field names (`id`, `hp.current`, `ac` as a
+ *   number, `abilities.*.modifier`).
+ * - Diagnostics routes wrap it as `{ success: true, data: { logs, total, ... } }`
+ *   on `feat/v14-port`; the module's `main` answers them unwrapped, so
+ *   {@link unwrapOptionalEnvelope} accepts both. Their errors are HTTP 4xx/5xx
+ *   with `{ error }` and no `success` field.
  *
  * Every body is validated with Zod; a shape that does not match is rejected
  * with {@link RestShapeError} naming the route, rather than read as missing
@@ -113,9 +117,9 @@ export function unwrapRestEnvelope(body: unknown, route: string): unknown {
 }
 
 /**
- * For routes the module answers unwrapped (diagnostics): unwraps an envelope
- * when one is present, and passes any other body through for the caller's own
- * schema to validate.
+ * For the diagnostics routes, which the module's `main` answers unwrapped and
+ * `feat/v14-port` wraps: unwraps an envelope when one is present, and passes
+ * any other body through for the caller's own schema to validate.
  */
 export function unwrapOptionalEnvelope(body: unknown, route: string): unknown {
   if (isRecord(body) && typeof body.success === 'boolean') {
@@ -430,8 +434,12 @@ function toCompendiumEntry(rest: z.infer<typeof RestCompendiumEntrySchema>): Com
 /**
  * `GET /api/compendium/search` → {@link CompendiumSearchResult}.
  *
- * The module has no compendium route yet; this assumes the same convention
- * as its other search routes (`data` is the entry array, `total` beside it).
+ * The module (`scripts/routes/compendium.js`, `CompendiumAPI.searchCompendium`)
+ * answers `{ success, data, total, query }`: `data` is the page at `offset`,
+ * `total` counts every match. Each entry comes from `formatCompendiumEntry`:
+ * `{ compendiumId, itemId, name, type, img?, system?: { level?, school?,
+ * source?: { rules?, book?, custom? } } }`, absent fields omitted rather than
+ * null. `source.book` is accepted and not carried over.
  */
 export function mapRestCompendiumSearch(
   body: unknown,
