@@ -18,10 +18,16 @@
  * It only reads: one Socket.IO login (dual mode) and REST GETs, no writes.
  * vitest.integration.config.ts runs it as its own `parity` project, which keeps
  * the shell's FOUNDRY_URL and skips the container wait in global-setup.ts.
+ *
+ * client.js is imported in beforeAll, not at the top: importing it loads the
+ * logger, which validates the server config and throws when FOUNDRY_URL is
+ * unset. A static import would fail the file at collection time, before
+ * describe.skipIf could skip it, whenever the parity environment is absent
+ * (plain `bun run test:integration`, as CI runs it).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { FoundryClient, worldActorToFoundry, worldInfoToFoundry } from '../../src/foundry/client.js';
+import type { FoundryClient } from '../../src/foundry/client.js';
 import {
   compareParity,
   gapDrift,
@@ -69,7 +75,14 @@ describe.skipIf(missing.length > 0)(title, () => {
   const compared: Array<{ id: string; socket: FoundryActor; rest: FoundryActor; dual: FoundryActor }> =
     [];
 
+  /** Assigned in beforeAll with the lazily imported client module (see the header). */
+  let worldActorToFoundry: typeof import('../../src/foundry/client.js').worldActorToFoundry;
+  let worldInfoToFoundry: typeof import('../../src/foundry/client.js').worldInfoToFoundry;
+
   beforeAll(async () => {
+    const client = await import('../../src/foundry/client.js');
+    const { FoundryClient } = client;
+    ({ worldActorToFoundry, worldInfoToFoundry } = client);
     const timeout = 15000;
     dual = new FoundryClient({
       baseUrl: foundryUrl as string,
