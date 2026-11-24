@@ -29,11 +29,15 @@ export class RestKeyRejectedError extends Error {
 }
 
 /**
- * Shape the REST module's `/api/world` must answer with: a JSON object. Rejects
- * the HTML page, string, array or null that a server without the module (or a
- * proxy in front of it) can return with a 200. Extra fields pass through.
+ * What the module's `/api/world` must answer with: its `{ success: true, data }`
+ * envelope around the world object (`WorldAPI.getWorldInfo`). A bare JSON
+ * object is not enough (#310): any JSON server returns one, and the MCP used
+ * to read that as "connected" and then every field as missing.
  */
-const RestWorldProbeSchema = z.looseObject({});
+const RestWorldProbeSchema = z.looseObject({
+  success: z.literal(true),
+  data: z.looseObject({}),
+});
 
 /**
  * Proves the REST module is installed and accepts `FOUNDRY_API_KEY` (#230).
@@ -41,13 +45,14 @@ const RestWorldProbeSchema = z.looseObject({});
  * `/api/status` cannot do this: Foundry core serves it unauthenticated, so a
  * 200 there says nothing about the module or the key. `/api/world` is a module
  * route that requires the key, and the body is validated rather than trusting
- * any 2xx. Shared by `FoundryClient.connect()`, the diagnostics probe and the
+ * any 2xx: it must be the module's `{ success: true, data: {...} }` envelope. Shared by `FoundryClient.connect()`, the diagnostics probe and the
  * `scripts/` setup wizard and API diagnostics (#255).
  *
  * @param get - performs the GET (with the `x-api-key` header applied)
- * @returns the validated `/api/world` body
- * @throws Error naming the key on HTTP 401/403, or the missing module on any
- *   other HTTP status or a non-object body. A transport failure (no HTTP
+ * @returns the world object from the envelope's `data`
+ * @throws Error naming the key on HTTP 401/403, the missing module on any
+ *   other HTTP status or a non-object body, or an incompatible server for a
+ *   JSON object without the envelope. A transport failure (no HTTP
  *   response) is rethrown unchanged so "server unreachable" stays visible.
  */
 export async function probeRestModule(
@@ -75,9 +80,17 @@ export async function probeRestModule(
     throw error;
   }
 
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    const got = data === null ? 'null' : Array.isArray(data) ? 'array' : typeof data;
+    throw new Error(`${notJson}: got ${got} body`);
+  }
   const parsed = RestWorldProbeSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error(`${notJson}: got ${data === null ? 'null' : typeof data} body`);
+    throw new Error(
+      "FOUNDRY_API_KEY is set but /api/world did not answer with the REST module's " +
+        '{success: true, data} envelope (another server, an incompatible module version, ' +
+        'or the module reported a failure)',
+    );
   }
-  return parsed.data;
+  return parsed.data.data;
 }

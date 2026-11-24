@@ -8,7 +8,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { LogEntry } from '../../diagnostics/types.js';
 import { LogEntrySchema } from '../../diagnostics/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { ConnectionReport, FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { withToolError } from './utils.js';
 
@@ -353,6 +353,42 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
  * connection line legitimately reads "✅ Connected" while the cache is still
  * missing every broadcast the outage swallowed.
  */
+const TRANSPORT_LABELS: Readonly<Record<ConnectionReport['mode'], string>> = {
+  socket: 'Socket.IO',
+  dual: 'Socket.IO + REST bridge (dual)',
+  rest: 'REST only (deprecated)',
+};
+
+/**
+ * The two connection lines of `get_health_status`. The report is read after
+ * the world and system-health requests, so the REST line reflects them.
+ */
+function formatConnectionReport(report: ConnectionReport): string {
+  const socket = !report.socket.used
+    ? 'not used'
+    : report.socket.connected
+      ? '✅ Connected'
+      : '❌ Disconnected';
+
+  let rest = 'not configured';
+  if (report.rest.configured) {
+    const where = report.rest.baseUrl ? ` (${report.rest.baseUrl})` : '';
+    if (report.rest.reachable === true) {
+      rest = `✅ Reachable${where}`;
+    } else if (report.rest.reachable === false) {
+      rest = `❌ Unreachable: ${report.rest.lastError ?? 'last request failed'}`;
+    } else {
+      rest = `⏳ Not checked yet${where}`;
+    }
+  }
+
+  return [
+    `**Transport:** ${TRANSPORT_LABELS[report.mode]}`,
+    `**Socket.IO:** ${socket}`,
+    `**REST bridge:** ${rest}`,
+  ].join('\n');
+}
+
 export async function handleGetHealthStatus(
   _args: Record<string, unknown>,
   foundryClient: FoundryClient,
@@ -403,6 +439,7 @@ export async function handleGetHealthStatus(
 
 **FoundryVTT Connection:**
 ${foundryClient.isConnected() ? '✅ Connected' : '❌ Disconnected'}
+${formatConnectionReport(foundryClient.getConnectionReport())}
 
 **World Information:**
 ${worldLines.join('\n')}

@@ -10,6 +10,7 @@
 
 import type { z } from 'zod';
 import type { FoundryClient } from '../foundry/client.js';
+import { unwrapOptionalEnvelope } from '../foundry/rest-mappers.js';
 import { logger } from '../utils/logger.js';
 import type { LogPatternSearchParams, LogSearchParams } from './types.js';
 import {
@@ -104,8 +105,10 @@ export class DiagnosticsClient {
       const queryString = searchParams.toString();
       const url = `/api/diagnostics/logs${queryString ? `?${queryString}` : ''}`;
 
-      const response = await this.foundryClient.get(url);
-      const parsed = LogResponseSchema.parse(response.data);
+      const response = await this.foundryClient.restGet(url);
+      const parsed = LogResponseSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/logs'),
+      );
 
       logger.debug('DiagnosticsClient | Retrieved logs', {
         count: parsed.total,
@@ -166,8 +169,10 @@ export class DiagnosticsClient {
       }
 
       const url = `/api/diagnostics/search?${searchParams.toString()}`;
-      const response = await this.foundryClient.get(url);
-      const parsed = LogSearchResponseSchema.parse(response.data);
+      const response = await this.foundryClient.restGet(url);
+      const parsed = LogSearchResponseSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/search'),
+      );
 
       logger.debug('DiagnosticsClient | Search completed', {
         pattern: params.pattern,
@@ -205,8 +210,10 @@ export class DiagnosticsClient {
     try {
       logger.debug('DiagnosticsClient | Getting system health');
 
-      const response = await this.foundryClient.get('/api/diagnostics/health');
-      const parsed = SystemHealthSchema.parse(response.data);
+      const response = await this.foundryClient.restGet('/api/diagnostics/health');
+      const parsed = SystemHealthSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/health'),
+      );
 
       logger.debug('DiagnosticsClient | System health retrieved', {
         status: parsed.status,
@@ -254,8 +261,10 @@ export class DiagnosticsClient {
       searchParams.set('timeframe', timeframe.toString());
 
       const url = `/api/diagnostics/errors?${searchParams.toString()}`;
-      const response = await this.foundryClient.get(url);
-      const parsed = ErrorDiagnosisSchema.parse(response.data);
+      const response = await this.foundryClient.restGet(url);
+      const parsed = ErrorDiagnosisSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/errors'),
+      );
 
       logger.debug('DiagnosticsClient | Error diagnosis completed', {
         totalErrors: parsed.summary?.totalErrors,
@@ -355,7 +364,7 @@ export class DiagnosticsClient {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      await this.foundryClient.get('/api/diagnostics/health');
+      await this.foundryClient.restGet('/api/diagnostics/health');
       return true;
     } catch (error) {
       logger.debug('DiagnosticsClient | Diagnostics API not available:', error);

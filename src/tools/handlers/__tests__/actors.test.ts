@@ -341,3 +341,32 @@ describe('handleGetActorDetails', () => {
     await expect(handleGetActorDetails({ actorId: 'actor-1' }, client)).rejects.toThrow(McpError);
   });
 });
+
+describe('handleGetActorDetails saving throws (REST bridge augment)', () => {
+  it('lists save totals when the actor carries them', async () => {
+    const client = {
+      getActor: vi.fn().mockResolvedValue(
+        buildActor({
+          abilities: {
+            str: { value: 16, mod: 3, save: 5 },
+            dex: { value: 14, mod: 2, save: -1 },
+          },
+        }),
+      ),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleGetActorDetails({ actorId: 'actor-1' }, client));
+
+    expect(text).toContain('**Saving Throws:** STR +5, DEX -1');
+  });
+
+  it('omits the line when no save total is known (Socket.IO source data)', async () => {
+    const client = {
+      getActor: vi.fn().mockResolvedValue(buildActor()),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleGetActorDetails({ actorId: 'actor-1' }, client));
+
+    expect(text).not.toContain('Saving Throws');
+  });
+});

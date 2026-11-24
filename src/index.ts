@@ -84,6 +84,9 @@ class FoundryMCPServer {
     if (config.foundry.apiKey) {
       clientConfig.apiKey = config.foundry.apiKey;
     }
+    if (config.foundry.restUrl) {
+      clientConfig.restUrl = config.foundry.restUrl;
+    }
     if (config.foundry.username) {
       clientConfig.username = config.foundry.username;
     }
@@ -94,8 +97,11 @@ class FoundryMCPServer {
       clientConfig.userId = config.foundry.userId;
     }
     this.foundryClient = new FoundryClient(clientConfig);
+    for (const warning of this.foundryClient.getTransportWarnings()) {
+      logger.warn(warning);
+    }
     this.toolAvailability = {
-      transport: clientConfig.apiKey ? 'rest' : 'socket',
+      transport: this.foundryClient.getTransportMode(),
       writeEnabled: clientConfig.writeEnabled ?? false,
     };
 

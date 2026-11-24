@@ -220,4 +220,45 @@ describe('Config', () => {
       expect(config.cache.enabled).toBe(false);
     });
   });
+  describe('FOUNDRY_REST_URL (REST bridge augment)', () => {
+    it('reads the bridge URL', async () => {
+      process.env = {
+        FOUNDRY_URL: 'http://localhost:30000',
+        FOUNDRY_REST_URL: 'http://bridge:3030',
+      };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+
+      expect(config.foundry.restUrl).toBe('http://bridge:3030');
+    });
+
+    it('is undefined when unset or empty', async () => {
+      process.env = { FOUNDRY_URL: 'http://localhost:30000', FOUNDRY_REST_URL: '' };
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+
+      expect(config.foundry.restUrl).toBeUndefined();
+    });
+
+    it.each([
+      ['not a URL', 'bridge:3030'],
+      ['a non-HTTP scheme', 'ws://bridge:3030'],
+    ])('rejects %s, naming the variable', async (_label, value) => {
+      process.env = {
+        FOUNDRY_URL: 'http://localhost:30000',
+        FOUNDRY_REST_URL: value,
+        NODE_ENV: 'test',
+      };
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { config, resetConfig } = await import('../index.js');
+      resetConfig();
+
+      expect(() => config.foundry).toThrow();
+      const printed = errorSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(printed).toContain('FOUNDRY_REST_URL');
+    });
+  });
 });

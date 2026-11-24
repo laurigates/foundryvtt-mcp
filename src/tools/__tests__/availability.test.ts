@@ -11,6 +11,8 @@ const socketReadOnly: ToolAvailability = { transport: 'socket', writeEnabled: fa
 const socketWritable: ToolAvailability = { transport: 'socket', writeEnabled: true };
 const restReadOnly: ToolAvailability = { transport: 'rest', writeEnabled: false };
 const restWriteFlag: ToolAvailability = { transport: 'rest', writeEnabled: true };
+const dualReadOnly: ToolAvailability = { transport: 'dual', writeEnabled: false };
+const dualWritable: ToolAvailability = { transport: 'dual', writeEnabled: true };
 
 const names = (availability: ToolAvailability): string[] =>
   getAvailableTools(availability).map((tool) => tool.name);
@@ -146,5 +148,41 @@ describe('CallTool availability gate', () => {
 
   it('allows a write tool only with Socket.IO transport and the write opt-in', () => {
     expect(checkToolAvailability('move_token', socketWritable).status).toBe('available');
+  });
+});
+
+describe('dual transport (Socket.IO primary, REST bridge augment)', () => {
+  it('offers every tool with the write opt-in on', () => {
+    expect(names(dualWritable)).toEqual(getAllTools().map((tool) => tool.name));
+  });
+
+  it('offers the Socket.IO tools and the bridge-only tools together', () => {
+    const available = names(dualReadOnly);
+    for (const toolName of [
+      'search_world',
+      'get_combat_state',
+      'get_journal',
+      'refresh_world_data',
+      'search_compendium',
+      'get_recent_logs',
+      'search_logs',
+      'get_system_health',
+      'get_health_status',
+    ]) {
+      expect(available).toContain(toolName);
+    }
+    expect(available).toHaveLength(22);
+  });
+
+  it('still gates writes on FOUNDRY_WRITE_ENABLED', () => {
+    const result = checkToolAvailability('move_token', dualReadOnly);
+    expect(result.status).toBe('blocked');
+    expect(result.status === 'blocked' && result.reason).toContain('FOUNDRY_WRITE_ENABLED=true');
+    expect(checkToolAvailability('move_token', dualWritable).status).toBe('available');
+  });
+
+  it('names the bridge settings when a bridge-only tool is called over Socket.IO alone', () => {
+    const result = checkToolAvailability('get_recent_logs', socketReadOnly);
+    expect(result.status === 'blocked' && result.reason).toContain('FOUNDRY_REST_URL');
   });
 });

@@ -27,8 +27,11 @@ function probe(system: InstanceType<typeof DiagnosticSystem>): Promise<boolean> 
 }
 
 describe('DiagnosticSystem.testRestApiAvailability (#230)', () => {
-  it('is true when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is true when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(probe(new DiagnosticSystem(client))).resolves.toBe(true);
     expect(client.get).toHaveBeenCalledWith('/api/world');
     expect(client.get).not.toHaveBeenCalledWith('/api/status');
@@ -64,8 +67,11 @@ function authenticate(system: InstanceType<typeof DiagnosticSystem>): Promise<Au
 }
 
 describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
-  it('is valid when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is valid when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(authenticate(new DiagnosticSystem(client))).resolves.toEqual({ valid: true });
     expect(client.get).toHaveBeenCalledWith('/api/world');
   });
@@ -95,7 +101,7 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
  */
 function clientRejectingConnect(status: number) {
   const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
-  const http = Reflect.get(client, 'http') as { get: (url: string) => Promise<unknown> };
+  const http = Reflect.get(client, 'rest') as { get: (url: string) => Promise<unknown> };
   vi.spyOn(http, 'get').mockRejectedValue(
     Object.assign(new Error(`Request failed with status code ${status}`), {
       response: { status },

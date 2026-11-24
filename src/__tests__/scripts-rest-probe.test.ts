@@ -71,9 +71,21 @@ describe('scripts/setup-wizard.ts REST module check (#255)', () => {
     await expect(testAuthentication()).rejects.toThrow(/\/api\/world/);
   });
 
-  it('accepts the key only when /api/world answers with a JSON object', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('rejects a bare JSON object that lacks the module envelope', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     axiosGet.mockResolvedValue({ status: 200, data: { title: 'My World' }, headers: {} });
+    const testAuthentication = await apiKeyAuthStep();
+
+    await expect(testAuthentication()).rejects.toThrow(/envelope/);
+  });
+
+  it('accepts the key only when /api/world answers with the module envelope', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    axiosGet.mockResolvedValue({
+      status: 200,
+      data: { success: true, data: { title: 'My World' } },
+      headers: {},
+    });
     const testAuthentication = await apiKeyAuthStep();
 
     await testAuthentication();
@@ -126,9 +138,13 @@ describe('scripts/diagnose-api.ts REST module verdict (#255)', () => {
     expect(output).not.toContain('API authentication is working');
   });
 
-  it('reports the REST module as working when /api/world answers with a JSON object', async () => {
+  it('reports the REST module as working when /api/world answers with the module envelope', async () => {
     axiosCall.mockResolvedValue({ status: 200, data: { ok: true }, headers: {} });
-    axiosGet.mockResolvedValue({ status: 200, data: { title: 'My World' }, headers: {} });
+    axiosGet.mockResolvedValue({
+      status: 200,
+      data: { success: true, data: { title: 'My World' } },
+      headers: {},
+    });
 
     const output = await runWithAdvancingTimers();
 

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DiagnosticsClient } from '../../../diagnostics/client.js';
 import type { LogEntry, SystemHealth } from '../../../diagnostics/types.js';
 import { SystemHealthSchema } from '../../../diagnostics/types.js';
-import type { FoundryClient } from '../../../foundry/client.js';
+import type { ConnectionReport, FoundryClient } from '../../../foundry/client.js';
 import {
   handleGetHealthStatus,
   handleGetRecentLogs,
@@ -330,10 +330,19 @@ describe('handleGetSystemHealth', () => {
 });
 
 describe('handleGetHealthStatus', () => {
-  function worldClient(connected: boolean, stale = false): FoundryClient {
+  function worldClient(
+    connected: boolean,
+    stale = false,
+    report: ConnectionReport = {
+      mode: 'socket',
+      socket: { used: true, connected },
+      rest: { configured: false },
+    },
+  ): FoundryClient {
     return {
       isConnected: () => connected,
       isWorldDataStale: () => stale,
+      getConnectionReport: () => report,
       getWorldInfo: vi.fn().mockResolvedValue({
         id: 'test-world',
         title: 'Test World',
@@ -390,6 +399,11 @@ describe('handleGetHealthStatus', () => {
     const failingWorld = {
       isConnected: () => false,
       isWorldDataStale: () => false,
+      getConnectionReport: (): ConnectionReport => ({
+        mode: 'socket',
+        socket: { used: true, connected: false },
+        rest: { configured: false },
+      }),
       getWorldInfo: vi.fn().mockRejectedValue(new Error('not connected')),
     } as unknown as FoundryClient;
 
@@ -424,5 +438,75 @@ describe('handleGetHealthStatus', () => {
 
     expect(text).not.toMatch(/stale/i);
     expect(text).not.toContain('refresh_world_data');
+  });
+
+  describe('both connections (dual transport)', () => {
+    it('reports Socket.IO and the REST bridge separately', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'dual',
+            socket: { used: true, connected: true },
+            rest: { configured: true, baseUrl: 'http://bridge:3030', reachable: true },
+          }),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain('**Transport:** Socket.IO + REST bridge (dual)');
+      expect(text).toContain('**Socket.IO:** ✅ Connected');
+      expect(text).toContain('**REST bridge:** ✅ Reachable (http://bridge:3030)');
+    });
+
+    it('reports an unreachable bridge with its last error, Socket.IO still connected', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'dual',
+            socket: { used: true, connected: true },
+            rest: {
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: false,
+              lastError: 'connect ECONNREFUSED',
+            },
+          }),
+          {
+            getSystemHealth: vi.fn().mockRejectedValue(new Error('down')),
+          } as unknown as DiagnosticsClient,
+        ),
+      );
+
+      expect(text).toContain('**Socket.IO:** ✅ Connected');
+      expect(text).toContain('**REST bridge:** ❌ Unreachable: connect ECONNREFUSED');
+    });
+
+    it('says when the bridge is not configured', async () => {
+      const text = getText(
+        await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),
+      );
+
+      expect(text).toContain('**Transport:** Socket.IO');
+      expect(text).toContain('**REST bridge:** not configured');
+    });
+
+    it('marks REST-only mode as deprecated and Socket.IO as unused', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'rest',
+            socket: { used: false, connected: false },
+            rest: { configured: true, baseUrl: 'http://bridge:3030', reachable: true },
+          }),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain('REST only (deprecated)');
+      expect(text).toContain('**Socket.IO:** not used');
+    });
   });
 });
