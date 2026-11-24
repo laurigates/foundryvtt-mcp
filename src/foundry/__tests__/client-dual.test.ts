@@ -673,5 +673,20 @@ describe('FoundryClient dual transport', () => {
       expect(report.rest.configured).toBe(true);
       expect(report.rest.baseUrl).toBe(FOUNDRY_URL);
     });
+
+    it.each([
+      ['a transport failure', transportFailure(), 'unreachable'],
+      ['a 5xx', httpFailure(500), 'server-error'],
+    ])(
+      'reports no bridge pause in REST-only mode after %s on connect (nothing honours it)',
+      async (_label, failure, state) => {
+        http.get.mockRejectedValue(failure);
+        const client = new FoundryClient({ baseUrl: FOUNDRY_URL, apiKey: 'k', retryAttempts: 0 });
+        await expect(client.connect()).rejects.toThrow();
+        const report = client.getConnectionReport();
+        expect(report.rest.state).toBe(state);
+        expect(report.rest.paused).toBeUndefined();
+      },
+    );
   });
 });

@@ -688,9 +688,14 @@ export class FoundryClient {
    *   none (the connect probe, whose 5xx means no GM client serves any route);
    * - a 4xx or an unreadable answer: no pause — the bridge answered at once,
    *   so this call falls back and the next one asks again.
+   * Outside dual mode only the state is recorded: REST-only mode retries in
+   * `executeWithRetry` and nothing reads a pause, so reporting one would mislead.
    */
   private recordRestFailure(error: unknown, capability?: Capability): void {
     const state = this.noteRestFailure(error);
+    if (this.mode !== 'dual') {
+      return;
+    }
     const until = Date.now() + REST_RETRY_AFTER_MS;
     const summary = this.restLastError ?? 'request failed';
     if (state === 'unreachable' || (state === 'server-error' && capability === undefined)) {
