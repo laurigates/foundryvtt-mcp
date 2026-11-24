@@ -11,8 +11,8 @@ The mode is decided from configuration alone (`src/foundry/transport.ts`); an em
 | Mode | Configuration | Consequences |
 | --- | --- | --- |
 | **Socket.IO** (`socket`, default) | `FOUNDRY_URL`, `FOUNDRY_USERNAME` or `FOUNDRY_USER_ID`, and `FOUNDRY_PASSWORD`. No `FOUNDRY_API_KEY`. | Authenticated connection to an active Foundry world. Loads world data and follows document changes. Needs no Foundry module. Prepared dnd5e values (non-flat AC, character max HP, save totals) are unavailable; compendium search, logs and system health are hidden. |
-| **Dual** (`dual`) | Socket.IO credentials as above, plus `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` (the [REST bridge](./configuration.md#optional-rest-bridge-augment), e.g. `http://localhost:3030`). | Everything Socket.IO mode offers, plus prepared actor values, Foundry's dice engine, compendium search, logs and system health from the bridge. A failed bridge call falls back to the Socket.IO answer or an "unavailable" label; no Socket.IO tool is hidden while the bridge is down. |
-| **REST only** (`rest`, deprecated) | `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL` (then `FOUNDRY_URL` is treated as the bridge). | Kept so older configurations behave as before; a warning is logged at startup. No writes, combat, journals, chat, users, world search or live updates. |
+| **Dual** (`dual`) | Socket.IO credentials as above, plus `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` (the [REST bridge](./configuration.md#optional-rest-bridge-augment), e.g. `http://localhost:3030`). | Everything Socket.IO mode offers, plus Foundry's dice engine from the bridge, and prepared actor values, compendium search, logs and system health once the bridge defects below are fixed. A failed bridge call falls back to the Socket.IO answer or an "unavailable" label; no Socket.IO tool is hidden while the bridge is down. A bridge that answers 5xx (for example, no GM browser client) is skipped for that capability for 30 seconds, so only the first call waits for it. |
+| **REST only** (`rest`, deprecated) | `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL` (then `FOUNDRY_URL` is treated as the bridge; this stays REST-only on purpose, with the warning, and is not promoted to dual mode). | Kept so older configurations behave as before; a warning is logged at startup. No writes, combat, journals, chat, users, world search or live updates. |
 
 `FOUNDRY_REST_URL` without `FOUNDRY_API_KEY` stays in Socket.IO mode and logs that the augment is off. `FOUNDRY_WRITE_ENABLED=true` enables the write tools only where Socket.IO is connected.
 
@@ -67,7 +67,10 @@ Fallbacks after a failed bridge call are not shown.
 | `move_token` | socket [write opt-in] | socket [write opt-in] | hidden |
 | `apply_status_effect` | socket [write opt-in] | socket [write opt-in] | hidden |
 
-**Bridge routes not working yet.** The bridge routes `/api/diagnostics/*` to an action the module rejects and has no compendium route ([laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6)). Until that is fixed, `search_compendium`, `get_recent_logs`, `search_logs`, `get_system_health` and the system-health part of `get_health_status` report as unavailable even with a working bridge.
+**Bridge routes not working yet.** Both defects are addressed in [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4); the fixes apply once it is merged.
+
+- The bridge routes `/api/diagnostics/*` to an action the module rejects and has no compendium route ([laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6)). Until that is fixed, `search_compendium`, `get_recent_logs`, `search_logs`, `get_system_health` and the system-health part of `get_health_status` report as unavailable even with a working bridge.
+- Through the bridge, `GET /api/actors/:id` always fails validation ("id is required"), and actor search ignores `query`, `type` and `limit` and returns the first 50 actors ([laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8)). Until that is fixed, dual mode cannot deliver prepared actor values: `get_actor_details` and `search_actors` return the Socket.IO answer with its "unavailable" labels (search overlays only actors that happen to be among those 50).
 
 ## Read, search, utility and diagnostic tools (22)
 
@@ -94,7 +97,7 @@ Fallbacks after a failed bridge call are not shown.
 | `search_logs` | Search logs and show matching entries. | Needs the REST bridge. |
 | `get_system_health` | Fetch backend health/version/module and memory information. | Needs the REST bridge; not full CPU/disk monitoring. |
 | `diagnose_errors` | Format a diagnosis summary. | **Stub**: fixed response, not an actual investigation. |
-| `get_health_status` | Summarize the transport mode, the Socket.IO state, the bridge state (reachable, or its last error), the world, and the bridge's system health. | System health needs the bridge; can warn about a stale world snapshot. |
+| `get_health_status` | Summarize the transport mode, the Socket.IO state, the bridge state (reachable, unreachable, answering with errors, rejected or unusable response, with the last error and running pauses), the world, and the bridge's system health. | System health needs the bridge; can warn about a stale world snapshot. |
 
 ## Mutating tools (11)
 
@@ -132,7 +135,7 @@ All nine resources are listed in every mode. The source columns are copied from 
 | `foundry://world/settings` | World/system metadata. | socket | socket | rest GET /api/world |
 | `foundry://system/diagnostics` | Bridge diagnostics or unavailable notice. | none | rest GET /api/diagnostics/health | rest GET /api/diagnostics/health |
 
-REST-only mode lists the scenes, journals, users and combat resources and then returns empty data (#333). `foundry://scenes/current` in REST-only mode hits the bridge defect in laurigates/foundryvtt-local-rest-api#6.
+REST-only mode lists the scenes, journals, users and combat resources and then returns empty data (#333). The bridge routes `/api/scenes/current` correctly (a60decf on the module's `feat/v14-port`; on its `main` since its PR #3), so `foundry://scenes/current` in REST-only mode is not affected by laurigates/foundryvtt-local-rest-api#6, whose scenes item is stale.
 
 ## Fields one transport reports and the other does not
 

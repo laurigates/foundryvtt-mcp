@@ -58,7 +58,10 @@ from configuration alone (empty values count as unset); the design is
   module + Node bridge server on `:3030`) augments it with prepared dnd5e values,
   Foundry's dice engine, compendium search, logs and system health. A failed
   bridge call falls back to the Socket.IO answer; `connect()` never fails
-  because of the bridge.
+  because of the bridge. A transport failure pauses the whole bridge, a 5xx
+  (e.g. no GM browser client) pauses that capability, both for 30 s; a 4xx
+  pauses nothing. The prepared values and the diagnostics/compendium routes
+  depend on bridge fixes (foundryvtt-local-rest-api#8, #6; its PR #4).
 - **`rest`** (deprecated: the key without Socket.IO credentials, or without
   `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
   startup warning. It probes the bridge's authenticated `/api/world`

@@ -86,9 +86,14 @@ It has two parts, because module code runs in the browser and cannot serve HTTP:
 - a **Foundry module**, which runs in a browser client and reads the game data;
 - a **bridge server** (Node.js, port `3030` by default), which serves the REST API, logs in to Foundry as its own world user, and relays each request to the module.
 
-The bridge answers only while a **Gamemaster is logged in through a browser** with the module enabled. Without that client, dual mode serves the Socket.IO answers only.
+The bridge answers only while a **Gamemaster is logged in through a browser** with the module enabled. Without that client, the bridge answers HTTP 500 after its `REQUEST_TIMEOUT` (5 s by default), and dual mode serves the Socket.IO answers. The MCP then skips the bridge for that capability for 30 seconds, so only the first call in each window waits; `get_health_status` shows the bridge as "Reachable, answering with errors" and lists the pauses.
 
-**Status:** the module has **no published release yet** (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to paste into Foundry's module installer. It is verified on Foundry v13; the v14 port is in review (laurigates/foundryvtt-local-rest-api#4). Some routes the MCP uses do not work yet (laurigates/foundryvtt-local-rest-api#6): until that is fixed, compendium search, logs and system health report as unavailable even with a working bridge.
+**Status:** the module has **no published release yet** (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to paste into Foundry's module installer. It is verified on Foundry v13; the v14 port is in review (laurigates/foundryvtt-local-rest-api#4). Some routes the MCP uses do not work yet, and dual mode falls back to the Socket.IO answer or an "unavailable" label for them:
+
+- [laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8): `GET /api/actors/:id` through the bridge fails validation, and actor search ignores `query`, `type` and `limit`. Until it is fixed, dual mode cannot deliver prepared actor values (AC, max HP, save totals).
+- [laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6): diagnostics routing and the missing compendium route. Until it is fixed, compendium search, logs and system health report as unavailable even with a working bridge.
+
+Both are addressed in [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4); the fixes apply once it is merged.
 
 Until a release exists, install from a checkout of that repository and follow its README:
 
@@ -101,6 +106,6 @@ Until a release exists, install from a checkout of that repository and follow it
    FOUNDRY_REST_URL=http://localhost:3030
    ```
 
-`FOUNDRY_URL` keeps pointing at Foundry itself. `get_health_status` shows the mode (`Socket.IO + REST bridge (dual)`) and whether the bridge is reachable.
+`FOUNDRY_URL` keeps pointing at Foundry itself. `get_health_status` shows the mode (`Socket.IO + REST bridge (dual)`) and the bridge's state: reachable, unreachable (no answer), answering with errors (5xx), last request rejected (4xx) or unusable response, with the last error and any running pauses.
 
-**Deprecated REST-only mode.** `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL`, still selects the old REST-only mode, in which `FOUNDRY_URL` must point at the bridge. It has no writes, combat, journals, chat or live updates, and logs a warning at startup. Set `FOUNDRY_URL` to Foundry and `FOUNDRY_REST_URL` to the bridge to move to dual mode.
+**Deprecated REST-only mode.** `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL`, still selects the old REST-only mode, in which `FOUNDRY_URL` must point at the bridge. The second case is deliberate: the MCP does not guess that such a configuration meant dual mode. It has no writes, combat, journals, chat or live updates, and logs a warning at startup. Set `FOUNDRY_URL` to Foundry and `FOUNDRY_REST_URL` to the bridge to move to dual mode.

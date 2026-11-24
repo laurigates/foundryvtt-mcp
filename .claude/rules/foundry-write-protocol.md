@@ -24,7 +24,8 @@ capability in `src/foundry/capabilities.ts` (see ADR-011,
 [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api):
 a Foundry module plus a Node bridge server (`:3030`). It answers only while a
 GM is logged in through a browser, has no published release yet, and some of
-its routes are broken (laurigates/foundryvtt-local-rest-api#6). **Writes never
+its routes are broken (laurigates/foundryvtt-local-rest-api#6, #8; fixed in
+its PR #4 once merged). A 5xx from the bridge pauses that capability for 30 s. **Writes never
 go through the bridge.** Default deployments are Socket.IO-only, so do not
 assume the bridge is present; a dual-mode read must fall back when it is down.
 

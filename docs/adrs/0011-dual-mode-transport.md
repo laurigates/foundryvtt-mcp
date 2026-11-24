@@ -5,7 +5,7 @@
 **Domain**: foundry-transport
 **Amends**: [ADR-001](../blueprint/adrs/ADR-001-socketio-for-foundry-communication.md) (its "no custom module required" holds for core features only)
 **Related**: [ADR-004](../blueprint/adrs/ADR-004-in-memory-world-state-cache.md), [ADR-010](0010-mutation-api-conventions.md), [ADR-012](0012-derived-values-from-source-data.md), [PRD-002](../blueprint/prds/PRD-002-optional-diagnostics.md)
-**Issues**: #308, #309, #310, #327, #329, #331, #332, #333; laurigates/foundryvtt-local-rest-api#2, #4, #6
+**Issues**: #308, #309, #310, #327, #329, #331, #332, #333; laurigates/foundryvtt-local-rest-api#2, #4, #6, #8
 
 ## Context
 
@@ -53,7 +53,7 @@ Socket.IO stays the primary transport. The REST bridge (laurigates/foundryvtt-lo
 | `FOUNDRY_API_KEY` + credentials, no `FOUNDRY_REST_URL` | `rest`: deprecated, `FOUNDRY_URL` treated as the bridge, warning naming `FOUNDRY_REST_URL` |
 | `FOUNDRY_REST_URL` without `FOUNDRY_API_KEY` | `socket`, warning that the augment stays off |
 
-The REST-only mode is kept so existing configurations behave as before, and deprecated: it has no writes, combat, journals, chat or live updates.
+The REST-only mode is kept so existing configurations behave as before, and deprecated: it has no writes, combat, journals, chat or live updates. A key plus Socket.IO credentials without `FOUNDRY_REST_URL` stays in this legacy mode on purpose, with the warning, instead of being promoted to dual mode with `FOUNDRY_URL` as the bridge: such a configuration was written for REST-only mode, where `FOUNDRY_URL` points at the bridge, so it cannot also be the Socket.IO server.
 
 ### Per-capability source selection
 
@@ -67,7 +67,16 @@ The REST-only mode is kept so existing configurations behave as before, and depr
 
 ### Fallback
 
-In dual mode a bridge call that fails, times out or returns an unexpected shape yields the Socket.IO answer, or the existing "unavailable" label when there is none. Each capability's failure is logged once until a call succeeds again. After a network failure the bridge is skipped for 30 seconds (`REST_RETRY_AFTER_MS`). `connect()` never fails because of the bridge, and no Socket.IO tool is hidden while the bridge is down.
+In dual mode a bridge call that fails, times out or returns an unexpected shape yields the Socket.IO answer, or the existing "unavailable" label when there is none. Each capability's failure is logged once until a call succeeds again. Failures that would cost the same wait on the next call start a 30-second pause (`REST_RETRY_AFTER_MS`):
+
+| Bridge failure | Pause |
+|---|---|
+| No HTTP response (refused, reset, DNS, client timeout) | Every bridge call |
+| HTTP 5xx on the connect probe (`/api/world`) | Every bridge call |
+| HTTP 5xx on a call | That capability only |
+| HTTP 4xx, the module's `success: false`, or an unreadable body | None: that call falls back, the next one asks again |
+
+The 5xx case is a bridge that runs while no GM browser client hosts the module: it answers 500 only after its own `REQUEST_TIMEOUT` (5 s by default). Without the pause, every `get_actor_details`, `search_actors` and `roll_dice` call would wait that long. With it, the first call per capability in each 30-second window pays the wait and the rest fall back at once. Dice keep the bridge-first order (Foundry's `Roll`, then the local roller) under the same rule. `connect()` never fails because of the bridge, and no Socket.IO tool is hidden while the bridge is down. `get_health_status` labels the bridge by the last request: unreachable (no answer), answering with errors (5xx), last request rejected (4xx) or unusable response, each with its error, and lists the running pauses.
 
 ### Mapping the bridge's responses
 
@@ -84,7 +93,7 @@ The tool and resource cells are recorded in [docs/guides/capabilities.md](../gui
 | Writes (11 tools, with `FOUNDRY_WRITE_ENABLED=true`) | Yes | Yes | No |
 | Combat, chat, users, journals, world search, refresh | Yes | Yes | No |
 | Live cache updates from broadcasts | Yes | Yes | No |
-| Prepared AC, max HP, save totals | Exact-from-source subset only (ADR-012) | Yes, from the bridge | Yes |
+| Prepared AC, max HP, save totals | Exact-from-source subset only (ADR-012) | From the bridge once foundryvtt-local-rest-api#8 is fixed; until then the Socket.IO answer | Once foundryvtt-local-rest-api#8 is fixed |
 | Compendium search, logs, system health | No (tools hidden) | Yes, once the bridge defects are fixed | Yes, once the bridge defects are fixed |
 | Dice engine | Local roller | Foundry `Roll`, local fallback | Foundry `Roll` |
 | Needs the module, bridge server and a logged-in GM browser | No | Yes | Yes |
@@ -99,7 +108,8 @@ Each failure names the files to update together: the matrix, `KNOWN_GAPS`, `docs
 
 ### Known gaps at the time of writing
 
-- **Bridge defects (laurigates/foundryvtt-local-rest-api#6)**: `/api/diagnostics/*` is routed to an action the module rejects, `/api/scenes/current` is treated as a scene id, and there is no compendium route. Until it is fixed, logs, system health and compendium search report as unavailable in dual mode even with a working bridge. The compendium mapping assumes the shape of the module's other search routes.
+- **Bridge defects in actor reads ([laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8))**: through the bridge, `GET /api/actors/:id` always fails the module's validation with "id is required", and actor search ignores `query`, `type` and `limit` and returns the first 50 actors. Until it is fixed, dual mode cannot deliver prepared actor values: `get_actor_details` never gets them, and the `search_actors` overlay covers only the requested actors that happen to be among those 50. The fallback still returns the correct Socket.IO data with its "unavailable" labels. A fix is in [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4); it applies once merged.
+- **Bridge defects in diagnostics and compendium ([laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6))**: `/api/diagnostics/*` is routed to an action the module rejects, and there is no compendium route. Until it is fixed, logs, system health and compendium search report as unavailable in dual mode even with a working bridge; the 500 from the diagnostics route pauses `system-health` for 30 seconds. The compendium mapping assumes the shape of the module's other search routes. [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4) also addresses this issue; it applies once merged. The `/api/scenes/current` item in that issue is stale: the bridge already routes it ahead of the scene-id pattern (a60decf on the module's `feat/v14-port`; on its `main` since its PR #3).
 - **One-sided fields** (`KNOWN_GAPS` in `src/foundry/parity.ts`). Actor: `hp.max`, `ac.value` and `abilities.*.save` come only from REST (prepared values); `hp.temp` and `attributes.prof` only from Socket.IO (the bridge route does not send them). Item: price, weight, quantity, equipped and identified only from REST (the Socket.IO mapper does not read them); `rarity` is a REST default; `description` is Socket.IO-only on search. World: the module list only from REST.
 - **Declared but unused REST fallback** for actors, items, scenes and world info in dual mode (#332).
 - **REST-only mode lists resources it cannot fill** (scenes, journals, users, combat; #333).
@@ -108,7 +118,7 @@ Each failure names the files to update together: the matrix, `KNOWN_GAPS`, `docs
 
 ### Operational cost of the augment
 
-- The bridge answers only while a **GM is logged in through a browser** with the module enabled: that client runs the module code that reads the prepared data. A headless server with no GM client gives dual mode the Socket.IO answers only.
+- The bridge answers only while a **GM is logged in through a browser** with the module enabled: that client runs the module code that reads the prepared data. With no GM client, the bridge answers each request with HTTP 500 after its `REQUEST_TIMEOUT`, and dual mode serves the Socket.IO answers, paying that wait once per capability every 30 seconds (see Fallback). Lowering the bridge's `REQUEST_TIMEOUT` shortens that first wait.
 - The bridge server logs in to Foundry as its own world user and must be run and kept up separately.
 - The module has no published release yet (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to install from; installation is from a checkout.
 

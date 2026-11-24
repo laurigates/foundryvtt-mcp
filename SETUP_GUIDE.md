@@ -114,7 +114,8 @@ The log and system-health tools need the optional **REST bridge** ([laurigates/f
 - `get_system_health` - Server health status with versions, user/module counts, memory and log error counts (no CPU or disk metrics)
 - `diagnose_errors` - **stub**: returns a fixed "no errors detected" summary
 - `get_health_status` - Comprehensive health diagnostics: the transport mode, the Socket.IO
-  state and the bridge state (reachable, or its last error)
+  state and the bridge state (reachable, unreachable, answering with errors, rejected or
+  unusable response, with the last error and any running pauses)
 
 The module has **no published release yet** (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to install from. To enable it from a checkout:
 1. Install and enable the module in your world, turn on its REST API setting and copy the generated API key
