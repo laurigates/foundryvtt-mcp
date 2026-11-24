@@ -360,8 +360,32 @@ const TRANSPORT_LABELS: Readonly<Record<ConnectionReport['mode'], string>> = {
 };
 
 /**
- * The two connection lines of `get_health_status`. The report is read after
- * the world and system-health requests, so the REST line reflects them.
+ * The REST line by the state of the last request: no answer at all
+ * (unreachable) reads differently from an answer that was an error, so a bridge
+ * that is up but has no GM client is not reported as down.
+ */
+function formatRestState(rest: ConnectionReport['rest']): string {
+  const where = rest.baseUrl ? ` (${rest.baseUrl})` : '';
+  const error = rest.lastError ?? 'last request failed';
+  switch (rest.state) {
+    case 'ok':
+      return `✅ Reachable${where}`;
+    case 'unreachable':
+      return `❌ Unreachable: ${error}`;
+    case 'server-error':
+      return `⚠️ Reachable, answering with errors${where}: ${error}`;
+    case 'rejected':
+      return `⚠️ Reachable, last request rejected${where}: ${error}`;
+    case 'invalid-response':
+      return `⚠️ Reachable, unusable response${where}: ${error}`;
+    default:
+      return `⏳ Not checked yet${where}`;
+  }
+}
+
+/**
+ * The connection lines of `get_health_status`. The report is read after the
+ * world and system-health requests, so the REST line reflects them.
  */
 function formatConnectionReport(report: ConnectionReport): string {
   const socket = !report.socket.used
@@ -370,23 +394,20 @@ function formatConnectionReport(report: ConnectionReport): string {
       ? '✅ Connected'
       : '❌ Disconnected';
 
-  let rest = 'not configured';
-  if (report.rest.configured) {
-    const where = report.rest.baseUrl ? ` (${report.rest.baseUrl})` : '';
-    if (report.rest.reachable === true) {
-      rest = `✅ Reachable${where}`;
-    } else if (report.rest.reachable === false) {
-      rest = `❌ Unreachable: ${report.rest.lastError ?? 'last request failed'}`;
-    } else {
-      rest = `⏳ Not checked yet${where}`;
-    }
-  }
-
-  return [
+  const lines = [
     `**Transport:** ${TRANSPORT_LABELS[report.mode]}`,
     `**Socket.IO:** ${socket}`,
-    `**REST bridge:** ${rest}`,
-  ].join('\n');
+    `**REST bridge:** ${report.rest.configured ? formatRestState(report.rest) : 'not configured'}`,
+  ];
+  const paused = report.rest.paused ?? [];
+  if (paused.length > 0) {
+    const entries = paused.map(
+      (pause) =>
+        `${pause.scope === 'bridge' ? 'all bridge calls' : pause.scope} for ${pause.retryInSeconds} s (${pause.error})`,
+    );
+    lines.push(`**REST bridge paused:** ${entries.join('; ')}`);
+  }
+  return lines.join('\n');
 }
 
 export async function handleGetHealthStatus(

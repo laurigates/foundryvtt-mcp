@@ -30,7 +30,7 @@ import {
   RestRequestError,
   RestShapeError,
 } from './rest-mappers.js';
-import { probeRestModule } from './rest-probe.js';
+import { probeRestModule, RestKeyRejectedError, RestProbeResponseError } from './rest-probe.js';
 import { resolveTransportPlan, type TransportMode } from './transport.js';
 import type {
   ActorAttributeUpdateResult,
@@ -129,6 +129,80 @@ function hasHttpResponse(error: unknown): boolean {
 }
 
 /**
+ * HTTP status of a rejected REST request, read reflectively from the error or,
+ * for an error that wraps one (the connect probe), from its `cause`.
+ */
+function restStatusOf(error: unknown): number | undefined {
+  for (const candidate of [error, causeOf(error)]) {
+    const response = responseOf(candidate);
+    const status: unknown = response === undefined ? undefined : Reflect.get(response, 'status');
+    if (typeof status === 'number') {
+      return status;
+    }
+  }
+  return undefined;
+}
+
+function causeOf(error: unknown): unknown {
+  return typeof error === 'object' && error !== null ? Reflect.get(error, 'cause') : undefined;
+}
+
+function responseOf(error: unknown): object | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+  const response: unknown = Reflect.get(error, 'response');
+  return typeof response === 'object' && response !== null ? response : undefined;
+}
+
+/**
+ * The bridge's own one-line explanation in an error body (`{ message }`), if
+ * any: e.g. "Failed to communicate with FoundryVTT server" for the 500 it
+ * answers when no GM browser client runs the module.
+ */
+function restBodyMessage(error: unknown): string | undefined {
+  for (const candidate of [error, causeOf(error)]) {
+    const response = responseOf(candidate);
+    const data: unknown = response === undefined ? undefined : Reflect.get(response, 'data');
+    if (typeof data === 'object' && data !== null) {
+      const message: unknown = Reflect.get(data, 'message');
+      if (typeof message === 'string' && message.trim() !== '') {
+        return message.replace(/\s+/g, ' ').trim().slice(0, 200);
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * What a failed REST request says about the bridge:
+ * - `unreachable`: no HTTP response (refused, reset, DNS, client timeout);
+ * - `server-error`: an HTTP 5xx — the bridge answered but could not serve the
+ *   request, typically because no GM browser client runs the module and its
+ *   socket request timed out;
+ * - `rejected`: an HTTP 4xx, or the module's `success: false` — this request
+ *   was refused; others may work;
+ * - `invalid-response`: a 2xx the MCP cannot read (an incompatible bridge).
+ */
+function classifyRestFailure(error: unknown): Exclude<RestState, 'ok'> {
+  const status = restStatusOf(error);
+  if (status !== undefined) {
+    return status >= 500 ? 'server-error' : 'rejected';
+  }
+  if (
+    error instanceof RestShapeError ||
+    error instanceof RestProbeResponseError ||
+    error instanceof z.ZodError
+  ) {
+    return 'invalid-response';
+  }
+  if (error instanceof RestRequestError) {
+    return 'rejected';
+  }
+  return 'unreachable';
+}
+
+/**
  * Spacing between sibling `sort` values, mirroring Foundry's
  * `CONST.SORT_INTEGER_DENSITY`. Leaving every sibling at the default `0` makes
  * ordering depend on incidental collection insertion order, and gives Foundry
@@ -220,6 +294,18 @@ export interface FoundryClientConfig {
   writeEnabled?: boolean;
 }
 
+/** Outcome of the last REST request; see {@link classifyRestFailure}. */
+export type RestState = 'ok' | 'unreachable' | 'server-error' | 'rejected' | 'invalid-response';
+
+/** Dual mode: bridge calls skipped until a cooldown ends. */
+export interface RestPause {
+  /** One capability (after its 5xx), or `bridge` for every call. */
+  scope: Capability | 'bridge';
+  /** The failure that started the pause. */
+  error: string;
+  retryInSeconds: number;
+}
+
 /** Both connections as `get_health_status` reports them. */
 export interface ConnectionReport {
   mode: TransportMode;
@@ -228,15 +314,26 @@ export interface ConnectionReport {
     configured: boolean;
     /** Origin and path of the REST base URL; credentials in it are never shown. */
     baseUrl?: string;
-    /** Undefined until the first REST request (or the connect probe) completes. */
+    /**
+     * The last REST request got an HTTP answer (any state but `unreachable`).
+     * Undefined until the first REST request (or the connect probe) completes.
+     */
     reachable?: boolean;
+    /** Outcome of the last REST request; undefined before the first. */
+    state?: RestState;
+    /** Why the last REST request failed; absent when it succeeded. */
     lastError?: string;
+    /** Dual mode: pauses still running; absent when none. */
+    paused?: RestPause[];
   };
 }
 
 /**
- * How long dual mode skips an unreachable bridge after a transport failure, so
- * each read does not pay the request timeout before falling back.
+ * How long dual mode skips the bridge after a failure that would cost the
+ * same wait again: the whole bridge after a transport failure (or a 5xx on the
+ * connect probe), one capability after its 5xx. A bridge with no GM client
+ * answers 500 only after its own REQUEST_TIMEOUT (5 s by default), so without
+ * the pause every call would wait that long before falling back.
  */
 const REST_RETRY_AFTER_MS = 30_000;
 
@@ -314,10 +411,13 @@ export class FoundryClient {
   private rest: AxiosInstance | null = null;
   private restBaseUrl: string | undefined;
   /** Outcome of the last REST request in any mode; undefined before the first. */
-  private restReachable: boolean | undefined;
+  private restState: RestState | undefined;
   private restLastError: string | undefined;
-  /** Dual mode: skip the bridge until this time after a transport failure. */
+  /** Dual mode: skip every bridge call until this time (transport failure, probe 5xx). */
   private restRetryAfter = 0;
+  private restPauseError: string | undefined;
+  /** Dual mode: skip one capability's bridge calls until `until`, after its 5xx. */
+  private readonly restCapabilityPauses = new Map<Capability, { until: number; error: string }>();
   /** Dual mode: capabilities whose bridge failure was already logged since the last success. */
   private readonly restFailuresLogged = new Set<string>();
 
@@ -405,13 +505,13 @@ export class FoundryClient {
     rest.interceptors.response.use(
       (response) => {
         this.restLinkLive = true;
-        this.restReachable = true;
+        this.restState = 'ok';
+        this.restLastError = undefined;
         return response;
       },
       (error: unknown) => {
         this.restLinkLive = hasHttpResponse(error);
-        this.restReachable = false;
-        this.restLastError = restErrorSummary(error);
+        this.noteRestFailure(error);
         return Promise.reject(error);
       },
     );
@@ -439,14 +539,50 @@ export class FoundryClient {
     if (this.rest !== null && this.restBaseUrl !== undefined) {
       const url = new URL(this.restBaseUrl);
       report.rest.baseUrl = `${url.origin}${url.pathname === '/' ? '' : url.pathname}`;
-      if (this.restReachable !== undefined) {
-        report.rest.reachable = this.restReachable;
+      if (this.restState !== undefined) {
+        report.rest.reachable = this.restState !== 'unreachable';
+        report.rest.state = this.restState;
       }
-      if (this.restLastError !== undefined) {
+      if (this.restLastError !== undefined && this.restState !== 'ok') {
         report.rest.lastError = this.restLastError;
+      }
+      const paused = this.activeRestPauses();
+      if (paused.length > 0) {
+        report.rest.paused = paused;
       }
     }
     return report;
+  }
+
+  /** Pauses still running, whole bridge first. */
+  private activeRestPauses(): RestPause[] {
+    const now = Date.now();
+    const seconds = (until: number) => Math.ceil((until - now) / 1000);
+    const paused: RestPause[] = [];
+    if (now < this.restRetryAfter) {
+      paused.push({
+        scope: 'bridge',
+        error: this.restPauseError ?? 'request failed',
+        retryInSeconds: seconds(this.restRetryAfter),
+      });
+    }
+    for (const [capability, pause] of this.restCapabilityPauses) {
+      if (now < pause.until) {
+        paused.push({
+          scope: capability,
+          error: pause.error,
+          retryInSeconds: seconds(pause.until),
+        });
+      }
+    }
+    return paused;
+  }
+
+  /** The pause that currently stops `capability` reaching the bridge, if any. */
+  private restPauseFor(capability: Capability): RestPause | undefined {
+    return this.activeRestPauses().find(
+      (pause) => pause.scope === 'bridge' || pause.scope === capability,
+    );
   }
 
   /**
@@ -525,22 +661,43 @@ export class FoundryClient {
     }
   }
 
-  private recordRestSuccess(): void {
-    this.restReachable = true;
+  private recordRestSuccess(capability?: Capability): void {
+    this.restState = 'ok';
+    this.restLastError = undefined;
     this.restRetryAfter = 0;
+    this.restPauseError = undefined;
+    if (capability !== undefined) {
+      this.restCapabilityPauses.delete(capability);
+    }
     this.restFailuresLogged.clear();
   }
 
-  /**
-   * Records a failed REST request. `reachable` means "the last REST request
-   * worked", so any failure clears it; a transport failure (no HTTP response)
-   * also pauses the bridge in dual mode for {@link REST_RETRY_AFTER_MS}.
-   */
-  private recordRestFailure(error: unknown): void {
-    this.restReachable = false;
+  /** Records the state and summary of a failed REST request; returns the state. */
+  private noteRestFailure(error: unknown): Exclude<RestState, 'ok'> {
+    const state = classifyRestFailure(error);
+    this.restState = state;
     this.restLastError = restErrorSummary(error);
-    if (!hasHttpResponse(error) && !(error instanceof RestShapeError)) {
-      this.restRetryAfter = Date.now() + REST_RETRY_AFTER_MS;
+    return state;
+  }
+
+  /**
+   * Records a failed REST request and starts the pause it calls for (honoured
+   * in dual mode, for {@link REST_RETRY_AFTER_MS}):
+   * - no HTTP response: the whole bridge;
+   * - a 5xx: the capability that got it, or the whole bridge when there is
+   *   none (the connect probe, whose 5xx means no GM client serves any route);
+   * - a 4xx or an unreadable answer: no pause — the bridge answered at once,
+   *   so this call falls back and the next one asks again.
+   */
+  private recordRestFailure(error: unknown, capability?: Capability): void {
+    const state = this.noteRestFailure(error);
+    const until = Date.now() + REST_RETRY_AFTER_MS;
+    const summary = this.restLastError ?? 'request failed';
+    if (state === 'unreachable' || (state === 'server-error' && capability === undefined)) {
+      this.restRetryAfter = until;
+      this.restPauseError = summary;
+    } else if (state === 'server-error' && capability !== undefined) {
+      this.restCapabilityPauses.set(capability, { until, error: summary });
     }
   }
 
@@ -556,15 +713,15 @@ export class FoundryClient {
     call: (rest: AxiosInstance) => Promise<T>,
   ): Promise<T | undefined> {
     const rest = this.rest;
-    if (!rest || Date.now() < this.restRetryAfter) {
+    if (!rest || this.restPauseFor(capability) !== undefined) {
       return undefined;
     }
     try {
       const result = await call(rest);
-      this.recordRestSuccess();
+      this.recordRestSuccess(capability);
       return result;
     } catch (error) {
-      this.recordRestFailure(error);
+      this.recordRestFailure(error, capability);
       if (!this.restFailuresLogged.has(capability)) {
         this.restFailuresLogged.add(capability);
         logger.warn(`REST bridge failed for ${capability} — using the Socket.IO answer instead`, {
@@ -592,7 +749,15 @@ export class FoundryClient {
     if (this.mode === 'rest') {
       return this.executeWithRetry(() => rest.get(url));
     }
-    const response = await this.tryRest(capabilityOfRestPath(url), (client) => client.get(url));
+    const capability = capabilityOfRestPath(url);
+    const pause = this.restPauseFor(capability);
+    if (pause !== undefined) {
+      throw new Error(
+        `The REST bridge is paused for ${pause.scope === 'bridge' ? 'all calls' : capability} ` +
+          `after ${pause.error}; next attempt in ${pause.retryInSeconds} s.`,
+      );
+    }
+    const response = await this.tryRest(capability, (client) => client.get(url));
     if (response === undefined) {
       throw new Error(
         `The REST bridge is unavailable (${this.restLastError ?? 'paused after a failed request'}).`,
@@ -822,9 +987,11 @@ export class FoundryClient {
     this.worldDataStale = false;
     this._isConnected = false;
     this.restLinkLive = true;
-    this.restReachable = undefined;
+    this.restState = undefined;
     this.restLastError = undefined;
     this.restRetryAfter = 0;
+    this.restPauseError = undefined;
+    this.restCapabilityPauses.clear();
     this.restFailuresLogged.clear();
     logger.info('FoundryVTT client disconnected');
   }
@@ -2387,10 +2554,15 @@ function capabilityOfRestPath(url: string): Capability {
  * message, never the request config (it carries the API key header).
  */
 function restErrorSummary(error: unknown): string {
-  const { status, code } = describeRestFailure(error);
-  if (status !== undefined) {
-    return `HTTP ${status}`;
+  if (error instanceof RestKeyRejectedError) {
+    return error.message;
   }
+  const status = restStatusOf(error);
+  if (status !== undefined) {
+    const message = restBodyMessage(error);
+    return message === undefined ? `HTTP ${status}` : `HTTP ${status}: ${message}`;
+  }
+  const { code } = describeRestFailure(error);
   const message = error instanceof Error ? error.message : String(error);
   return code !== undefined && !message.includes(code) ? `${code}: ${message}` : message;
 }

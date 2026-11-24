@@ -29,6 +29,15 @@ export class RestKeyRejectedError extends Error {
 }
 
 /**
+ * `/api/world` answered 2xx with a body that is not the module's envelope: an
+ * incompatible server or module version. A distinct class so the client can
+ * tell "answered, unusably" from "not reachable".
+ */
+export class RestProbeResponseError extends Error {
+  override name = 'RestProbeResponseError';
+}
+
+/**
  * What the module's `/api/world` must answer with: its `{ success: true, data }`
  * envelope around the world object (`WorldAPI.getWorldInfo`). A bare JSON
  * object is not enough (#310): any JSON server returns one, and the MCP used
@@ -82,11 +91,11 @@ export async function probeRestModule(
 
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     const got = data === null ? 'null' : Array.isArray(data) ? 'array' : typeof data;
-    throw new Error(`${notJson}: got ${got} body`);
+    throw new RestProbeResponseError(`${notJson}: got ${got} body`);
   }
   const parsed = RestWorldProbeSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error(
+    throw new RestProbeResponseError(
       "FOUNDRY_API_KEY is set but /api/world did not answer with the REST module's " +
         '{success: true, data} envelope (another server, an incompatible module version, ' +
         'or the module reported a failure)',

@@ -116,6 +116,26 @@ function transportFailure() {
   });
 }
 
+/** An HTTP error answer, as axios rejects with it. */
+function httpFailure(status: number, data?: unknown) {
+  return Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data },
+  });
+}
+
+/**
+ * What the bridge answers when no GM browser client runs the module: its
+ * socket request times out after REQUEST_TIMEOUT (5 s by default) and the
+ * route turns that into this 500 (bridge-server/routes/actors.js).
+ */
+function bridgeTimeout500() {
+  return httpFailure(500, {
+    success: false,
+    error: 'Internal Server Error',
+    message: 'Failed to communicate with FoundryVTT server',
+  });
+}
+
 function buildSocket() {
   const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
   const socket = {
@@ -245,7 +265,7 @@ describe('FoundryClient dual transport', () => {
       expect(client.getConnectionReport()).toEqual({
         mode: 'dual',
         socket: { used: true, connected: true },
-        rest: { configured: true, baseUrl: BRIDGE_URL, reachable: true },
+        rest: { configured: true, baseUrl: BRIDGE_URL, reachable: true, state: 'ok' },
       });
     });
 
@@ -257,15 +277,175 @@ describe('FoundryClient dual transport', () => {
       expect(client.isConnected()).toBe(true);
       const report = client.getConnectionReport();
       expect(report.rest.reachable).toBe(false);
+      expect(report.rest.state).toBe('unreachable');
       expect(report.rest.lastError).toContain('ECONNREFUSED');
       expect(logger.warn).toHaveBeenCalled();
     });
 
-    it('treats a bare /api/world object as an incompatible bridge, not a connected one', async () => {
+    it('treats a bare /api/world object as an incompatible bridge: it answered, unusably', async () => {
       const { client } = await connectDual(async () => ({ data: { id: 'w', title: 'T' } }));
 
       expect(client.isConnected()).toBe(true);
-      expect(client.getConnectionReport().rest.reachable).toBe(false);
+      const report = client.getConnectionReport();
+      expect(report.rest.reachable).toBe(true);
+      expect(report.rest.state).toBe('invalid-response');
+      expect(report.rest.paused).toBeUndefined();
+    });
+
+    it('pauses the whole bridge after a 5xx from the connect probe (no GM client)', async () => {
+      const { client } = await connectDual(async () => {
+        throw bridgeTimeout500();
+      });
+
+      expect(client.isConnected()).toBe(true);
+      const report = client.getConnectionReport();
+      expect(report.rest.reachable).toBe(true);
+      expect(report.rest.state).toBe('server-error');
+      expect(report.rest.lastError).toBe('HTTP 500: Failed to communicate with FoundryVTT server');
+      expect(report.rest.paused).toEqual([
+        {
+          scope: 'bridge',
+          error: 'HTTP 500: Failed to communicate with FoundryVTT server',
+          retryInSeconds: 30,
+        },
+      ]);
+
+      rest.get.mockClear();
+      rest.post.mockClear();
+      await client.getActor(ACTOR_ID);
+      expect((await client.rollDice('1d6')).source).toBe('local');
+      expect(rest.get).not.toHaveBeenCalled();
+      expect(rest.post).not.toHaveBeenCalled();
+    });
+
+    it('does not pause the bridge when the probe key is rejected (4xx)', async () => {
+      const { client } = await connectDual(async () => {
+        throw httpFailure(401);
+      });
+
+      const report = client.getConnectionReport();
+      expect(report.rest.reachable).toBe(true);
+      expect(report.rest.state).toBe('rejected');
+      expect(report.rest.lastError).toMatch(/FOUNDRY_API_KEY was rejected.*HTTP 401/);
+      expect(report.rest.paused).toBeUndefined();
+    });
+  });
+
+  describe('bridge errors answered over HTTP (5xx pauses a capability, 4xx does not)', () => {
+    it('pauses actor-derived after a 5xx instead of waiting for the bridge timeout on every call', async () => {
+      const { client } = await connectDual();
+      rest.get.mockClear();
+      rest.get.mockRejectedValue(bridgeTimeout500());
+
+      await client.getActor(ACTOR_ID);
+      await client.getActor(ACTOR_ID);
+      const result = await client.searchActors({ query: 'paladin' });
+
+      expect(rest.get).toHaveBeenCalledTimes(1);
+      expect(result.actors[0]?.derivedUnavailable).toEqual(['hpMax', 'ac']);
+    });
+
+    it('keeps other capabilities on the bridge while one is paused', async () => {
+      const { client } = await connectDual();
+      rest.get.mockRejectedValue(bridgeTimeout500());
+      await client.getActor(ACTOR_ID);
+      rest.post.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { total: 4, breakdown: [{ dice: '1d6', results: [4], total: 4 }] },
+        },
+      });
+
+      const roll = await client.rollDice('1d6');
+
+      expect(rest.post).toHaveBeenCalledTimes(1);
+      expect(roll.source).toBe('server');
+    });
+
+    it('rolls locally without calling the bridge again after a dice 5xx (bridge up, no GM)', async () => {
+      const { client } = await connectDual();
+      rest.post.mockRejectedValue(bridgeTimeout500());
+
+      const first = await client.rollDice('2d6');
+      const second = await client.rollDice('2d6');
+
+      expect(first.source).toBe('local');
+      expect(second.source).toBe('local');
+      expect(rest.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a paused capability once the cooldown has passed', async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      try {
+        const { client } = await connectDual();
+        rest.get.mockClear();
+        rest.get.mockRejectedValueOnce(bridgeTimeout500());
+        await client.getActor(ACTOR_ID);
+        await client.getActor(ACTOR_ID);
+        expect(rest.get).toHaveBeenCalledTimes(1);
+
+        now.mockReturnValue(1_000_000 + 30_001);
+        rest.get.mockResolvedValueOnce({ data: REST_ACTOR });
+        const actor = await client.getActor(ACTOR_ID);
+
+        expect(rest.get).toHaveBeenCalledTimes(2);
+        expect(actor.ac).toEqual({ value: 18 });
+        expect(client.getConnectionReport().rest.paused).toBeUndefined();
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it('falls back per call on a 4xx and keeps asking the bridge', async () => {
+      const { client } = await connectDual();
+      rest.get.mockClear();
+      rest.get.mockRejectedValue(httpFailure(400, { success: false, message: 'id is required' }));
+
+      await client.getActor(ACTOR_ID);
+      await client.getActor(ACTOR_ID);
+      const actor = await client.getActor(ACTOR_ID);
+
+      expect(rest.get).toHaveBeenCalledTimes(3);
+      expect(actor.derivedUnavailable).toEqual(['hpMax', 'ac']);
+    });
+
+    it('reports a 4xx as rejected, a 5xx as a server error with its pause, never as unreachable', async () => {
+      const { client } = await connectDual();
+
+      rest.get.mockRejectedValueOnce(httpFailure(404));
+      await client.getActor(ACTOR_ID);
+      expect(client.getConnectionReport().rest).toMatchObject({
+        reachable: true,
+        state: 'rejected',
+        lastError: 'HTTP 404',
+      });
+      expect(client.getConnectionReport().rest.paused).toBeUndefined();
+
+      rest.get.mockRejectedValueOnce(bridgeTimeout500());
+      await client.getActor(ACTOR_ID);
+      expect(client.getConnectionReport().rest).toMatchObject({
+        reachable: true,
+        state: 'server-error',
+        lastError: 'HTTP 500: Failed to communicate with FoundryVTT server',
+        paused: [
+          {
+            scope: 'actor-derived',
+            error: 'HTTP 500: Failed to communicate with FoundryVTT server',
+            retryInSeconds: 30,
+          },
+        ],
+      });
+    });
+
+    it('pauses system health after a diagnostics 5xx and says so', async () => {
+      const { client } = await connectDual();
+      rest.get.mockClear();
+      rest.get.mockRejectedValue(httpFailure(500));
+
+      await expect(client.restGet('/api/diagnostics/health')).rejects.toThrow(/HTTP 500/);
+      await expect(client.restGet('/api/diagnostics/health')).rejects.toThrow(/paused/);
+
+      expect(rest.get).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -89,9 +89,10 @@ describe.skipIf(missing.length > 0)(title, () => {
     expect(rest.getTransportMode()).toBe('rest');
     await dual.connect();
     await rest.connect();
-    expect(dual.getConnectionReport().rest.reachable, 'the bridge did not answer the dual client').toBe(
-      true,
-    );
+    expect(
+      dual.getConnectionReport().rest.state,
+      'the bridge did not serve the dual client (a GM browser client must run the module)',
+    ).toBe('ok');
 
     const characters = (dual.getWorldData()?.actors ?? [])
       .filter((actor) => actor.type === 'character')
