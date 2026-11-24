@@ -45,7 +45,9 @@ import { VISIBILITY_LEVELS } from './types.js';
 import {
   applyDocumentBroadcast,
   applyUserActivity,
+  type DocumentBroadcast,
   parseDocumentBroadcast,
+  parseDocumentBroadcastBatch,
   parseUserActivity,
 } from './world-cache.js';
 import { searchWorldDocuments, type WorldSearchResults } from './world-search.js';
@@ -213,14 +215,26 @@ export interface FoundryClientConfig {
   writeEnabled?: boolean;
 }
 
-/** Minimal shape of FoundryVTT's `modifyDocument` Socket.IO acknowledgement. */
-interface DocumentSocketResponse {
+/** One FoundryVTT `modifyDocument` response, as far as the write path reads it. */
+const DocumentSocketResponseSchema = z.object({
   /** Created/updated data objects, or deleted ids, on success. */
-  result?: unknown[];
+  result: z.array(z.unknown()).optional(),
   /** Present when the server rejects the operation. */
-  error?: { message?: string } | null;
-  userId?: string;
-}
+  error: z.object({ message: z.string().optional() }).passthrough().nullish(),
+  /** v14: true for a response describing a server-side side effect, not the request itself. */
+  sideEffect: z.boolean().optional(),
+});
+type DocumentSocketResponse = z.infer<typeof DocumentSocketResponseSchema>;
+
+/**
+ * The `modifyDocument` acknowledgement. A single response when the write had no
+ * side effects (v13 and v14); from v14, `{ results: [...] }` — the side-effect
+ * responses plus the primary one — when it did (#232).
+ */
+const ModifyDocumentAckSchema = z.union([
+  z.object({ results: z.array(DocumentSocketResponseSchema) }),
+  DocumentSocketResponseSchema,
+]);
 
 export interface SearchActorsParams {
   query?: string;
@@ -417,6 +431,8 @@ export class FoundryClient {
           // Keep the snapshot live from here on (#205). Attached only after a
           // successful handshake so the reject paths have no listener to leak.
           this.socket?.on('modifyDocument', this.onDocumentBroadcast);
+          // v14 delivers a write that had side effects on this event instead (#232).
+          this.socket?.on('modifyDocumentBatch', this.onDocumentBatchBroadcast);
           // Presence (#218): `activeUsers` is not a document collection, so it
           // only moves on this event.
           this.socket?.on('userActivity', this.onUserActivity);
@@ -448,12 +464,27 @@ export class FoundryClient {
    * leaves the cache untouched (and stale) rather than taking the connection down.
    */
   private onDocumentBroadcast = (payload: unknown): void => {
-    if (!this.worldData) {
-      return;
-    }
-
     const broadcast = parseDocumentBroadcast(payload);
-    if (!broadcast) {
+    if (broadcast) {
+      this.applyBroadcastToCache(broadcast);
+    }
+  };
+
+  /**
+   * Applies a FoundryVTT v14 `modifyDocumentBatch` broadcast (#232): a write
+   * that had server-side side effects, delivered as `{ results: [...] }` with
+   * one entry per side effect plus the primary change. Entries are applied in
+   * order; like {@link onDocumentBroadcast}, this never throws.
+   */
+  private onDocumentBatchBroadcast = (payload: unknown): void => {
+    for (const broadcast of parseDocumentBroadcastBatch(payload)) {
+      this.applyBroadcastToCache(broadcast);
+    }
+  };
+
+  /** Applies one validated broadcast to `worldData`, logging instead of throwing. */
+  private applyBroadcastToCache(broadcast: DocumentBroadcast): void {
+    if (!this.worldData) {
       return;
     }
 
@@ -471,7 +502,7 @@ export class FoundryClient {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  };
+  }
 
   /**
    * Applies a FoundryVTT `userActivity` broadcast to cached presence (#218).
@@ -561,6 +592,7 @@ export class FoundryClient {
       return;
     }
     this.socket.off('modifyDocument', this.onDocumentBroadcast);
+    this.socket.off('modifyDocumentBatch', this.onDocumentBatchBroadcast);
     this.socket.off('userActivity', this.onUserActivity);
     this.socket.off('connect', this.onSocketConnect);
     this.socket.off('disconnect', this.onSocketDisconnect);
@@ -954,14 +986,21 @@ export class FoundryClient {
   /**
    * Performs a FoundryVTT document mutation over Socket.IO using the core
    * `modifyDocument` protocol. The request shape is verified against the
-   * v13.348 client source (`client/data/client-backend.mjs` `#buildRequest`,
-   * `helpers/socket-interface.mjs` `dispatch`, `common/abstract/socket.mjs`).
+   * v13.348 and v14.369 builds (client `ClientDatabaseBackend` request
+   * building and dispatch, server `ServerDatabaseBackend` socket handler,
+   * `common/abstract/socket.mjs`); see `.claude/rules/foundry-write-protocol.md`.
+   *
+   * The acknowledgement is a single response, or — from v14, when the write had
+   * server-side side effects — `{ results: [...] }` holding the side-effect
+   * responses and the primary one (#232). Either way the primary response's
+   * `result` is returned, and any error in the set rejects.
    *
    * @param type - Document name ("Actor", "Item", …)
    * @param action - "create" | "update" | "delete"
    * @param operation - action-specific payload: `data` (create) / `updates`
    *   (update) / `ids` (delete), plus `parentUuid` for embedded documents.
-   * @returns the server's `result` array (created/updated data, or deleted ids)
+   * @returns the primary response's `result` array (created/updated data, or
+   *   deleted ids)
    */
   private async modifyDocument(
     type: string,
@@ -973,13 +1012,22 @@ export class FoundryClient {
       action,
       operation: { broadcast: true, pack: null, modifiedTime: Date.now(), ...operation },
     };
-    const response = await this.emitWithAck<DocumentSocketResponse>('modifyDocument', request);
-    if (response?.error) {
+    const ack = ModifyDocumentAckSchema.safeParse(
+      await this.emitWithAck<unknown>('modifyDocument', request),
+    );
+    if (!ack.success) {
+      throw new Error(`Unrecognized modifyDocument acknowledgement for ${action} ${type}`);
+    }
+    const responses: DocumentSocketResponse[] =
+      'results' in ack.data ? ack.data.results : [ack.data];
+    const failed = responses.find((response) => response.error);
+    if (failed?.error) {
       throw new Error(
-        `FoundryVTT rejected ${action} ${type}: ${response.error.message || 'unknown error'}`,
+        `FoundryVTT rejected ${action} ${type}: ${failed.error.message || 'unknown error'}`,
       );
     }
-    return Array.isArray(response?.result) ? response.result : [];
+    const primary = responses.find((response) => !response.sideEffect);
+    return primary?.result ?? [];
   }
 
   // ==========================================================================
@@ -1153,7 +1201,7 @@ export class FoundryClient {
    *      `parentUuid: "Combat.<combatId>"` (mirrors the Combatant→Combat embed
    *      used by {@link setCombatantInitiative}).
    *
-   * The create wire shape is verified against the v13.348 client source per
+   * The create wire shape is verified against the v13.348 and v14.369 builds per
    * `.claude/rules/foundry-write-protocol.md`; smoke-test one live round-trip
    * when changing it.
    *
@@ -1233,7 +1281,7 @@ export class FoundryClient {
    *
    * `Token` is an embedded document of `Scene`, so the update is sent with
    * `parentUuid: "Scene.<sceneId>"` (mirrors the Combatant→Combat embed). The
-   * wire shape is verified against the v13.348 client source per
+   * wire shape is verified against the v13.348 and v14.369 builds per
    * `.claude/rules/foundry-write-protocol.md`.
    *
    * @param sceneId - 16-char alphanumeric Scene document id (the parent)

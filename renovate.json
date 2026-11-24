@@ -14,7 +14,7 @@
   ],
   "packageRules": [
     {
-      "description": "Move the felddy/foundryvtt image tag and the FOUNDRY_VERSION default in one PR (#233), and hold it for approval on the Dependency Dashboard: the modifyDocument wire shape is unverified past 13.348 (#232) and the integration tier does not run in CI (#183), so a FoundryVTT bump has to be approved deliberately.",
+      "description": "Move the felddy/foundryvtt image tag and the FOUNDRY_VERSION default in one PR (#233), and hold it for approval on the Dependency Dashboard: the modifyDocument wire shape has been read only from the 13.348 and 14.369 builds (#232) and the integration tier does not run in CI (#183), so a FoundryVTT bump has to be approved deliberately.",
       "matchPackageNames": ["felddy/foundryvtt"],
       "groupName": "FoundryVTT",
       "dependencyDashboardApproval": true
