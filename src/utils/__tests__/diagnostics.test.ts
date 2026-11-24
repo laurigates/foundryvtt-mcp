@@ -89,6 +89,49 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
   });
 });
 
+/**
+ * A REST-mode client whose transport answers /api/world with `status`, so
+ * `testConnection()` rejects through the real `connect()` → `probeRestModule`.
+ */
+function clientRejectingConnect(status: number) {
+  const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+  const http = Reflect.get(client, 'http') as { get: (url: string) => Promise<unknown> };
+  vi.spyOn(http, 'get').mockRejectedValue(
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      response: { status },
+    }),
+  );
+  return client;
+}
+
+describe('DiagnosticSystem.diagnoseFeatureProblem, rejected API key (#301)', () => {
+  it.each([401, 403])('keeps the rejection cause for HTTP %i (#288)', async (status) => {
+    const result = await new DiagnosticSystem(
+      clientRejectingConnect(status),
+    ).diagnoseFeatureProblem('actors');
+    expect(result.explanation).toMatch(new RegExp(`FOUNDRY_API_KEY was rejected.*HTTP ${status}`));
+  });
+
+  it('reports an API-key authentication failure, not an unexpected error', async () => {
+    const result = await new DiagnosticSystem(clientRejectingConnect(401)).diagnoseFeatureProblem(
+      'actors',
+    );
+    expect(result.explanation).toMatch(/^Authentication failed using API key/);
+    expect(result.explanation).not.toMatch(/unexpected error/);
+    expect(result.suggestions).toMatch(/Check API key/);
+    expect(result.suggestions).toMatch(/REST API module is enabled/);
+    expect(result.suggestions).not.toMatch(/Restart services/);
+    expect(result.documentationUrl).toMatch(/#authentication-issues$/);
+  });
+
+  it('still uses the generic diagnostic when the module is missing (HTTP 404)', async () => {
+    const result = await new DiagnosticSystem(clientRejectingConnect(404)).diagnoseFeatureProblem(
+      'actors',
+    );
+    expect(result.explanation).toMatch(/unexpected error.*did not answer \/api\/world with JSON/);
+  });
+});
+
 /** `testDiceRolling` is private; reach it reflectively. */
 function rollCheck(system: InstanceType<typeof DiagnosticSystem>): Promise<boolean> {
   const fn = Reflect.get(system, 'testDiceRolling') as () => Promise<boolean>;
