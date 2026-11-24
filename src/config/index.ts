@@ -29,6 +29,22 @@ function parseIntegerEnv(value: string | undefined): number | undefined {
 }
 
 /**
+ * An optional http(s) URL setting whose validation messages name its
+ * environment variable.
+ */
+function httpUrlFromEnv(name: string) {
+  const error = `${name} must be an http:// or https:// URL`;
+  return z.string({ error }).refine((value) => {
+    try {
+      const { protocol } = new URL(value);
+      return protocol === 'http:' || protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, error);
+}
+
+/**
  * Zod schema for validating server configuration
  *
  * Defines the structure and validation rules for all configuration options,
@@ -68,6 +84,12 @@ const ConfigSchema = z.object({
         }
       }, 'URL validation failed'),
     apiKey: z.string().optional(),
+    /**
+     * The REST bridge server (foundryvtt-local-rest-api's Node server, :3030
+     * by default). With FOUNDRY_API_KEY and Socket.IO credentials it enables
+     * dual mode; see `src/foundry/transport.ts`.
+     */
+    restUrl: httpUrlFromEnv('FOUNDRY_REST_URL').optional(),
     username: z.string().optional(),
     password: z.string().optional(),
     userId: z.string().optional(),
@@ -124,6 +146,7 @@ function loadConfig(): Config {
     foundry: {
       url: process.env.FOUNDRY_URL,
       apiKey: process.env.FOUNDRY_API_KEY,
+      restUrl: process.env.FOUNDRY_REST_URL || undefined,
       username: process.env.FOUNDRY_USERNAME,
       password: process.env.FOUNDRY_PASSWORD,
       userId: process.env.FOUNDRY_USER_ID,

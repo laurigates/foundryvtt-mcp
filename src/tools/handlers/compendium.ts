@@ -83,7 +83,9 @@ export async function handleSearchCompendium(
 
     const restNote =
       result.restAvailable === false
-        ? '\n\n_Note: compendium search requires FOUNDRY_API_KEY (REST API module); returning no results._'
+        ? result.unavailableReason
+          ? `\n\n_Note: compendium search could not run: ${result.unavailableReason}; returning no results._`
+          : '\n\n_Note: compendium search requires FOUNDRY_API_KEY (REST API module); returning no results._'
         : '';
 
     const cursorNote = result.nextCursor

@@ -31,8 +31,8 @@ Add this to your Claude Desktop MCP settings file:
 ```
 
 > The server connects to FoundryVTT directly over **Socket.IO** using a world
-> user account — no custom module required. Setting `FOUNDRY_API_KEY` additionally
-> enables the optional, read-only REST diagnostics tools.
+> user account — no custom module required. Setting `FOUNDRY_API_KEY` and
+> `FOUNDRY_REST_URL` additionally enables the optional, read-only REST bridge (dual mode).
 
 ### Alternative: Using .env file
 
@@ -160,9 +160,10 @@ FOUNDRY_URL=http://localhost:30000
 FOUNDRY_USERNAME=your_username
 FOUNDRY_PASSWORD=your_password
 
-# Optional — enables the read-only REST API diagnostics tools.
-# When set, the server uses REST API mode instead of Socket.IO.
-FOUNDRY_API_KEY=your_api_key_here
+# Optional — the read-only REST bridge (laurigates/foundryvtt-local-rest-api), alongside
+# Socket.IO (dual mode). Set both; the key alone selects the deprecated REST-only mode.
+# FOUNDRY_API_KEY=your_api_key_here
+# FOUNDRY_REST_URL=http://localhost:3030
 
 # Optional — enables game-state mutations (write tools). Default: false.
 FOUNDRY_WRITE_ENABLED=true
@@ -232,7 +233,7 @@ Once connected, try these prompts with your AI assistant:
 3. **"Empty results" or limited functionality**
    - Ensure a **world is loaded** in FoundryVTT (the server needs an active world, not the setup screen)
    - Verify the user account has sufficient permissions (Assistant GM or higher)
-   - The optional REST API module / `FOUNDRY_API_KEY` adds diagnostics tools, but is not required for core data access
+   - The optional REST bridge (`FOUNDRY_API_KEY` with `FOUNDRY_REST_URL`, [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api)) adds prepared actor values and diagnostics alongside Socket.IO, but is not required for core data access
 
 4. **Permission or authentication errors**
    - Check FoundryVTT user permissions

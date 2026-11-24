@@ -86,7 +86,7 @@ describe('FoundryClient', () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockResolvedValue({
         status: 200,
-        data: { id: 'world-1', title: 'Test World' },
+        data: { success: true, data: { id: 'world-1', title: 'Test World' } },
       });
 
       await expect(client.testConnection()).resolves.toBe(true);
@@ -148,7 +148,10 @@ describe('FoundryClient', () => {
         username: 'gm',
         password: 'gm-password',
       });
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { success: true, data: { id: 'world-1' } },
+      });
 
       await expect(client.testConnection()).resolves.toBe(true);
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
@@ -205,15 +208,33 @@ describe('FoundryClient', () => {
     // #230: `/api/status` is served unauthenticated by Foundry core, so a 200
     // there proves neither the REST module nor the key. The probe must hit an
     // authenticated module route and validate the body shape.
-    it('should connect via REST API when /api/world answers with a JSON object', async () => {
+    it('should connect via REST API when /api/world answers with the module envelope', async () => {
       mockAxiosInstance.get.mockResolvedValue({
         status: 200,
-        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+        data: { success: true, data: { id: 'world-1', title: 'Test World', system: 'dnd5e' } },
       });
       await client.connect();
       expect(client.isConnected()).toBe(true);
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
       expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/api/status');
+    });
+
+    it('should reject a bare JSON object: it is not the module envelope (#310)', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+      });
+      await expect(client.connect()).rejects.toThrow(/\{success: true, data\} envelope/);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should reject a success: false envelope', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { success: false, error: 'Unauthorized', message: 'Valid API key required' },
+      });
+      await expect(client.connect()).rejects.toThrow(/envelope/);
+      expect(client.isConnected()).toBe(false);
     });
 
     it('should reject and stay disconnected when /api/world answers 200 with HTML', async () => {
@@ -279,35 +300,72 @@ describe('FoundryClient', () => {
       expect(reqConfig.headers['x-api-key']).toBe('test-api-key');
     });
 
-    it('should search actors via REST API', async () => {
-      const mockData = { actors: [{ _id: '1', name: 'Hero', type: 'character' }] };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
+    it('should search actors via REST API and map the module summary (#310)', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          success: true,
+          data: [
+            {
+              id: 'heroaaaaaaaaaaaa',
+              name: 'Hero',
+              type: 'character',
+              hp: { current: 7, max: 12 },
+              ac: 15,
+            },
+          ],
+          total: 1,
+        },
+      });
 
       const result = await client.searchActors({ query: 'Hero' });
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
         params: { query: 'Hero' },
       });
-      expect(result.actors).toEqual(mockData.actors);
+      expect(result.actors).toEqual([
+        {
+          _id: 'heroaaaaaaaaaaaa',
+          name: 'Hero',
+          type: 'character',
+          hp: { value: 7, max: 12 },
+          ac: { value: 15 },
+        },
+      ]);
     });
 
-    it('should search items via REST API', async () => {
-      const mockData = { items: [{ _id: '1', name: 'Sword', type: 'weapon' }] };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
+    it('should search items via REST API and map the module summary', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          success: true,
+          data: [{ id: 'swordaaaaaaaaaaa', name: 'Sword', type: 'weapon' }],
+          total: 1,
+        },
+      });
 
       const result = await client.searchItems({ query: 'Sword', type: 'weapon', limit: 10 });
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/items', {
         params: { query: 'Sword', type: 'weapon', limit: 10 },
       });
-      expect(result.items).toEqual(mockData.items);
+      expect(result.items).toEqual([{ _id: 'swordaaaaaaaaaaa', name: 'Sword', type: 'weapon' }]);
     });
 
-    it('should get world info via REST API', async () => {
-      const mockWorld = { id: 'world-1', title: 'Test World', system: 'dnd5e' };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockWorld });
+    it('should get world info via REST API and map it', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { success: true, data: { id: 'world-1', title: 'Test World', system: 'dnd5e' } },
+      });
 
       const result = await client.getWorldInfo();
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
-      expect(result).toEqual(mockWorld);
+      expect(result).toMatchObject({ id: 'world-1', title: 'Test World', system: 'dnd5e' });
+    });
+
+    it('should reject an unmapped REST actor shape with a clear error', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { actors: [{ _id: '1', name: 'Hero', type: 'character' }] },
+      });
+
+      await expect(client.searchActors({ query: 'Hero' })).rejects.toThrow(
+        /unexpected response shape/,
+      );
     });
 
     it('should retry failed requests', async () => {
@@ -321,7 +379,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'test' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
@@ -375,7 +433,7 @@ describe('FoundryClient', () => {
       }
 
       beforeEach(async () => {
-        mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+        mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { success: true, data: {} } });
         await client.connect();
         expect(client.isConnected()).toBe(true);
       });
@@ -489,7 +547,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(429))
         .mockRejectedValueOnce(build4xxError(429))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
@@ -506,7 +564,7 @@ describe('FoundryClient', () => {
 
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(500))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
@@ -523,7 +581,7 @@ describe('FoundryClient', () => {
 
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(503))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
@@ -542,7 +600,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(new Error('transient'))
         .mockRejectedValueOnce(new Error('transient'))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const start = Date.now();
       await client.searchActors({ query: 'x' });
@@ -709,14 +767,17 @@ describe('FoundryClient', () => {
 
       it('lets a parenthesised formula through to FoundryVTT over REST', async () => {
         mockAxiosInstance.post.mockResolvedValue({
-          data: { total: 21, terms: [{ results: [16] }] },
+          data: {
+            success: true,
+            data: { total: 21, breakdown: [{ dice: '1d20', results: [16], total: 16 }] },
+          },
         });
 
         const result = await restClient().rollDice('(1d20+5)', 'Attack');
 
         expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/dice/roll', {
           formula: '(1d20+5)',
-          flavor: 'Attack',
+          reason: 'Attack',
         });
         expect(result.total).toBe(21);
       });
@@ -796,7 +857,10 @@ describe('FoundryClient', () => {
 
       it('marks a roll FoundryVTT evaluated as source "server" and warns about nothing', async () => {
         mockAxiosInstance.post.mockResolvedValue({
-          data: { total: 21, terms: [{ results: [16] }] },
+          data: {
+            success: true,
+            data: { total: 21, breakdown: [{ dice: '1d20', results: [16], total: 16 }] },
+          },
         });
 
         const result = await restClient().rollDice('1d20+5');
@@ -1525,7 +1589,7 @@ describe('FoundryClient', () => {
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
       });
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { success: true, data: {} } });
 
       await restClient.connect();
       expect(restClient.isConnected()).toBe(true);

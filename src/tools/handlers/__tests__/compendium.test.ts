@@ -84,6 +84,23 @@ describe('Compendium handlers', () => {
       expect(text).toContain('requires FOUNDRY_API_KEY');
     });
 
+    it('names the bridge failure instead of the missing key when the bridge is down', async () => {
+      const mockClient = createMockClient({
+        results: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        restAvailable: false,
+        nextCursor: null,
+        unavailableReason: 'the REST bridge is unavailable (HTTP 404)',
+      });
+      const result = await handleSearchCompendium({ query: 'Divine Smite' }, mockClient);
+
+      const text = result.content[0].text;
+      expect(text).toContain('the REST bridge is unavailable (HTTP 404)');
+      expect(text).not.toContain('requires FOUNDRY_API_KEY');
+    });
+
     it('surfaces the next-page cursor when more results remain', async () => {
       const mockClient = createMockClient({
         ...divineSmite2014,

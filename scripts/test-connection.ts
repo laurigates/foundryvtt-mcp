@@ -107,7 +107,7 @@ async function testConnection() {
         });
         console.log('✅ Actor search works!\n');
       } else {
-        console.log('ℹ️  No actors found (may require REST API module)\n');
+        console.log('ℹ️  No actors found (the world may have none)\n');
       }
     } catch (error) {
       if (config.foundry.apiKey && isRestRouteMissing(error)) {
@@ -155,11 +155,14 @@ async function testConnection() {
     console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
 
     if (!config.foundry.apiKey) {
-      console.log('\n💡 Optional: the "Foundry REST API" module adds the diagnostics + compendium path.');
-      console.log('   1. Install the "Foundry REST API" module in FoundryVTT');
-      console.log('   2. Copy the API key from the module configuration page');
-      console.log('   3. Set FOUNDRY_API_KEY in .env (this switches the client to REST transport)');
-      console.log('   4. Restart the MCP server');
+      console.log('\n💡 Optional: the REST bridge adds prepared actor values, compendium search and diagnostics.');
+      console.log('   1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api');
+      console.log('      (no published release yet; install from a checkout)');
+      console.log('   2. Enable the module, turn on its REST API and copy the API key');
+      console.log('   3. Start the bridge server (port 3030) and keep a Gamemaster logged in through a browser');
+      console.log('   4. Set FOUNDRY_API_KEY and FOUNDRY_REST_URL (e.g. http://localhost:3030) in .env, keeping');
+      console.log('      the Socket.IO credentials (dual mode)');
+      console.log('   5. Restart the MCP server');
     }
 
   } catch (error) {

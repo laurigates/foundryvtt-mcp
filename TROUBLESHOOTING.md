@@ -121,16 +121,17 @@ The server provides detailed diagnostics on startup. Look for:
 **Symptoms**: Dice roll commands fail
 **Solutions**:
 1. **Check formula**: The portable local notation accepts dice terms and whole numbers joined by `+` or `-` (e.g., `1d20+5`, `2d6 + 1d4`).
-2. **Choose the evaluator**: Socket.IO mode rolls locally; REST mode may use Foundry's Roll engine, then fall back to the local roller if REST rolling is unavailable. Foundry modifiers such as `4d6kh3` are not supported by this tool.
+2. **Choose the evaluator**: Socket.IO mode rolls locally; with the REST bridge configured, rolls use Foundry's Roll engine and fall back to the local roller if the bridge is unavailable. Foundry modifiers such as `4d6kh3` are not supported by this tool.
 
 #### Diagnostics Tools Not Working
 **Symptoms**: Health monitoring and log tools fail
 **Solutions**:
-1. **Transport mode**: `FOUNDRY_API_KEY` selects the optional Foundry Local REST API connection rather than Socket.IO.
-2. **Module**: Install and enable the REST API module in your Foundry world and use its API key.
-3. **Probe**: Check that `GET /api/world` responds with a JSON object using the `x-api-key` header.
-4. **Scope**: `get_recent_logs`, `search_logs` and `get_system_health` use backend endpoints; `diagnose_errors` is a placeholder and `get_health_status` can return a partial summary.
-5. **Writes**: The existing mutation tools require an authenticated Socket.IO connection instead of REST mode.
+1. **Bridge configured**: log and system-health tools need the optional REST bridge ([laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api)). Set `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` alongside the Socket.IO credentials; `get_health_status` shows the mode and whether the bridge is reachable. See the [configuration guide](docs/guides/configuration.md#optional-rest-bridge-augment).
+2. **Module and bridge server**: the module must be enabled in your world, the bridge server running (port `3030` by default), and a Gamemaster logged in through a browser. The module has no published release yet, so install it from a checkout.
+3. **Probe**: Check that `GET <FOUNDRY_REST_URL>/api/world` responds with a JSON object using the `x-api-key` header.
+4. **Known bridge defect**: the bridge's `/api/diagnostics/*` routes do not work yet (laurigates/foundryvtt-local-rest-api#6), so these tools report as unavailable even with a working bridge.
+5. **Scope**: `get_recent_logs`, `search_logs` and `get_system_health` use backend endpoints; `diagnose_errors` is a placeholder and `get_health_status` can return a partial summary.
+6. **Writes**: The mutation tools always use the authenticated Socket.IO connection, never the bridge.
 
 ## Environment Configuration
 
@@ -144,9 +145,10 @@ FOUNDRY_PASSWORD=your_password
 # Optional: Direct user ID bypass
 # FOUNDRY_USER_ID=abc123def456ghij
 
-# Optional alternative transport: Foundry Local REST API (compendium search/diagnostics)
-# Setting this key switches away from Socket.IO and disables Socket.IO writes
+# Optional REST bridge (laurigates/foundryvtt-local-rest-api), alongside Socket.IO (dual mode).
+# Both are needed; the key alone selects the deprecated REST-only mode.
 # FOUNDRY_API_KEY=your_api_key_here
+# FOUNDRY_REST_URL=http://localhost:3030
 
 # Optional Socket.IO writes (require GM/owner permissions)
 # FOUNDRY_WRITE_ENABLED=false

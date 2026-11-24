@@ -3,9 +3,12 @@ id: ADR-004
 title: In-Memory World State Cache
 status: accepted
 created: 2026-03-03
+amended-by: ADR-013
 ---
 
 # ADR-004: In-Memory World State Cache
+
+> **Amended by [ADR-013](../../adrs/0013-live-world-cache-from-broadcasts.md) (recorded 2026-11-24):** since #208 (2026-08-11) the cache follows `modifyDocument` broadcasts instead of staying a connect-time snapshot. The in-memory cache and `refresh_world_data` stand. The body below is unchanged.
 
 ## Context
 

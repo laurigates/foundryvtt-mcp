@@ -46,47 +46,52 @@ bun run test-connection # Test MCP→FoundryVTT connection
 
 ### Authentication & transport selection
 
-`client.ts` selects transport purely by whether `FOUNDRY_API_KEY` is set:
+`src/foundry/transport.ts` (`resolveTransportPlan`) picks one of three modes
+from configuration alone (empty values count as unset); the design is
+[ADR-011](docs/adrs/0011-dual-mode-transport.md):
 
-- **`FOUNDRY_API_KEY` unset → Socket.IO mode** (default): authenticates with
-  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD` and loads full `worldData`.
-- **`FOUNDRY_API_KEY` set → REST API mode**: probes the REST module's
-  authenticated `/api/world` (`probeRestModule()` in `src/foundry/rest-probe.ts`,
-  re-exported from `client.ts`) and counts as
-  connected only when it answers with a JSON object. `/api/status` is served
+- **`socket`** (default, no `FOUNDRY_API_KEY`): authenticates with
+  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD` and loads the live `worldData` cache.
+- **`dual`** (`FOUNDRY_API_KEY` + `FOUNDRY_REST_URL` + Socket.IO credentials):
+  Socket.IO stays primary; the REST bridge
+  ([laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api),
+  module + Node bridge server on `:3030`) augments it with prepared dnd5e values,
+  Foundry's dice engine, compendium search, logs and system health. A failed
+  bridge call falls back to the Socket.IO answer; `connect()` never fails
+  because of the bridge. A transport failure pauses the whole bridge, a 5xx
+  (e.g. no GM browser client) pauses that capability, both for 30 s; a 4xx
+  pauses nothing. The prepared values and the diagnostics/compendium routes
+  depend on bridge fixes (foundryvtt-local-rest-api#8, #6; its PR #4).
+- **`rest`** (deprecated: the key without Socket.IO credentials, or without
+  `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
+  startup warning. It probes the bridge's authenticated `/api/world`
+  (`probeRestModule()` in `src/foundry/rest-probe.ts`); `/api/status` is served
   unauthenticated by Foundry core, so it proves neither the module nor the key.
-  This is a transport **switch**, not an additive layer — it does not run
-  alongside the Socket.IO `worldData` path.
-- `USE_REST_MODULE` (seen in some `.env`/example files and the `test-connection`
-  tips) is **not read** by `src/config/index.ts` — it is a no-op. Transport is
-  decided solely by `apiKey` presence.
+- `USE_REST_MODULE` (seen in some `.env`/example files) is **not read** by
+  `src/config/index.ts` — it is a no-op.
 
-**The exposed tool list depends on the mode** (`src/tools/availability.ts`):
-`tools/list` is filtered by transport, and the same rules gate `CallTool`.
-
-- **Shared** tools (e.g. `roll_dice`, `search_actors`, `get_health_status`) are
-  offered in both modes.
-- **Socket-only** tools (e.g. `search_world`, `get_combat_state`,
-  `get_journal`) are offered only in Socket.IO mode.
-- **REST-only** tools (`search_compendium`, `get_recent_logs`, `search_logs`,
-  `get_system_health`) are offered only in REST mode — they are **hidden** in
-  Socket.IO mode, not served as empty results.
-- **Write** tools (the 11 mutating tools, e.g. `move_token`, `end_combat`) are
-  offered **only** in Socket.IO mode **and** with `FOUNDRY_WRITE_ENABLED=true`.
-
-A direct `CallTool` for a hidden tool is rejected with a reason naming the
-actual cause (writes disabled vs REST mode vs Socket.IO mode); a name absent
-from the table falls through to the router's "Unknown tool" error.
+**One table decides sources and tool exposure**: `src/foundry/capabilities.ts`
+lists, per capability, the sources that can serve it and the preferred one, and
+maps every tool to its capabilities. `src/tools/availability.ts` derives
+`tools/list` and the CallTool gate from it; `FoundryClient` routes reads with it.
+Write tools are offered only where Socket.IO is connected **and**
+`FOUNDRY_WRITE_ENABLED=true`. A direct `CallTool` for a hidden tool is rejected
+with a reason naming the actual cause; a name absent from the table falls
+through to the router's "Unknown tool" error. The per-mode result is recorded in
+`docs/guides/capabilities.md` and pinned by
+`src/tools/__tests__/capability-matrix.test.ts`; field differences between the
+transports are `KNOWN_GAPS` in `src/foundry/parity.ts`.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `FOUNDRY_URL` | Yes | FoundryVTT server URL |
-| `FOUNDRY_USERNAME` | Yes | FoundryVTT user |
-| `FOUNDRY_PASSWORD` | Yes | FoundryVTT password |
+| `FOUNDRY_USERNAME` | Socket.IO, dual | FoundryVTT user |
+| `FOUNDRY_PASSWORD` | Socket.IO, dual | FoundryVTT password |
 | `FOUNDRY_USER_ID` | No | Bypass username→ID resolution |
-| `FOUNDRY_API_KEY` | No | REST API module key (read-only diagnostics path) |
+| `FOUNDRY_API_KEY` | No | REST bridge key; with `FOUNDRY_REST_URL` and credentials → dual mode |
+| `FOUNDRY_REST_URL` | No | REST bridge server URL (e.g. `http://localhost:3030`) |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default `false`) |
 | `LOG_LEVEL` | No | `debug` for verbose output |
 | `FOUNDRY_TIMEOUT` | No | Request timeout (ms, default 10000) |
@@ -96,7 +101,7 @@ from the table falls through to the router's "Unknown tool" error.
 See `.claude/rules/` for detailed guidelines:
 - `development.md` — TDD workflow, commit conventions, build commands
 - `testing.md` — Test tiers (unit, integration, E2E) and requirements
-- `foundry-write-protocol.md` — transport (Socket.IO vs REST) and the `modifyDocument` write protocol
+- `foundry-write-protocol.md` — transports (Socket.IO primary, REST bridge augment) and the `modifyDocument` write protocol
 - `document-management.md` — Document detection and organization
 
 ## Reference

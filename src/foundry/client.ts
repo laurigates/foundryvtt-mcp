@@ -10,6 +10,7 @@ import { io, type Socket } from 'socket.io-client';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { authenticateFoundry, sessionSocketOptions, socketOrigin } from './auth.js';
+import { type Capability, sourceOrder } from './capabilities.js';
 import { evaluateDiceFormula } from './dice-formula.js';
 import {
   abilityModifier,
@@ -17,7 +18,20 @@ import {
   flatArmorClass,
   proficiencyBonus,
 } from './dnd5e-derived.js';
-import { probeRestModule } from './rest-probe.js';
+import {
+  decodeCursor,
+  mapRestActor,
+  mapRestActorSearch,
+  mapRestCompendiumSearch,
+  mapRestDiceRoll,
+  mapRestItemSearch,
+  mapRestScene,
+  mapRestWorld,
+  RestRequestError,
+  RestShapeError,
+} from './rest-mappers.js';
+import { probeRestModule, RestKeyRejectedError, RestProbeResponseError } from './rest-probe.js';
+import { resolveTransportPlan, type TransportMode } from './transport.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -36,6 +50,7 @@ import type {
   WorldCombat,
   WorldData,
   WorldEffect,
+  WorldItem,
   WorldJournal,
   WorldMessage,
   WorldScene,
@@ -114,6 +129,80 @@ function hasHttpResponse(error: unknown): boolean {
 }
 
 /**
+ * HTTP status of a rejected REST request, read reflectively from the error or,
+ * for an error that wraps one (the connect probe), from its `cause`.
+ */
+function restStatusOf(error: unknown): number | undefined {
+  for (const candidate of [error, causeOf(error)]) {
+    const response = responseOf(candidate);
+    const status: unknown = response === undefined ? undefined : Reflect.get(response, 'status');
+    if (typeof status === 'number') {
+      return status;
+    }
+  }
+  return undefined;
+}
+
+function causeOf(error: unknown): unknown {
+  return typeof error === 'object' && error !== null ? Reflect.get(error, 'cause') : undefined;
+}
+
+function responseOf(error: unknown): object | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+  const response: unknown = Reflect.get(error, 'response');
+  return typeof response === 'object' && response !== null ? response : undefined;
+}
+
+/**
+ * The bridge's own one-line explanation in an error body (`{ message }`), if
+ * any: e.g. "Failed to communicate with FoundryVTT server" for the 500 it
+ * answers when no GM browser client runs the module.
+ */
+function restBodyMessage(error: unknown): string | undefined {
+  for (const candidate of [error, causeOf(error)]) {
+    const response = responseOf(candidate);
+    const data: unknown = response === undefined ? undefined : Reflect.get(response, 'data');
+    if (typeof data === 'object' && data !== null) {
+      const message: unknown = Reflect.get(data, 'message');
+      if (typeof message === 'string' && message.trim() !== '') {
+        return message.replace(/\s+/g, ' ').trim().slice(0, 200);
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * What a failed REST request says about the bridge:
+ * - `unreachable`: no HTTP response (refused, reset, DNS, client timeout);
+ * - `server-error`: an HTTP 5xx — the bridge answered but could not serve the
+ *   request, typically because no GM browser client runs the module and its
+ *   socket request timed out;
+ * - `rejected`: an HTTP 4xx, or the module's `success: false` — this request
+ *   was refused; others may work;
+ * - `invalid-response`: a 2xx the MCP cannot read (an incompatible bridge).
+ */
+function classifyRestFailure(error: unknown): Exclude<RestState, 'ok'> {
+  const status = restStatusOf(error);
+  if (status !== undefined) {
+    return status >= 500 ? 'server-error' : 'rejected';
+  }
+  if (
+    error instanceof RestShapeError ||
+    error instanceof RestProbeResponseError ||
+    error instanceof z.ZodError
+  ) {
+    return 'invalid-response';
+  }
+  if (error instanceof RestRequestError) {
+    return 'rejected';
+  }
+  return 'unreachable';
+}
+
+/**
  * Spacing between sibling `sort` values, mirroring Foundry's
  * `CONST.SORT_INTEGER_DENSITY`. Leaving every sibling at the default `0` makes
  * ordering depend on incidental collection insertion order, and gives Foundry
@@ -130,22 +219,7 @@ const TOKEN_ACTOR_UUID_PATTERN =
   /^(Actor\.[a-zA-Z0-9]{16}|Scene\.[a-zA-Z0-9]{16}\.Token\.[a-zA-Z0-9]{16}\.Actor\.[a-zA-Z0-9]{16})$/;
 
 /**
- * Minimal Zod schema for the `/api/dice/roll` REST response.
- *
- * The REST module is external input, so the body is validated rather than read
- * off an `any`: a 200 whose payload carries no numeric `total` would otherwise
- * produce a `DiceRoll` with `total: undefined` while the type claims `number`,
- * and `roll_dice` would render that straight to the caller. A body that does
- * not match is treated like any other REST failure and falls through to the
- * local roller.
- */
-const RestDiceRollSchema = z.object({
-  total: z.number(),
-  terms: z.array(z.object({ results: z.array(z.number()).optional() })).optional(),
-});
-
-/**
- * Loggable summary of why a REST dice call failed (#254).
+ * Loggable summary of why a REST call failed (#254).
  *
  * Reads only the HTTP status and the error code, structurally rather than via
  * `axios.isAxiosError`, so nothing else on the error — in particular
@@ -156,7 +230,7 @@ function describeRestFailure(error: unknown): {
   status?: number;
   code?: string;
 } {
-  if (error instanceof z.ZodError) {
+  if (error instanceof z.ZodError || error instanceof RestShapeError) {
     return { reason: 'response body failed schema validation' };
   }
   if (typeof error !== 'object' || error === null) {
@@ -204,6 +278,11 @@ const WorldDataSchema = z.object({
 export interface FoundryClientConfig {
   baseUrl: string;
   apiKey?: string;
+  /**
+   * REST bridge server (FOUNDRY_REST_URL). With `apiKey` and Socket.IO
+   * credentials it enables dual mode; see `transport.ts`.
+   */
+  restUrl?: string;
   username?: string;
   password?: string;
   userId?: string;
@@ -214,6 +293,49 @@ export interface FoundryClientConfig {
   /** Opt-in gate for game-state mutations (FOUNDRY_WRITE_ENABLED). Default false. */
   writeEnabled?: boolean;
 }
+
+/** Outcome of the last REST request; see {@link classifyRestFailure}. */
+export type RestState = 'ok' | 'unreachable' | 'server-error' | 'rejected' | 'invalid-response';
+
+/** Dual mode: bridge calls skipped until a cooldown ends. */
+export interface RestPause {
+  /** One capability (after its 5xx), or `bridge` for every call. */
+  scope: Capability | 'bridge';
+  /** The failure that started the pause. */
+  error: string;
+  retryInSeconds: number;
+}
+
+/** Both connections as `get_health_status` reports them. */
+export interface ConnectionReport {
+  mode: TransportMode;
+  socket: { used: boolean; connected: boolean };
+  rest: {
+    configured: boolean;
+    /** Origin and path of the REST base URL; credentials in it are never shown. */
+    baseUrl?: string;
+    /**
+     * The last REST request got an HTTP answer (any state but `unreachable`).
+     * Undefined until the first REST request (or the connect probe) completes.
+     */
+    reachable?: boolean;
+    /** Outcome of the last REST request; undefined before the first. */
+    state?: RestState;
+    /** Why the last REST request failed; absent when it succeeded. */
+    lastError?: string;
+    /** Dual mode: pauses still running; absent when none. */
+    paused?: RestPause[];
+  };
+}
+
+/**
+ * How long dual mode skips the bridge after a failure that would cost the
+ * same wait again: the whole bridge after a transport failure (or a 5xx on the
+ * connect probe), one capability after its 5xx. A bridge with no GM client
+ * answers 500 only after its own REQUEST_TIMEOUT (5 s by default), so without
+ * the pause every call would wait that long before falling back.
+ */
+const REST_RETRY_AFTER_MS = 30_000;
 
 /** One FoundryVTT `modifyDocument` response, as far as the write path reads it. */
 const DocumentSocketResponseSchema = z.object({
@@ -280,9 +402,24 @@ export class FoundryClient {
   private worldDataStale = false;
   /**
    * Last observed outcome of a REST request: false once one failed to reach
-   * FoundryVTT at all (#217). Unused in Socket.IO mode.
+   * the REST server at all (#217). Unused in Socket.IO mode.
    */
   private restLinkLive = true;
+  private readonly mode: TransportMode;
+  private readonly transportWarnings: readonly string[];
+  /** HTTP client for the REST bridge (dual) or REST server (REST-only); null in Socket.IO mode. */
+  private rest: AxiosInstance | null = null;
+  private restBaseUrl: string | undefined;
+  /** Outcome of the last REST request in any mode; undefined before the first. */
+  private restState: RestState | undefined;
+  private restLastError: string | undefined;
+  /** Dual mode: skip every bridge call until this time (transport failure, probe 5xx). */
+  private restRetryAfter = 0;
+  private restPauseError: string | undefined;
+  /** Dual mode: skip one capability's bridge calls until `until`, after its 5xx. */
+  private readonly restCapabilityPauses = new Map<Capability, { until: number; error: string }>();
+  /** Dual mode: capabilities whose bridge failure was already logged since the last success. */
+  private readonly restFailuresLogged = new Set<string>();
 
   constructor(config: FoundryClientConfig) {
     if (!config.baseUrl || config.baseUrl.trim() === '') {
@@ -316,28 +453,136 @@ export class FoundryClient {
       validateStatus: (status) => status >= 200 && status < 300,
     });
 
-    if (this.config.apiKey) {
-      this.http.interceptors.request.use((reqConfig) => {
-        reqConfig.headers['x-api-key'] = this.config.apiKey;
-        return reqConfig;
-      });
+    const plan = resolveTransportPlan({
+      url: this.config.baseUrl,
+      apiKey: this.config.apiKey,
+      restUrl: this.config.restUrl,
+      username: this.config.username,
+      userId: this.config.userId,
+      password: this.config.password,
+    });
+    this.mode = plan.mode;
+    this.transportWarnings = plan.warnings;
 
-      // REST mode has no socket to ask about liveness, so every request that
-      // does happen doubles as the probe (#217). See `isConnected()`.
-      this.http.interceptors.response.use(
-        (response) => {
-          this.restLinkLive = true;
-          return response;
-        },
-        (error: unknown) => {
-          this.restLinkLive = hasHttpResponse(error);
-          return Promise.reject(error);
-        },
-      );
+    if (plan.restBaseUrl !== undefined) {
+      try {
+        new URL(plan.restBaseUrl);
+      } catch {
+        throw new Error(`Invalid restUrl: ${plan.restBaseUrl}`);
+      }
+      this.restBaseUrl = plan.restBaseUrl;
+      this.rest = this.createRestClient(plan.restBaseUrl);
     }
 
-    const mode = this.config.apiKey ? 'REST API' : 'Socket.IO';
-    logger.info(`FoundryVTT client initialized (${mode} mode)`);
+    const label = { socket: 'Socket.IO', dual: 'Socket.IO + REST bridge', rest: 'REST API' }[
+      this.mode
+    ];
+    logger.info(`FoundryVTT client initialized (${label} mode)`);
+  }
+
+  /**
+   * The REST HTTP client: sends the key, and records every outcome so that
+   * liveness needs no extra I/O (#217). Only this client carries the key; the
+   * Foundry HTTP client never does.
+   */
+  private createRestClient(baseURL: string): AxiosInstance {
+    const rest = axios.create({
+      baseURL,
+      timeout: this.config.timeout || 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'FoundryMCP/0.2.0',
+      },
+      maxRedirects: 3,
+      maxContentLength: 50 * 1024 * 1024,
+      maxBodyLength: 50 * 1024 * 1024,
+      validateStatus: (status) => status >= 200 && status < 300,
+    });
+    rest.interceptors.request.use((reqConfig) => {
+      reqConfig.headers['x-api-key'] = this.config.apiKey;
+      return reqConfig;
+    });
+    rest.interceptors.response.use(
+      (response) => {
+        this.restLinkLive = true;
+        this.restState = 'ok';
+        this.restLastError = undefined;
+        return response;
+      },
+      (error: unknown) => {
+        this.restLinkLive = hasHttpResponse(error);
+        this.noteRestFailure(error);
+        return Promise.reject(error);
+      },
+    );
+    return rest;
+  }
+
+  /** Which connections this client uses; see `transport.ts`. */
+  getTransportMode(): TransportMode {
+    return this.mode;
+  }
+
+  /** Configuration problems found when choosing the transport, for logging once at startup. */
+  getTransportWarnings(): readonly string[] {
+    return this.transportWarnings;
+  }
+
+  /** Both connections, for `get_health_status`. Never does I/O. */
+  getConnectionReport(): ConnectionReport {
+    const socketUsed = this.mode !== 'rest';
+    const report: ConnectionReport = {
+      mode: this.mode,
+      socket: { used: socketUsed, connected: socketUsed && this.isConnected() },
+      rest: { configured: this.rest !== null },
+    };
+    if (this.rest !== null && this.restBaseUrl !== undefined) {
+      const url = new URL(this.restBaseUrl);
+      report.rest.baseUrl = `${url.origin}${url.pathname === '/' ? '' : url.pathname}`;
+      if (this.restState !== undefined) {
+        report.rest.reachable = this.restState !== 'unreachable';
+        report.rest.state = this.restState;
+      }
+      if (this.restLastError !== undefined && this.restState !== 'ok') {
+        report.rest.lastError = this.restLastError;
+      }
+      const paused = this.activeRestPauses();
+      if (paused.length > 0) {
+        report.rest.paused = paused;
+      }
+    }
+    return report;
+  }
+
+  /** Pauses still running, whole bridge first. */
+  private activeRestPauses(): RestPause[] {
+    const now = Date.now();
+    const seconds = (until: number) => Math.ceil((until - now) / 1000);
+    const paused: RestPause[] = [];
+    if (now < this.restRetryAfter) {
+      paused.push({
+        scope: 'bridge',
+        error: this.restPauseError ?? 'request failed',
+        retryInSeconds: seconds(this.restRetryAfter),
+      });
+    }
+    for (const [capability, pause] of this.restCapabilityPauses) {
+      if (now < pause.until) {
+        paused.push({
+          scope: capability,
+          error: pause.error,
+          retryInSeconds: seconds(pause.until),
+        });
+      }
+    }
+    return paused;
+  }
+
+  /** The pause that currently stops `capability` reaching the bridge, if any. */
+  private restPauseFor(capability: Capability): RestPause | undefined {
+    return this.activeRestPauses().find(
+      (pause) => pause.scope === 'bridge' || pause.scope === capability,
+    );
   }
 
   /**
@@ -347,12 +592,15 @@ export class FoundryClient {
    * Socket.IO mode: authenticates and loads full worldData.
    */
   async connect(): Promise<void> {
-    if (this.config.apiKey) {
+    if (this.mode === 'rest' && this.rest) {
+      const rest = this.rest;
       try {
-        await probeRestModule((url) => this.http.get(url));
+        await probeRestModule((url) => rest.get(url));
         this._isConnected = true;
+        this.recordRestSuccess();
         logger.info('Connected to FoundryVTT via REST API module');
       } catch (error) {
+        this.recordRestFailure(error);
         logger.error('Failed to connect via REST API module:', error);
         throw error;
       }
@@ -383,6 +631,144 @@ export class FoundryClient {
       scenes: this.worldData.scenes.length,
       items: this.worldData.items.length,
     });
+
+    if (this.mode === 'dual') {
+      await this.probeRestAugment();
+    }
+  }
+
+  /**
+   * Dual mode: checks the bridge once at connect. A failure is logged and
+   * recorded, never thrown: Socket.IO is connected and every tool works
+   * without the bridge, with the derived values labelled as before.
+   */
+  private async probeRestAugment(): Promise<void> {
+    const rest = this.rest;
+    if (!rest) {
+      return;
+    }
+    try {
+      await probeRestModule((url) => rest.get(url));
+      this.recordRestSuccess();
+      logger.info('Connected to the REST bridge', { url: this.getConnectionReport().rest.baseUrl });
+    } catch (error) {
+      this.recordRestFailure(error);
+      logger.warn(
+        'REST bridge unavailable — continuing on Socket.IO only; derived actor values, ' +
+          'compendium search, logs and system health will report as unavailable',
+        { ...describeRestFailure(error), error: this.restLastError },
+      );
+    }
+  }
+
+  private recordRestSuccess(capability?: Capability): void {
+    this.restState = 'ok';
+    this.restLastError = undefined;
+    this.restRetryAfter = 0;
+    this.restPauseError = undefined;
+    if (capability !== undefined) {
+      this.restCapabilityPauses.delete(capability);
+    }
+    this.restFailuresLogged.clear();
+  }
+
+  /** Records the state and summary of a failed REST request; returns the state. */
+  private noteRestFailure(error: unknown): Exclude<RestState, 'ok'> {
+    const state = classifyRestFailure(error);
+    this.restState = state;
+    this.restLastError = restErrorSummary(error);
+    return state;
+  }
+
+  /**
+   * Records a failed REST request and starts the pause it calls for (honoured
+   * in dual mode, for {@link REST_RETRY_AFTER_MS}):
+   * - no HTTP response: the whole bridge;
+   * - a 5xx: the capability that got it, or the whole bridge when there is
+   *   none (the connect probe, whose 5xx means no GM client serves any route);
+   * - a 4xx or an unreadable answer: no pause — the bridge answered at once,
+   *   so this call falls back and the next one asks again.
+   * Outside dual mode only the state is recorded: REST-only mode retries in
+   * `executeWithRetry` and nothing reads a pause, so reporting one would mislead.
+   */
+  private recordRestFailure(error: unknown, capability?: Capability): void {
+    const state = this.noteRestFailure(error);
+    if (this.mode !== 'dual') {
+      return;
+    }
+    const until = Date.now() + REST_RETRY_AFTER_MS;
+    const summary = this.restLastError ?? 'request failed';
+    if (state === 'unreachable' || (state === 'server-error' && capability === undefined)) {
+      this.restRetryAfter = until;
+      this.restPauseError = summary;
+    } else if (state === 'server-error' && capability !== undefined) {
+      this.restCapabilityPauses.set(capability, { until, error: summary });
+    }
+  }
+
+  /**
+   * Dual mode: runs one REST call for `capability`. Returns undefined instead
+   * of throwing when the bridge is paused, unreachable, answers an error or an
+   * unknown shape, so the caller can fall back to its Socket.IO answer. The
+   * first failure per capability is logged; later ones stay quiet until a
+   * REST call succeeds again.
+   */
+  private async tryRest<T>(
+    capability: Capability,
+    call: (rest: AxiosInstance) => Promise<T>,
+  ): Promise<T | undefined> {
+    const rest = this.rest;
+    if (!rest || this.restPauseFor(capability) !== undefined) {
+      return undefined;
+    }
+    try {
+      const result = await call(rest);
+      this.recordRestSuccess(capability);
+      return result;
+    } catch (error) {
+      this.recordRestFailure(error, capability);
+      if (!this.restFailuresLogged.has(capability)) {
+        this.restFailuresLogged.add(capability);
+        logger.warn(`REST bridge failed for ${capability} — using the Socket.IO answer instead`, {
+          ...describeRestFailure(error),
+          error: this.restLastError,
+        });
+      }
+      return undefined;
+    }
+  }
+
+  /**
+   * GET on the REST server, for callers with no Socket.IO alternative
+   * (diagnostics). REST-only mode retries as before; dual mode makes one
+   * attempt, honours the pause after a transport failure, and throws a
+   * message naming the bridge; Socket.IO-only mode throws without any I/O.
+   */
+  async restGet(url: string): Promise<{ data: unknown }> {
+    const rest = this.rest;
+    if (!rest) {
+      throw new Error(
+        'The REST bridge is not configured: set FOUNDRY_API_KEY and FOUNDRY_REST_URL to enable it.',
+      );
+    }
+    if (this.mode === 'rest') {
+      return this.executeWithRetry(() => rest.get(url));
+    }
+    const capability = capabilityOfRestPath(url);
+    const pause = this.restPauseFor(capability);
+    if (pause !== undefined) {
+      throw new Error(
+        `The REST bridge is paused for ${pause.scope === 'bridge' ? 'all calls' : capability} ` +
+          `after ${pause.error}; next attempt in ${pause.retryInSeconds} s.`,
+      );
+    }
+    const response = await this.tryRest(capability, (client) => client.get(url));
+    if (response === undefined) {
+      throw new Error(
+        `The REST bridge is unavailable (${this.restLastError ?? 'paused after a failed request'}).`,
+      );
+    }
+    return response;
   }
 
   /**
@@ -606,6 +992,12 @@ export class FoundryClient {
     this.worldDataStale = false;
     this._isConnected = false;
     this.restLinkLive = true;
+    this.restState = undefined;
+    this.restLastError = undefined;
+    this.restRetryAfter = 0;
+    this.restPauseError = undefined;
+    this.restCapabilityPauses.clear();
+    this.restFailuresLogged.clear();
     logger.info('FoundryVTT client disconnected');
   }
 
@@ -629,7 +1021,7 @@ export class FoundryClient {
    * I/O of its own, because this accessor is synchronous and widely called.
    */
   isConnected(): boolean {
-    if (this.config.apiKey) {
+    if (this.mode === 'rest') {
       return this._isConnected && this.restLinkLive;
     }
     return this._isConnected && this.socket?.connected === true;
@@ -712,14 +1104,43 @@ export class FoundryClient {
   // Actor methods
   // ==========================================================================
 
+  /**
+   * Searches actors. Base data comes from the first source the capability
+   * table names for `actors`; in dual mode the bridge's prepared values are
+   * then overlaid by actor id (`actor-derived` prefers REST), and a failed
+   * bridge call leaves the Socket.IO answer as it was.
+   */
   async searchActors(params: SearchActorsParams): Promise<ActorSearchResult> {
-    if (this.config.apiKey) {
+    if (this.preferred('actors') === 'rest') {
+      const rest = this.requireRest();
       return this.executeWithRetry(async () => {
-        const response = await this.http.get('/api/actors', { params });
-        return response.data;
+        const response = await rest.get('/api/actors', { params });
+        return mapRestActorSearch(response.data, params.limit || 10);
       });
     }
 
+    const result = this.searchActorsInWorld(params);
+    if (this.preferred('actor-derived') !== 'rest' || result.actors.length === 0) {
+      return result;
+    }
+    const restResult = await this.tryRest('actor-derived', async (rest) => {
+      const response = await rest.get('/api/actors', { params });
+      return mapRestActorSearch(response.data, params.limit || 10);
+    });
+    if (!restResult) {
+      return result;
+    }
+    const byId = new Map(restResult.actors.map((actor) => [actor._id, actor]));
+    return {
+      ...result,
+      actors: result.actors.map((actor) => {
+        const prepared = byId.get(actor._id);
+        return prepared ? overlayDerivedValues(actor, prepared) : actor;
+      }),
+    };
+  }
+
+  private searchActorsInWorld(params: SearchActorsParams): ActorSearchResult {
     if (!this.worldData) {
       return { actors: [], total: 0, page: 1, limit: params.limit || 10 };
     }
@@ -746,10 +1167,12 @@ export class FoundryClient {
     if (!FOUNDRY_ID_PATTERN.test(actorId)) {
       throw new Error(`Invalid actorId format: ${actorId}`);
     }
-    if (this.config.apiKey) {
+    const route = `/api/actors/${actorId}`;
+    if (this.preferred('actors') === 'rest') {
+      const rest = this.requireRest();
       return this.executeWithRetry(async () => {
-        const response = await this.http.get(`/api/actors/${actorId}`);
-        return response.data;
+        const response = await rest.get(route);
+        return mapRestActor(response.data, route);
       });
     }
 
@@ -757,12 +1180,20 @@ export class FoundryClient {
       throw new Error('Not connected — no world data available');
     }
 
-    const actor = this.worldData.actors.find((a) => a._id === actorId);
-    if (!actor) {
+    const raw = this.worldData.actors.find((a) => a._id === actorId);
+    if (!raw) {
       throw new Error(`Actor not found: ${actorId}`);
     }
 
-    return worldActorToFoundry(actor);
+    const actor = worldActorToFoundry(raw);
+    if (this.preferred('actor-derived') !== 'rest') {
+      return actor;
+    }
+    const prepared = await this.tryRest('actor-derived', async (rest) => {
+      const response = await rest.get(route);
+      return mapRestActor(response.data, route);
+    });
+    return prepared ? overlayDerivedValues(actor, prepared) : actor;
   }
 
   /**
@@ -839,10 +1270,11 @@ export class FoundryClient {
   // ==========================================================================
 
   async searchItems(params: SearchItemsParams): Promise<ItemSearchResult> {
-    if (this.config.apiKey) {
+    if (this.preferred('items') === 'rest') {
+      const rest = this.requireRest();
       return this.executeWithRetry(async () => {
-        const response = await this.http.get('/api/items', { params });
-        return response.data;
+        const response = await rest.get('/api/items', { params });
+        return mapRestItemSearch(response.data, params.limit || 10);
       });
     }
 
@@ -863,32 +1295,7 @@ export class FoundryClient {
 
     const total = results.length;
     const limit = params.limit || 10;
-    const items = results.slice(0, limit).map((i) => {
-      const item: {
-        _id: string;
-        name: string;
-        type: string;
-        img?: string;
-        description?: string;
-        rarity?: string;
-      } = {
-        _id: i._id,
-        name: i.name,
-        type: i.type,
-      };
-      if (i.img) {
-        item.img = i.img;
-      }
-      const desc = extractString(i.system, 'description', 'value');
-      if (desc) {
-        item.description = desc;
-      }
-      const rar = extractString(i.system, 'rarity');
-      if (rar) {
-        item.rarity = rar;
-      }
-      return item;
-    });
+    const items = results.slice(0, limit).map(worldItemToFoundry);
 
     return { items, total, page: 1, limit };
   }
@@ -901,40 +1308,46 @@ export class FoundryClient {
    * Searches FoundryVTT compendium packs by name and metadata.
    *
    * Compendium data is not present in the cached worldData snapshot, so this
-   * read requires the REST API module (FOUNDRY_API_KEY). When the key is
-   * absent it returns a graceful empty result with `restAvailable: false`
-   * rather than throwing, mirroring the no-worldData behaviour of
-   * {@link searchItems}/{@link searchActors}; the handler surfaces a note
-   * explaining why no results were returned.
+   * read needs the REST bridge. Without one it returns a graceful empty result
+   * with `restAvailable: false` rather than throwing; in dual mode a failed
+   * bridge call returns the same result with `unavailableReason` set. The
+   * handler surfaces a note explaining why no results were returned. REST-only
+   * mode keeps throwing on failure, as before.
    */
   async searchCompendium(params: CompendiumSearchParams): Promise<CompendiumSearchResult> {
     const limit = params.limit ?? 20;
     const offset = decodeCursor(params.cursor);
-
-    if (this.config.apiKey) {
-      return this.executeWithRetry(async () => {
-        // Translate the opaque cursor into a wire offset for the bridge.
-        const { cursor: _cursor, ...rest } = params;
-        const response = await this.http.get('/api/compendium/search', {
-          params: { ...rest, limit, offset },
-        });
-        const data = (
-          isRecord(response.data) ? response.data : {}
-        ) as Partial<CompendiumSearchResult>;
-        const results = data.results ?? [];
-        const total = typeof data.total === 'number' ? data.total : results.length;
-        const nextOffset = offset + results.length;
-        return {
-          results,
-          total,
-          page: Math.floor(offset / limit) + 1,
-          limit,
-          restAvailable: true,
-          nextCursor: nextOffset < total ? encodeCursor(nextOffset) : null,
-        };
+    const unavailable: CompendiumSearchResult = {
+      results: [],
+      total: 0,
+      page: 1,
+      limit,
+      restAvailable: false,
+      nextCursor: null,
+    };
+    // Translate the opaque cursor into a wire offset for the bridge.
+    const { cursor: _cursor, ...query } = params;
+    const search = async (rest: AxiosInstance) => {
+      const response = await rest.get('/api/compendium/search', {
+        params: { ...query, limit, offset },
       });
+      return mapRestCompendiumSearch(response.data, { limit, offset });
+    };
+
+    if (this.preferred('compendium') !== 'rest') {
+      return unavailable;
     }
-    return { results: [], total: 0, page: 1, limit, restAvailable: false, nextCursor: null };
+    if (this.mode === 'rest') {
+      const rest = this.requireRest();
+      return this.executeWithRetry(() => search(rest));
+    }
+    const result = await this.tryRest('compendium', search);
+    return (
+      result ?? {
+        ...unavailable,
+        unavailableReason: `the REST bridge is unavailable (${this.restLastError ?? 'paused after a failed request'})`,
+      }
+    );
   }
 
   // ==========================================================================
@@ -1383,11 +1796,12 @@ export class FoundryClient {
     if (sceneId !== undefined && !FOUNDRY_ID_PATTERN.test(sceneId)) {
       throw new Error(`Invalid sceneId format: ${sceneId}`);
     }
-    if (this.config.apiKey) {
+    if (this.preferred('scenes') === 'rest') {
+      const rest = this.requireRest();
+      const endpoint = sceneId ? `/api/scenes/${sceneId}` : '/api/scenes/current';
       return this.executeWithRetry(async () => {
-        const endpoint = sceneId ? `/api/scenes/${sceneId}` : '/api/scenes/current';
-        const response = await this.http.get(endpoint);
-        return response.data;
+        const response = await rest.get(endpoint);
+        return mapRestScene(response.data, endpoint);
       });
     }
 
@@ -1422,10 +1836,11 @@ export class FoundryClient {
   // ==========================================================================
 
   async getWorldInfo(): Promise<FoundryWorld> {
-    if (this.config.apiKey) {
+    if (this.preferred('world-info') === 'rest') {
+      const rest = this.requireRest();
       return this.executeWithRetry(async () => {
-        const response = await this.http.get('/api/world');
-        return response.data;
+        const response = await rest.get('/api/world');
+        return mapRestWorld(response.data);
       });
     }
 
@@ -1443,21 +1858,7 @@ export class FoundryClient {
       };
     }
 
-    const w = this.worldData.world as Record<string, unknown>;
-    const s = this.worldData.system as Record<string, unknown>;
-    const r = this.worldData.release as Record<string, unknown>;
-
-    return {
-      id: (w.id as string) || 'unknown',
-      title: (w.title as string) || 'Unknown World',
-      description: (w.description as string) || '',
-      system: (s.id as string) || 'unknown',
-      coreVersion: (r.version as string) || (r.generation as string) || 'unknown',
-      systemVersion: (s.version as string) || 'unknown',
-      playtime: 0,
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-    };
+    return worldInfoToFoundry(this.worldData);
   }
 
   // ==========================================================================
@@ -1653,38 +2054,34 @@ export class FoundryClient {
       throw new Error(`Invalid dice formula: ${formula}`);
     }
 
-    if (this.config.apiKey) {
+    if (this.preferred('dice') === 'rest') {
       if (!formula || !DICE_FORMULA_ALPHABET.test(formula)) {
         throw alphabetViolation(formula);
       }
+      const body = reason ? { formula, reason } : { formula };
+      const roll = async (rest: AxiosInstance) => {
+        const response = await rest.post('/api/dice/roll', body);
+        return mapRestDiceRoll(response.data, formula, reason);
+      };
 
-      try {
-        const response = await this.http.post('/api/dice/roll', {
-          formula,
-          flavor: reason,
-        });
-
-        const rolled = RestDiceRollSchema.parse(response.data);
-
-        const result: DiceRoll = {
-          formula,
-          total: rolled.total,
-          breakdown: rolled.terms?.map((term) => term.results?.join(', ')).join(' + ') || formula,
-          timestamp: new Date().toISOString(),
-          source: 'server',
-        };
-        if (reason) {
-          result.reason = reason;
+      if (this.mode === 'dual') {
+        // Augment semantics: one logged failure, then the local roller.
+        const rolled = await this.tryRest('dice', roll);
+        if (rolled) {
+          return rolled;
         }
-        return result;
-      } catch (error) {
-        // Keep the fallback, but never in silence (#254): the result is marked
-        // `source: 'local'` and the failure is logged without the request
-        // config, which carries the API key header.
-        logger.warn(
-          'REST dice roll failed — falling back to the local roller',
-          describeRestFailure(error),
-        );
+      } else {
+        try {
+          return await roll(this.requireRest());
+        } catch (error) {
+          // Keep the fallback, but never in silence (#254): the result is marked
+          // `source: 'local'` and the failure is logged without the request
+          // config, which carries the API key header.
+          logger.warn(
+            'REST dice roll failed — falling back to the local roller',
+            describeRestFailure(error),
+          );
+        }
       }
     }
 
@@ -1727,7 +2124,7 @@ export class FoundryClient {
     try {
       await this.connect();
       logger.debug('Authenticated connection test successful', {
-        transport: this.config.apiKey ? 'REST API' : 'Socket.IO',
+        transport: this.mode,
       });
       return true;
     } catch (error) {
@@ -1751,6 +2148,12 @@ export class FoundryClient {
       } catch (error) {
         lastError = error as Error;
 
+        // A body the module would never send, or a failure it reported, does
+        // not change on a retry.
+        if (error instanceof RestShapeError || error instanceof RestRequestError) {
+          throw error;
+        }
+
         if (axios.isAxiosError(error)) {
           const status = error.response?.status;
           if (status && status >= 400 && status < 500 && status !== 429) {
@@ -1771,8 +2174,29 @@ export class FoundryClient {
     throw lastError || new Error('Request failed after all retry attempts');
   }
 
+  /**
+   * The client `/api/*` helpers use: the REST server when one is configured
+   * (it holds the key), Foundry otherwise.
+   */
+  private apiHttp(): AxiosInstance {
+    return this.rest ?? this.http;
+  }
+
+  /** First source the capability table names for `capability` in this mode. */
+  private preferred(capability: Capability): string | undefined {
+    return sourceOrder(capability, this.mode)[0];
+  }
+
+  /** The REST client; only called on paths the capability table routes to REST. */
+  private requireRest(): AxiosInstance {
+    if (!this.rest) {
+      throw new Error('The REST bridge is not configured.');
+    }
+    return this.rest;
+  }
+
   async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.executeWithRetry(() => this.http.get(url, config));
+    return this.executeWithRetry(() => this.apiHttp().get(url, config));
   }
 
   async post<T = unknown>(
@@ -1780,7 +2204,7 @@ export class FoundryClient {
     data?: unknown,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<T>> {
-    return this.executeWithRetry(() => this.http.post(url, data, config));
+    return this.executeWithRetry(() => this.apiHttp().post(url, data, config));
   }
 
   async put<T = unknown>(
@@ -1788,19 +2212,62 @@ export class FoundryClient {
     data?: unknown,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<T>> {
-    return this.executeWithRetry(() => this.http.put(url, data, config));
+    return this.executeWithRetry(() => this.apiHttp().put(url, data, config));
   }
 
   async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.executeWithRetry(() => this.http.delete(url, config));
+    return this.executeWithRetry(() => this.apiHttp().delete(url, config));
   }
 }
 
 // ============================================================================
 // Mapping helpers — WorldData raw documents → display interfaces
+//
+// Exported for the transport parity tests (parity-contract.test.ts), which run
+// the same dnd5e scenario through these and through rest-mappers.ts.
 // ============================================================================
 
-function worldActorToFoundry(a: WorldActor): FoundryActor {
+/** A Socket.IO world (or actor-owned) item → {@link FoundryItem}. */
+export function worldItemToFoundry(i: WorldItem): FoundryItem {
+  const item: FoundryItem = {
+    _id: i._id,
+    name: i.name,
+    type: i.type,
+  };
+  if (i.img) {
+    item.img = i.img;
+  }
+  const desc = extractString(i.system, 'description', 'value');
+  if (desc) {
+    item.description = desc;
+  }
+  const rar = extractString(i.system, 'rarity');
+  if (rar) {
+    item.rarity = rar;
+  }
+  return item;
+}
+
+/** The Socket.IO world snapshot's world, system and release data → {@link FoundryWorld}. */
+export function worldInfoToFoundry(worldData: WorldData): FoundryWorld {
+  const w = worldData.world as Record<string, unknown>;
+  const s = worldData.system as Record<string, unknown>;
+  const r = worldData.release as Record<string, unknown>;
+
+  return {
+    id: (w.id as string) || 'unknown',
+    title: (w.title as string) || 'Unknown World',
+    description: (w.description as string) || '',
+    system: (s.id as string) || 'unknown',
+    coreVersion: (r.version as string) || (r.generation as string) || 'unknown',
+    systemVersion: (s.version as string) || 'unknown',
+    playtime: 0,
+    created: new Date().toISOString(),
+    modified: new Date().toISOString(),
+  };
+}
+
+export function worldActorToFoundry(a: WorldActor): FoundryActor {
   const sys = a.system || {};
   const hpRaw = extractNested(sys, 'attributes', 'hp');
   const hp = isRecord(hpRaw) ? hpRaw : undefined;
@@ -1940,23 +2407,6 @@ function systemOf(obj: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-/**
- * Compendium pagination cursors are opaque base64-encoded result offsets.
- * `encodeCursor` turns an offset into a cursor; `decodeCursor` reads it back,
- * returning 0 when the cursor is absent or malformed.
- */
-function encodeCursor(offset: number): string {
-  return Buffer.from(String(offset), 'utf8').toString('base64');
-}
-
-function decodeCursor(cursor: string | undefined): number {
-  if (!cursor) {
-    return 0;
-  }
-  const decoded = Number.parseInt(Buffer.from(cursor, 'base64').toString('utf8'), 10);
-  return Number.isFinite(decoded) && decoded >= 0 ? decoded : 0;
-}
-
 function extractNested(obj: Record<string, unknown>, ...keys: string[]): unknown {
   let current: unknown = obj;
   for (const key of keys) {
@@ -2061,4 +2511,63 @@ function validateAttributePatch(
       }
     }
   }
+}
+
+/**
+ * Overlays the bridge's prepared (derived) values on a Socket.IO actor: AC,
+ * max HP and save totals, which dnd5e computes in a browser client's
+ * `prepareData` and the Socket.IO source data lacks (#308). Everything else
+ * stays as Socket.IO reported it. A value the bridge reports as absent leaves
+ * the Socket.IO value (or its "not available" label) in place.
+ */
+export function overlayDerivedValues(base: FoundryActor, prepared: FoundryActor): FoundryActor {
+  const actor: FoundryActor = { ...base };
+  let unavailable = base.derivedUnavailable ?? [];
+
+  if (prepared.ac) {
+    actor.ac = { ...prepared.ac };
+    unavailable = unavailable.filter((field) => field !== 'ac');
+  }
+  if (typeof prepared.hp?.max === 'number') {
+    actor.hp = { ...base.hp, max: prepared.hp.max };
+    unavailable = unavailable.filter((field) => field !== 'hpMax');
+  }
+  if (base.abilities && prepared.abilities) {
+    const abilities: NonNullable<FoundryActor['abilities']> = {};
+    for (const [key, ability] of Object.entries(base.abilities)) {
+      const save = prepared.abilities[key]?.save;
+      abilities[key] = typeof save === 'number' ? { ...ability, save } : ability;
+    }
+    actor.abilities = abilities;
+  }
+
+  if (unavailable.length > 0) {
+    actor.derivedUnavailable = unavailable;
+  } else {
+    delete actor.derivedUnavailable;
+  }
+  return actor;
+}
+
+/** Which capability a diagnostics REST path serves, for the log-once bookkeeping. */
+function capabilityOfRestPath(url: string): Capability {
+  return url.startsWith('/api/diagnostics/health') ? 'system-health' : 'logs';
+}
+
+/**
+ * One line for the log and the health report: the HTTP status, error code or
+ * message, never the request config (it carries the API key header).
+ */
+function restErrorSummary(error: unknown): string {
+  if (error instanceof RestKeyRejectedError) {
+    return error.message;
+  }
+  const status = restStatusOf(error);
+  if (status !== undefined) {
+    const message = restBodyMessage(error);
+    return message === undefined ? `HTTP ${status}` : `HTTP ${status}: ${message}`;
+  }
+  const { code } = describeRestFailure(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return code !== undefined && !message.includes(code) ? `${code}: ${message}` : message;
 }

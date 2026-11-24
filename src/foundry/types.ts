@@ -599,6 +599,11 @@ export interface CompendiumSearchResult {
   limit: number;
   restAvailable: boolean;
   nextCursor: string | null;
+  /**
+   * Why `restAvailable` is false when a bridge is configured but the call
+   * failed (dual mode); absent when no bridge is configured.
+   */
+  unavailableReason?: string;
 }
 
 /**

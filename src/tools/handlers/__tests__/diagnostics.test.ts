@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DiagnosticsClient } from '../../../diagnostics/client.js';
 import type { LogEntry, SystemHealth } from '../../../diagnostics/types.js';
 import { SystemHealthSchema } from '../../../diagnostics/types.js';
-import type { FoundryClient } from '../../../foundry/client.js';
+import type { ConnectionReport, FoundryClient } from '../../../foundry/client.js';
 import {
   handleGetHealthStatus,
   handleGetRecentLogs,
@@ -330,10 +330,19 @@ describe('handleGetSystemHealth', () => {
 });
 
 describe('handleGetHealthStatus', () => {
-  function worldClient(connected: boolean, stale = false): FoundryClient {
+  function worldClient(
+    connected: boolean,
+    stale = false,
+    report: ConnectionReport = {
+      mode: 'socket',
+      socket: { used: true, connected },
+      rest: { configured: false },
+    },
+  ): FoundryClient {
     return {
       isConnected: () => connected,
       isWorldDataStale: () => stale,
+      getConnectionReport: () => report,
       getWorldInfo: vi.fn().mockResolvedValue({
         id: 'test-world',
         title: 'Test World',
@@ -390,6 +399,11 @@ describe('handleGetHealthStatus', () => {
     const failingWorld = {
       isConnected: () => false,
       isWorldDataStale: () => false,
+      getConnectionReport: (): ConnectionReport => ({
+        mode: 'socket',
+        socket: { used: true, connected: false },
+        rest: { configured: false },
+      }),
       getWorldInfo: vi.fn().mockRejectedValue(new Error('not connected')),
     } as unknown as FoundryClient;
 
@@ -424,5 +438,192 @@ describe('handleGetHealthStatus', () => {
 
     expect(text).not.toMatch(/stale/i);
     expect(text).not.toContain('refresh_world_data');
+  });
+
+  describe('both connections (dual transport)', () => {
+    it('reports Socket.IO and the REST bridge separately', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'dual',
+            socket: { used: true, connected: true },
+            rest: { configured: true, baseUrl: 'http://bridge:3030', reachable: true, state: 'ok' },
+          }),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain('**Transport:** Socket.IO + REST bridge (dual)');
+      expect(text).toContain('**Socket.IO:** ✅ Connected');
+      expect(text).toContain('**REST bridge:** ✅ Reachable (http://bridge:3030)');
+    });
+
+    it('reports an unreachable bridge with its last error, Socket.IO still connected', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'dual',
+            socket: { used: true, connected: true },
+            rest: {
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: false,
+              state: 'unreachable',
+              lastError: 'connect ECONNREFUSED',
+            },
+          }),
+          {
+            getSystemHealth: vi.fn().mockRejectedValue(new Error('down')),
+          } as unknown as DiagnosticsClient,
+        ),
+      );
+
+      expect(text).toContain('**Socket.IO:** ✅ Connected');
+      expect(text).toContain('**REST bridge:** ❌ Unreachable: connect ECONNREFUSED');
+    });
+
+    function dualReport(rest: ConnectionReport['rest']): ConnectionReport {
+      return { mode: 'dual', socket: { used: true, connected: true }, rest };
+    }
+
+    it('reports a bridge answering 5xx as reachable but erroring, with its pauses', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(
+            true,
+            false,
+            dualReport({
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: true,
+              state: 'server-error',
+              lastError: 'HTTP 500: Failed to communicate with FoundryVTT server',
+              paused: [
+                {
+                  scope: 'system-health',
+                  error: 'HTTP 500: Failed to communicate with FoundryVTT server',
+                  retryInSeconds: 30,
+                },
+              ],
+            }),
+          ),
+          {
+            getSystemHealth: vi.fn().mockRejectedValue(new Error('500')),
+          } as unknown as DiagnosticsClient,
+        ),
+      );
+
+      expect(text).not.toContain('Unreachable');
+      expect(text).toContain(
+        '**REST bridge:** ⚠️ Reachable, answering with errors (http://bridge:3030): HTTP 500: Failed to communicate with FoundryVTT server',
+      );
+      expect(text).toContain(
+        '**REST bridge paused:** system-health for 30 s (HTTP 500: Failed to communicate with FoundryVTT server)',
+      );
+    });
+
+    it('reports a 4xx as a rejected request, not an unreachable bridge', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(
+            true,
+            false,
+            dualReport({
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: true,
+              state: 'rejected',
+              lastError: 'HTTP 404',
+            }),
+          ),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).not.toContain('Unreachable');
+      expect(text).toContain(
+        '**REST bridge:** ⚠️ Reachable, last request rejected (http://bridge:3030): HTTP 404',
+      );
+      expect(text).not.toContain('REST bridge paused');
+    });
+
+    it('reports an incompatible answer as an unusable response', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(
+            true,
+            false,
+            dualReport({
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: true,
+              state: 'invalid-response',
+              lastError: 'no envelope',
+            }),
+          ),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain(
+        '**REST bridge:** ⚠️ Reachable, unusable response (http://bridge:3030): no envelope',
+      );
+    });
+
+    it('names a whole-bridge pause', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(
+            true,
+            false,
+            dualReport({
+              configured: true,
+              baseUrl: 'http://bridge:3030',
+              reachable: false,
+              state: 'unreachable',
+              lastError: 'connect ECONNREFUSED',
+              paused: [{ scope: 'bridge', error: 'connect ECONNREFUSED', retryInSeconds: 12 }],
+            }),
+          ),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain(
+        '**REST bridge paused:** all bridge calls for 12 s (connect ECONNREFUSED)',
+      );
+    });
+
+    it('says when the bridge is not configured', async () => {
+      const text = getText(
+        await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),
+      );
+
+      expect(text).toContain('**Transport:** Socket.IO');
+      expect(text).toContain('**REST bridge:** not configured');
+    });
+
+    it('marks REST-only mode as deprecated and Socket.IO as unused', async () => {
+      const text = getText(
+        await handleGetHealthStatus(
+          {},
+          worldClient(true, false, {
+            mode: 'rest',
+            socket: { used: false, connected: false },
+            rest: { configured: true, baseUrl: 'http://bridge:3030', reachable: true, state: 'ok' },
+          }),
+          healthClient(makeHealth()),
+        ),
+      );
+
+      expect(text).toContain('REST only (deprecated)');
+      expect(text).toContain('**Socket.IO:** not used');
+    });
   });
 });

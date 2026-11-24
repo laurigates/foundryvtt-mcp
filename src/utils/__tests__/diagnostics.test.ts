@@ -27,8 +27,11 @@ function probe(system: InstanceType<typeof DiagnosticSystem>): Promise<boolean> 
 }
 
 describe('DiagnosticSystem.testRestApiAvailability (#230)', () => {
-  it('is true when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is true when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(probe(new DiagnosticSystem(client))).resolves.toBe(true);
     expect(client.get).toHaveBeenCalledWith('/api/world');
     expect(client.get).not.toHaveBeenCalledWith('/api/status');
@@ -64,8 +67,11 @@ function authenticate(system: InstanceType<typeof DiagnosticSystem>): Promise<Au
 }
 
 describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
-  it('is valid when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is valid when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(authenticate(new DiagnosticSystem(client))).resolves.toEqual({ valid: true });
     expect(client.get).toHaveBeenCalledWith('/api/world');
   });
@@ -95,7 +101,7 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
  */
 function clientRejectingConnect(status: number) {
   const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
-  const http = Reflect.get(client, 'http') as { get: (url: string) => Promise<unknown> };
+  const http = Reflect.get(client, 'rest') as { get: (url: string) => Promise<unknown> };
   vi.spyOn(http, 'get').mockRejectedValue(
     Object.assign(new Error(`Request failed with status code ${status}`), {
       response: { status },
@@ -119,7 +125,7 @@ describe('DiagnosticSystem.diagnoseFeatureProblem, rejected API key (#301)', () 
     expect(result.explanation).toMatch(/^Authentication failed using API key/);
     expect(result.explanation).not.toMatch(/unexpected error/);
     expect(result.suggestions).toMatch(/Check API key/);
-    expect(result.suggestions).toMatch(/REST API module is enabled/);
+    expect(result.suggestions).toMatch(/module is enabled, the bridge server is running/);
     expect(result.suggestions).not.toMatch(/Restart services/);
     expect(result.documentationUrl).toMatch(/#authentication-issues$/);
   });
@@ -171,5 +177,45 @@ describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
     } finally {
       Reflect.set(config.foundry, 'apiKey', saved);
     }
+  });
+});
+
+/** Every install hint names the real module repo, the bridge URL variable, and no install source that does not exist (#327). */
+describe('DiagnosticSystem REST bridge install hints (#327)', () => {
+  const MODULE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+  const system = new DiagnosticSystem(clientRejectingConnect(404));
+
+  it('points the feature diagnostic at the module repo and FOUNDRY_REST_URL', () => {
+    const create = Reflect.get(system, 'createRestApiDiagnostic') as (feature: string) => {
+      explanation: string;
+      suggestions: string;
+      documentationUrl?: string;
+    };
+    const result = create.call(system, 'compendium');
+    expect(result.explanation).toMatch(/REST bridge/);
+    expect(result.suggestions).toContain(MODULE_REPO);
+    expect(result.suggestions).toContain('FOUNDRY_REST_URL');
+    expect(result.suggestions).toMatch(/no published release/);
+    expect(result.suggestions).not.toMatch(/module browser/);
+    expect(result.documentationUrl).toMatch(/configuration\.md#optional-rest-bridge-augment$/);
+  });
+
+  it('points the health report hint at the module repo and FOUNDRY_REST_URL', () => {
+    const output = system.formatHealthReport({
+      connectivity: { status: 'limited', emoji: '⚠️', details: 'limited' },
+      authentication: { method: 'credentials', status: 'valid', emoji: '✅' },
+      features: {
+        diceRolling: true,
+        actorSearch: true,
+        itemSearch: true,
+        sceneData: true,
+        diagnostics: false,
+      },
+      restApiAvailable: false,
+      websocketAvailable: true,
+    });
+    expect(output).toContain(MODULE_REPO);
+    expect(output).toContain('FOUNDRY_REST_URL');
+    expect(output).not.toMatch(/Install the "Foundry Local REST API" module/);
   });
 });

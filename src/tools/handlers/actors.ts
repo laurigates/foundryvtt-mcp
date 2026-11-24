@@ -16,6 +16,10 @@ import { withToolError } from './utils.js';
 const DERIVED_UNAVAILABLE =
   'not available in Socket.IO mode (computed client-side by the game system)';
 
+function formatBonus(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
 function isDerivedUnavailable(
   actor: FoundryActor,
   field: NonNullable<FoundryActor['derivedUnavailable']>[number],
@@ -108,7 +112,12 @@ export async function handleGetActorDetails(
       : (actor.ac?.value ?? 'Unknown');
     const prof = actor.attributes?.prof;
     const proficiencyLine =
-      typeof prof === 'number' ? `\n**Proficiency Bonus:** ${prof >= 0 ? '+' : ''}${prof}` : '';
+      typeof prof === 'number' ? `\n**Proficiency Bonus:** ${formatBonus(prof)}` : '';
+    // Save totals are prepared values: only the REST bridge reports them.
+    const saves = Object.entries(actor.abilities ?? {}).flatMap(([key, ability]) =>
+      typeof ability.save === 'number' ? [`${key.toUpperCase()} ${formatBonus(ability.save)}`] : [],
+    );
+    const savesLine = saves.length > 0 ? `\n**Saving Throws:** ${saves.join(', ')}` : '';
 
     return {
       content: [
@@ -121,7 +130,7 @@ export async function handleGetActorDetails(
 **Armor Class:** ${armorClass}
 
 **Ability Scores:**
-${abilities}
+${abilities}${savesLine}
 
 **Description:** ${(actor as { description?: string }).description || 'No description available.'}`,
         },

@@ -73,7 +73,9 @@ class SetupWizard {
       console.log('   1. Run: npm run build');
       console.log('   2. Run: npm start');
       console.log('   3. Connect your AI client to the MCP server');
-      console.log('\n💡 For enhanced features, consider installing the Foundry Local REST API module.');
+      console.log('\n💡 Optional: the REST bridge (https://github.com/laurigates/foundryvtt-local-rest-api)');
+      console.log('   adds prepared actor values, compendium search and diagnostics alongside Socket.IO.');
+      console.log('   It has no published release yet; see docs/guides/configuration.md#optional-rest-bridge-augment.');
 
     } catch (error) {
       console.error('\n❌ Setup failed:', error instanceof Error ? error.message : error);
@@ -229,8 +231,8 @@ class SetupWizard {
     console.log('🔐 Step 3: Authentication Method\n');
     
     console.log('Choose your authentication method:');
-    console.log('1. API Key (Recommended - requires Foundry Local REST API module)');
-    console.log('2. Username/Password (Basic authentication)\n');
+    console.log('1. API Key (deprecated REST-only mode - requires the foundryvtt-local-rest-api module and bridge server)');
+    console.log('2. Username/Password (Socket.IO, the primary transport)\n');
 
     const choice = await this.question('Enter your choice (1 or 2): ');
     
@@ -257,10 +259,14 @@ class SetupWizard {
 
     if (this.config.authMethod === 'api-key') {
       console.log('🔧 API Key Setup:');
-      console.log('1. Install the "Foundry Local REST API" module in FoundryVTT');
+      console.log('1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api');
+      console.log('   (no published release yet: install the module from a checkout into Data/modules/)');
       console.log('2. Enable the module in your world settings');
       console.log('3. Go to Settings → Module Settings → Foundry Local REST API');
-      console.log('4. Enable the REST API and copy the generated API key\n');
+      console.log('4. Enable the REST API and copy the generated API key');
+      console.log('5. Start the bridge server (port 3030 by default) and keep a Gamemaster logged in through a browser');
+      console.log('   In this mode FOUNDRY_URL must be the bridge URL. For dual mode (Socket.IO plus the bridge),');
+      console.log('   choose credentials instead and add FOUNDRY_API_KEY and FOUNDRY_REST_URL to .env afterwards.\n');
 
       this.config.apiKey = await this.question('🔑 Enter your API key: ');
       
