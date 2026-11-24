@@ -291,7 +291,8 @@ async function runDiagnostics() {
 
   console.log('\n🔧 Troubleshooting Steps:');
   console.log('1. Verify FoundryVTT is running and accessible');
-  console.log('2. Check if "Foundry REST API" module is installed');
+  console.log('2. Check the foundryvtt-local-rest-api module is installed and its bridge server is running');
+  console.log('   (https://github.com/laurigates/foundryvtt-local-rest-api)');
   console.log('3. Enable "REST API" in module settings');
   console.log('4. Copy API key from module settings');
   console.log('5. Set FOUNDRY_API_KEY environment variable');

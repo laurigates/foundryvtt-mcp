@@ -30,7 +30,7 @@ No extra Foundry module is needed for the supported Socket.IO features.
 
 ## Configure the MCP client (read-only first)
 
-Use the canonical Socket.IO client configuration from the [integration guide](./integration.md#connect-via-socketio-default) — the published npm package, with `FOUNDRY_WRITE_ENABLED` left `false` and `FOUNDRY_API_KEY` deliberately **omitted** (supplying it switches the MCP to a separate Foundry Local REST API mode; see the [capability matrix](./capabilities.md#connection-modes-not-interchangeable)). For a checked-out Git branch, follow [Running a fork checkout](./integration.md#running-a-fork-checkout) and point the command to the checkout's built `dist/index.js`.
+Use the canonical Socket.IO client configuration from the [integration guide](./integration.md#connect-via-socketio-default) — the published npm package, with `FOUNDRY_WRITE_ENABLED` left `false` and `FOUNDRY_API_KEY` **omitted** (it belongs to the optional REST bridge, which needs a Gamemaster logged in through a browser; see the [capability matrix](./capabilities.md#connection-modes)). For a checked-out Git branch, follow [Running a fork checkout](./integration.md#running-a-fork-checkout) and point the command to the checkout's built `dist/index.js`.
 
 ## Test progressively
 
@@ -71,4 +71,4 @@ The repository's integration test environment targets Foundry **V14.367**. Authe
 
 ## Optional REST functions
 
-The Foundry **Local REST API** configuration (`FOUNDRY_API_KEY`) is a separate transport for features such as `search_compendium` and REST diagnostics. See the [capability matrix](./capabilities.md#connection-modes-not-interchangeable) for transport-specific tool support.
+The optional [REST bridge](./configuration.md#optional-rest-bridge-augment) (`FOUNDRY_API_KEY` with `FOUNDRY_REST_URL`) adds features such as prepared actor values, `search_compendium` and diagnostics alongside Socket.IO (dual mode). See the [capability matrix](./capabilities.md#connection-modes) for per-mode tool support.

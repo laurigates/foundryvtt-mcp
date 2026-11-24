@@ -51,6 +51,12 @@ export interface HealthReport {
   websocketAvailable: boolean;
 }
 
+/** Where the optional REST bridge (module + bridge server) lives (#327). */
+const REST_BRIDGE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+/** The setup notes for the REST bridge. */
+const REST_BRIDGE_GUIDE =
+  'https://github.com/laurigates/foundryvtt-mcp/blob/main/docs/guides/configuration.md#optional-rest-bridge-augment';
+
 /**
  * Enhanced diagnostic system for FoundryVTT MCP integration
  */
@@ -199,10 +205,11 @@ export class DiagnosticSystem {
     output += `  • System Diagnostics: ${report.features.diagnostics ? '✅ Available' : '❌ Unavailable'}\n\n`;
 
     if (!report.restApiAvailable) {
-      output += '💡 **Unlock Full Features**:\n';
-      output += '  → Install the "Foundry Local REST API" module in FoundryVTT\n';
-      output += '  → Enable the module and configure API key\n';
-      output += '  → See setup guide: https://github.com/laurigates/foundryvtt-mcp#setup\n\n';
+      output += '💡 **Unlock Full Features** (optional REST bridge):\n';
+      output += `  → Module and bridge server: ${REST_BRIDGE_REPO} (no published release yet)\n`;
+      output +=
+        '  → Set FOUNDRY_API_KEY and FOUNDRY_REST_URL alongside the Socket.IO credentials\n';
+      output += `  → See setup guide: ${REST_BRIDGE_GUIDE}\n\n`;
     }
 
     if (report.connectivity.status === 'offline') {
@@ -239,17 +246,16 @@ export class DiagnosticSystem {
    */
   private createRestApiDiagnostic(feature: string): DiagnosticResult {
     return {
-      explanation: `${feature.charAt(0).toUpperCase() + feature.slice(1)} search requires the REST API module for full functionality.`,
+      explanation: `${feature.charAt(0).toUpperCase() + feature.slice(1)} search requires the optional REST bridge for full functionality.`,
       suggestions:
-        '• **Install REST API module** - Get it from the FoundryVTT module browser\n' +
-        "• **Enable the module** - Activate it in your world's module settings\n" +
-        '• **Configure API key** - Generate and copy the API key from module settings\n' +
-        '• **Update .env file** - Set FOUNDRY_API_KEY with your generated key\n' +
+        `• **Install the module and bridge server** - From ${REST_BRIDGE_REPO} (no published release yet; install from a checkout)\n` +
+        "• **Enable the module** - Activate it in your world's module settings and turn on its REST API\n" +
+        '• **Start the bridge server** - Keep a Gamemaster logged in through a browser; the bridge answers through that client\n' +
+        '• **Update .env file** - Set FOUNDRY_API_KEY to the module key and FOUNDRY_REST_URL to the bridge (e.g. http://localhost:3030)\n' +
         '• **Restart MCP server** - Restart to pick up the new configuration',
       severity: 'warning',
       canContinue: true,
-      documentationUrl:
-        'https://github.com/laurigates/foundryvtt-mcp/blob/main/SETUP_GUIDE.md#rest-api-setup',
+      documentationUrl: REST_BRIDGE_GUIDE,
     };
   }
 
@@ -270,7 +276,7 @@ export class DiagnosticSystem {
       suggestions: isApiKey
         ? "• **Check API key** - Verify the key is correct and hasn't expired\n" +
           '• **Regenerate key** - Generate a new API key in FoundryVTT module settings\n' +
-          '• **Module status** - Ensure the REST API module is enabled and running\n' +
+          '• **Bridge status** - Ensure the module is enabled, the bridge server is running and a Gamemaster is logged in\n' +
           '• **Restart FoundryVTT** - Sometimes a restart resolves authentication issues'
         : '• **Check credentials** - Verify username and password are correct\n' +
           '• **User permissions** - Ensure the user has required permissions\n' +

@@ -15,7 +15,8 @@ cp .env.example .env
 | `FOUNDRY_URL` | Always | Active Foundry world URL (e.g. `https://foundry.example.com` or `http://localhost:30000`). |
 | `FOUNDRY_USERNAME` | Socket.IO mode | Foundry user name. |
 | `FOUNDRY_PASSWORD` | Socket.IO mode | Foundry user password. |
-| `FOUNDRY_API_KEY` | Optional REST mode | Authenticates to the **Foundry Local REST API module** and switches the MCP to REST mode. |
+| `FOUNDRY_API_KEY` | Optional REST bridge | The key of the [REST bridge](#optional-rest-bridge-augment). With `FOUNDRY_REST_URL` and Socket.IO credentials it enables dual mode. |
+| `FOUNDRY_REST_URL` | Optional REST bridge | The bridge server's URL (e.g. `http://localhost:3030`), an http/https URL. Without it, a set `FOUNDRY_API_KEY` selects the deprecated REST-only mode. |
 
 ### Optional
 
@@ -53,7 +54,7 @@ FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
 
 ## FoundryVTT Authentication
 
-By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. Setting `FOUNDRY_API_KEY` instead selects a different REST transport; it does not add REST capabilities alongside the Socket.IO session. See the [capability matrix — connection modes](./capabilities.md#connection-modes-not-interchangeable) for the canonical, mode-specific tool support.
+By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. The optional [REST bridge](#optional-rest-bridge-augment) adds what only code inside Foundry can see, alongside the Socket.IO session (dual mode). See the [capability matrix — connection modes](./capabilities.md#connection-modes) for the canonical, mode-specific tool support.
 
 ### Socket.IO setup
 
@@ -74,18 +75,32 @@ This flow runs against the Foundry URL and does not require an open browser tab 
 
 ### Required permissions
 
-The Foundry user needs access to the documents the tools will read. Write operations also require appropriate GM/owner permissions and `FOUNDRY_WRITE_ENABLED=true`; an active Socket.IO session is mandatory. Pack search is not part of the default world snapshot and requires the optional REST transport.
+The Foundry user needs access to the documents the tools will read. Write operations also require appropriate GM/owner permissions and `FOUNDRY_WRITE_ENABLED=true`; an active Socket.IO session is mandatory. Pack search is not part of the default world snapshot and requires the optional REST bridge.
 
-### Optional: REST-mode compendium search and diagnostics
+### Optional: REST bridge augment
 
-The **Foundry Local REST API** module enables REST-only `search_compendium` and backend diagnostics endpoints. There are five diagnostics tool names, but `diagnose_errors` remains a **stub** and `get_health_status` provides a partial local summary without the backend. **Setting `FOUNDRY_API_KEY` changes the connection mode; it cannot be combined with Socket.IO write tools in the current implementation.**
+The REST bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api). In dual mode it adds prepared dnd5e values (AC, character max HP, save totals), Foundry's dice engine, compendium search, logs and system health to the Socket.IO session. The [capability matrix](./capabilities.md#tools-by-mode) lists what it changes per tool. Socket.IO stays primary: writes, combat, journals and live updates never go through the bridge, and a failed bridge call falls back to the Socket.IO answer.
 
-To configure this optional mode:
+It has two parts, because module code runs in the browser and cannot serve HTTP:
 
-1. In FoundryVTT: **Setup** > **Add-on Modules** > **Install Module**
-2. Paste: `https://github.com/laurigates/foundryvtt-mcp/releases/latest/download/module.json`
-3. Enable the module in your world and copy the generated API key
-4. Add to `.env`:
+- a **Foundry module**, which runs in a browser client and reads the game data;
+- a **bridge server** (Node.js, port `3030` by default), which serves the REST API, logs in to Foundry as its own world user, and relays each request to the module.
+
+The bridge answers only while a **Gamemaster is logged in through a browser** with the module enabled. Without that client, dual mode serves the Socket.IO answers only.
+
+**Status:** the module has **no published release yet** (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to paste into Foundry's module installer. It is verified on Foundry v13; the v14 port is in review (laurigates/foundryvtt-local-rest-api#4). Some routes the MCP uses do not work yet (laurigates/foundryvtt-local-rest-api#6): until that is fixed, compendium search, logs and system health report as unavailable even with a working bridge.
+
+Until a release exists, install from a checkout of that repository and follow its README:
+
+1. Put the module in your Foundry data directory under `Data/modules/foundryvtt-local-rest-api`, enable it in your world, turn on **Enable REST API** in its module settings and copy the generated API key.
+2. Configure the bridge server in the checkout's `bridge-server/` directory: the Foundry URL, the API key, and the world user it logs in as. Start it and check `http://localhost:3030/api/status`.
+3. Keep a Gamemaster logged in through a browser.
+4. Add to the MCP's `.env`, alongside the Socket.IO credentials:
    ```env
    FOUNDRY_API_KEY=your_api_key_here
+   FOUNDRY_REST_URL=http://localhost:3030
    ```
+
+`FOUNDRY_URL` keeps pointing at Foundry itself. `get_health_status` shows the mode (`Socket.IO + REST bridge (dual)`) and whether the bridge is reachable.
+
+**Deprecated REST-only mode.** `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL`, still selects the old REST-only mode, in which `FOUNDRY_URL` must point at the bridge. It has no writes, combat, journals, chat or live updates, and logs a warning at startup. Set `FOUNDRY_URL` to Foundry and `FOUNDRY_REST_URL` to the bridge to move to dual mode.

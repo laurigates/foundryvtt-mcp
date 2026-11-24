@@ -10,17 +10,23 @@ How the MCP server talks to FoundryVTT, and how to perform game-state
 mutations. Read this before adding any tool that reads or (especially) writes
 FoundryVTT documents.
 
-## Two transports — Socket.IO is primary
+## Transports — Socket.IO is primary, the REST bridge is an optional augment
 
 | Mode | Trigger | What it does |
 |------|---------|--------------|
-| **Socket.IO** (primary) | `FOUNDRY_USERNAME` + `FOUNDRY_PASSWORD` | Authenticates a real Foundry client session (4-step `/join` flow in `auth.ts`), connects to `FOUNDRY_URL` (`:30000`), and loads a read-only `worldData` snapshot. Reads are served from that cache. |
-| **REST / `apiKey`** (secondary) | `FOUNDRY_API_KEY` set | Hits `/api/*` on the REST module / bridge. Optional — per the README it powers "REST API diagnostics". May be extracted (`feat/extract-rest-api-module`). |
+| **Socket.IO** (`socket`, default) | `FOUNDRY_USERNAME` + `FOUNDRY_PASSWORD`, no `FOUNDRY_API_KEY` | Authenticates a real Foundry client session (4-step `/join` flow in `auth.ts`), connects to `FOUNDRY_URL` (`:30000`), and keeps a live `worldData` cache. Reads are served from that cache; writes use `modifyDocument`. |
+| **Dual** (`dual`) | Socket.IO credentials + `FOUNDRY_API_KEY` + `FOUNDRY_REST_URL` | Socket.IO as above, plus the REST bridge for what only code inside Foundry sees: prepared actor values, Foundry's Roll engine, compendium search, logs, system health. |
+| **REST only** (`rest`, deprecated) | `FOUNDRY_API_KEY` without credentials, or without `FOUNDRY_REST_URL` | `/api/*` on the bridge at `FOUNDRY_URL`; no writes, combat, journals or live updates. |
 
-`.env.example` states Socket.IO is the primary method and `FOUNDRY_API_KEY` is
-commented out. **Do not assume the bridge/REST path is in use** — default
-deployments are Socket.IO-only. The bridge repo (`foundryvtt-local-rest-api`)
-is local-only (no remote) with active WIP; treat it as out-of-scope.
+The mode is decided in `src/foundry/transport.ts`, and which source serves each
+capability in `src/foundry/capabilities.ts` (see ADR-011,
+`docs/adrs/0011-dual-mode-transport.md`). The bridge is
+[laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api):
+a Foundry module plus a Node bridge server (`:3030`). It answers only while a
+GM is logged in through a browser, has no published release yet, and some of
+its routes are broken (laurigates/foundryvtt-local-rest-api#6). **Writes never
+go through the bridge.** Default deployments are Socket.IO-only, so do not
+assume the bridge is present; a dual-mode read must fall back when it is down.
 
 ## Writes use the core `modifyDocument` Socket.IO protocol
 
@@ -145,11 +151,11 @@ round-trip against a live world.
 
 Compendium reads (`search_compendium`, compendium-source item create) use
 `CompendiumCollection.getDocuments` / the pack index — a separate socket path,
-not `modifyDocument`. `search_compendium` is a **REST-only** tool: in Socket.IO
-mode it is hidden from `tools/list` and a direct call is rejected by the
-availability gate (see `src/tools/availability.ts`), so the old "graceful-empty
-without `apiKey`" behaviour no longer applies. The same mode-based hiding now
-covers the other REST-only diagnostics (`get_recent_logs`, `search_logs`,
-`get_system_health`), and the write tools are hidden outside Socket.IO +
+not `modifyDocument`. `search_compendium` is served only by the REST
+bridge (dual or REST-only mode): in Socket.IO mode it is hidden from
+`tools/list` and a direct call is rejected by the availability gate (see
+`src/tools/availability.ts`). The same capability-based hiding covers the other
+bridge-only tools (`get_recent_logs`, `search_logs`, `get_system_health`), and
+the write tools are hidden unless Socket.IO is connected and
 `FOUNDRY_WRITE_ENABLED=true`. Compendium-source create stays rejected over
 Socket.IO. Design a pack-read path before adding compendium writes.

@@ -6,7 +6,7 @@ The available tools and connection-mode boundaries are described in the [capabil
 
 ## Connect via Socket.IO (default)
 
-Use this mode for supported world-state reads and the opt-in write tools. Keep `FOUNDRY_API_KEY` **unset**. Foundry must have an active world and the account must have the necessary permissions.
+Use this mode for supported world-state reads and the opt-in write tools. It needs no Foundry module; leave `FOUNDRY_API_KEY` unset unless you add the [REST bridge](#optional-dual-mode-with-the-rest-bridge). Foundry must have an active world and the account must have the necessary permissions.
 
 ### Claude Desktop / MCP clients using `mcpServers`
 
@@ -52,28 +52,29 @@ VS Code uses `servers` instead of `mcpServers` for its standard MCP configuratio
 }
 ```
 
-## Optional Foundry Local REST API mode
+## Optional: dual mode with the REST bridge
 
-Setting `FOUNDRY_API_KEY` switches the connection to **Foundry Local REST API mode** — a transport switch, not an extra key on top of Socket.IO. See the [capability matrix](./capabilities.md#connection-modes-not-interchangeable) for the canonical description of what each mode supports; in short, REST mode offers compendium search and REST-backed diagnostics, while the write tools require Socket.IO.
-
-For example, to use REST-backed searches and diagnostics, configure a separate MCP entry:
+Adding the [REST bridge](./configuration.md#optional-rest-bridge-augment) (laurigates/foundryvtt-local-rest-api) to a Socket.IO configuration selects **dual mode**: Socket.IO stays primary, and the bridge adds prepared actor values, Foundry's dice engine, compendium search, logs and system health. Set `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` **in addition to** the Socket.IO credentials; `FOUNDRY_URL` keeps pointing at Foundry. See the [capability matrix](./capabilities.md#connection-modes) for what each mode supports. The module has no published release yet, so set the bridge up from a checkout as the configuration guide describes.
 
 ```json
 {
   "mcpServers": {
-    "foundry-rest": {
+    "foundryvtt": {
       "command": "npx",
       "args": ["-y", "foundryvtt-mcp"],
       "env": {
         "FOUNDRY_URL": "https://foundry.example.com",
-        "FOUNDRY_API_KEY": "REPLACE_WITH_REST_MODULE_KEY"
+        "FOUNDRY_USERNAME": "mcp-api",
+        "FOUNDRY_PASSWORD": "REPLACE_WITH_SECRET",
+        "FOUNDRY_API_KEY": "REPLACE_WITH_BRIDGE_KEY",
+        "FOUNDRY_REST_URL": "http://localhost:3030"
       }
     }
   }
 }
 ```
 
-The REST mode above expects the **Foundry Local REST API** module's `/api/...` endpoints. REST-only behavior depends on the endpoints implemented by the installed module.
+The bridge answers only while a Gamemaster is logged in to the world through a browser. Setting `FOUNDRY_API_KEY` without the Socket.IO credentials, or without `FOUNDRY_REST_URL`, selects the deprecated REST-only mode instead, which has no write tools, combat, journals or live updates.
 
 ## Running a fork checkout
 

@@ -10,13 +10,13 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 ## Features
 
 - **Dice Rolling** — dice terms and integer modifiers with `+`/`-`; advanced modifier syntax is not supported across all transports.
-- **Data Querying** — actors, world items, scenes, journals, users and combat; optional REST-mode compendium search.
+- **Data Querying** — actors, world items, scenes, journals, users and combat; compendium search with the optional REST bridge.
 - **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
 - **World Search** — case-insensitive **name** search for actors, world items, scenes and journals (not full-text page search).
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — `foundry://` URIs for direct reads.
-- **Optional REST Mode** — `FOUNDRY_API_KEY` switches to the Foundry Local REST API module, enabling compendium search and REST diagnostics; it does **not** combine with Socket.IO writes.
+- **Optional REST Bridge (dual mode)** — the [foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api) module and bridge server, added alongside Socket.IO with `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL`, supply prepared dnd5e values (AC, max HP, saves), Foundry's dice engine, compendium search and diagnostics. It has no published release yet; see [the setup notes](docs/guides/configuration.md#optional-rest-bridge-augment).
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
@@ -123,7 +123,8 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 | `FOUNDRY_USERNAME` | Socket.IO | FoundryVTT user account |
 | `FOUNDRY_PASSWORD` | Socket.IO | FoundryVTT user password |
 | `FOUNDRY_USER_ID` | No | Optional alternative to `FOUNDRY_USERNAME`: bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | Selects **Foundry Local REST API mode** (a transport switch — see the [capability matrix](docs/guides/capabilities.md#connection-modes-not-interchangeable)) |
+| `FOUNDRY_API_KEY` | No | Key of the optional [REST bridge](docs/guides/configuration.md#optional-rest-bridge-augment); with `FOUNDRY_REST_URL` and Socket.IO credentials it enables dual mode (see the [capability matrix](docs/guides/capabilities.md#connection-modes)) |
+| `FOUNDRY_REST_URL` | No | REST bridge server URL (e.g. `http://localhost:3030`); without it, `FOUNDRY_API_KEY` selects the deprecated REST-only mode |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
@@ -145,7 +146,7 @@ Ask your AI assistant things like:
 - `search_actors` — find characters, NPCs, monsters
 - `get_actor_details` — detailed character information
 - `search_items` — find equipment, spells, consumables
-- `search_compendium` — search enabled compendium packs by name/metadata (**requires REST mode with `FOUNDRY_API_KEY`**)
+- `search_compendium` — search enabled compendium packs by name/metadata (**requires the REST bridge**)
 - `get_scene_info` — current scene details
 - `search_journals` — search notes and handouts
 - `get_journal` — retrieve a specific journal entry
@@ -187,7 +188,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
   unsupported notation (`4d6kh3`, `1d20r1`, `*`) rejected rather than dropped.
   Parentheses are the one transport difference: FoundryVTT evaluates them when
-  `FOUNDRY_API_KEY` is set, the local roller rejects them otherwise
+  the REST bridge is configured, the local roller rejects them otherwise
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
@@ -195,7 +196,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `generate_npc` — generate NPC text (not written to the world)
 - `generate_loot` — generate treasure text from a challenge rating (not written to the world)
 
-### Diagnostics (requires REST API module)
+### Diagnostics (logs and system health require the REST bridge)
 
 - `get_recent_logs` — retrieve filtered FoundryVTT logs
 - `search_logs` — search logs by pattern, listing the matching entries
@@ -216,7 +217,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 - `foundry://combat` — active combat state; `combatants` are in initiative order, so
   `combat.turn` indexes them directly
 - `foundry://world/settings` — world and campaign settings
-- `foundry://system/diagnostics` — system diagnostics (requires REST API module)
+- `foundry://system/diagnostics` — system diagnostics (requires the REST bridge)
 
 ## Troubleshooting
 
