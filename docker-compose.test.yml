@@ -16,11 +16,11 @@ services:
       # reproducible and does not depend on whatever felddy resolves that day
       # (which also risks foundryvtt.com 429 rate-limits).
       #
-      # NOTE: the modifyDocument wire shape in src/foundry/client.ts was
-      # verified against the v13.348 client source and has NOT been re-verified
-      # against 14.367. Re-run the procedure in
-      # .claude/rules/foundry-write-protocol.md before trusting the write tools
-      # on this pin.
+      # NOTE: the modifyDocument wire shape in src/foundry/client.ts was read
+      # from the 13.348 and 14.369 builds (#232), not from 14.367 itself, and
+      # the 14.369 write path has not yet had a live round-trip. Re-run the
+      # procedure in .claude/rules/foundry-write-protocol.md when moving this
+      # pin to a build that has not been read.
       - FOUNDRY_VERSION=${FOUNDRY_VERSION:-14.367}
       - FOUNDRY_ADMIN_KEY=integration-test-admin
       - CONTAINER_PRESERVE_CONFIG=false
