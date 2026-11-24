@@ -100,6 +100,33 @@ export function parseDocumentBroadcast(payload: unknown): DocumentBroadcast | nu
 }
 
 /**
+ * Validates a raw `modifyDocumentBatch` socket payload (FoundryVTT v14, #232).
+ *
+ * From v14 the server delivers a write that had server-side side effects (for
+ * example, creating an active Combat deactivates the previously active one) to
+ * other clients as a `modifyDocumentBatch` event carrying `{ results: [...] }`:
+ * one entry per side effect plus the primary change, each shaped like a
+ * single `modifyDocument` broadcast. Writes without side effects still arrive
+ * on `modifyDocument`.
+ *
+ * Each entry goes through {@link parseDocumentBroadcast}; malformed entries are
+ * dropped individually, and an unrecognized payload yields `[]`.
+ */
+export function parseDocumentBroadcastBatch(payload: unknown): DocumentBroadcast[] {
+  if (!isRecord(payload) || !Array.isArray(payload.results)) {
+    return [];
+  }
+  const broadcasts: DocumentBroadcast[] = [];
+  for (const entry of payload.results) {
+    const parsed = parseDocumentBroadcast(entry);
+    if (parsed) {
+      broadcasts.push(parsed);
+    }
+  }
+  return broadcasts;
+}
+
+/**
  * Keys that must never be copied out of a broadcast payload.
  *
  * Broadcast data arrives off the network from whatever FoundryVTT relays, so it

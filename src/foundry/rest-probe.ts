@@ -21,6 +21,14 @@ function httpStatusOf(error: unknown): number | undefined {
 }
 
 /**
+ * The REST module refused `FOUNDRY_API_KEY` (HTTP 401/403). A distinct class
+ * so diagnostics can report it as an authentication failure (#301).
+ */
+export class RestKeyRejectedError extends Error {
+  override name = 'RestKeyRejectedError';
+}
+
+/**
  * Shape the REST module's `/api/world` must answer with: a JSON object. Rejects
  * the HTML page, string, array or null that a server without the module (or a
  * proxy in front of it) can return with a 200. Extra fields pass through.
@@ -55,7 +63,7 @@ export async function probeRestModule(
   } catch (error) {
     const status = httpStatusOf(error);
     if (status === 401 || status === 403) {
-      throw new Error(
+      throw new RestKeyRejectedError(
         `FOUNDRY_API_KEY was rejected by the REST module at /api/world (HTTP ${status}); ` +
           'check the key configured in the module settings',
         { cause: error },

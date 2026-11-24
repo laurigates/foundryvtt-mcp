@@ -125,7 +125,7 @@ function stripMarkup(value: string): string {
       continue;
     }
     out +=
-      /^<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote|br|hr|table|thead|tbody|tfoot|pre|dt|dd|figcaption)\b/i.test(
+      /^<\/?\s*(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|article|blockquote|br|hr|table|thead|tbody|tfoot|pre|dt|dd|figcaption|header|footer|nav|aside|main)\b/i.test(
         tag,
       )
         ? ' '
