@@ -10,6 +10,24 @@
 
 import { z } from 'zod';
 
+/** An integer setting whose validation messages name its environment variable. */
+function integerFromEnv(name: string) {
+  const error = `${name} must be an integer`;
+  return z.number({ error }).int({ error });
+}
+
+/**
+ * Parse an integer environment variable. Anything other than an optionally
+ * signed run of decimal digits becomes NaN, which the schema rejects;
+ * parseInt would read '5abc' as 5 and '1.9' as 1 (#293).
+ */
+function parseIntegerEnv(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return /^\s*[+-]?\d+\s*$/.test(value) ? Number(value) : Number.NaN;
+}
+
 /**
  * Zod schema for validating server configuration
  *
@@ -54,15 +72,15 @@ const ConfigSchema = z.object({
     password: z.string().optional(),
     userId: z.string().optional(),
     socketPath: z.string().default('/socket.io/'),
-    timeout: z.number().default(10000),
-    retryAttempts: z.number().default(3),
-    retryDelay: z.number().default(1000),
+    timeout: integerFromEnv('FOUNDRY_TIMEOUT').default(10000),
+    retryAttempts: integerFromEnv('FOUNDRY_RETRY_ATTEMPTS').default(3),
+    retryDelay: integerFromEnv('FOUNDRY_RETRY_DELAY').default(1000),
     writeEnabled: z.boolean().default(false),
   }),
 
   cache: z.object({
     enabled: z.boolean().default(true),
-    ttlSeconds: z.number().default(300), // 5 minutes
+    ttlSeconds: integerFromEnv('CACHE_TTL_SECONDS').default(300), // 5 minutes
     // A bound below 1 lets CacheService.set() insert past it (#267).
     maxSize: z
       .number({ error: 'CACHE_MAX_SIZE must be an integer of at least 1' })
@@ -110,13 +128,9 @@ function loadConfig(): Config {
       password: process.env.FOUNDRY_PASSWORD,
       userId: process.env.FOUNDRY_USER_ID,
       socketPath: process.env.FOUNDRY_SOCKET_PATH,
-      timeout: process.env.FOUNDRY_TIMEOUT ? parseInt(process.env.FOUNDRY_TIMEOUT, 10) : undefined,
-      retryAttempts: process.env.FOUNDRY_RETRY_ATTEMPTS
-        ? parseInt(process.env.FOUNDRY_RETRY_ATTEMPTS, 10)
-        : undefined,
-      retryDelay: process.env.FOUNDRY_RETRY_DELAY
-        ? parseInt(process.env.FOUNDRY_RETRY_DELAY, 10)
-        : undefined,
+      timeout: parseIntegerEnv(process.env.FOUNDRY_TIMEOUT),
+      retryAttempts: parseIntegerEnv(process.env.FOUNDRY_RETRY_ATTEMPTS),
+      retryDelay: parseIntegerEnv(process.env.FOUNDRY_RETRY_DELAY),
       writeEnabled:
         process.env.FOUNDRY_WRITE_ENABLED !== undefined
           ? process.env.FOUNDRY_WRITE_ENABLED === 'true'
@@ -126,10 +140,8 @@ function loadConfig(): Config {
     cache: {
       enabled:
         process.env.CACHE_ENABLED !== undefined ? process.env.CACHE_ENABLED === 'true' : undefined,
-      ttlSeconds: process.env.CACHE_TTL_SECONDS
-        ? parseInt(process.env.CACHE_TTL_SECONDS, 10)
-        : undefined,
-      maxSize: process.env.CACHE_MAX_SIZE ? parseInt(process.env.CACHE_MAX_SIZE, 10) : undefined,
+      ttlSeconds: parseIntegerEnv(process.env.CACHE_TTL_SECONDS),
+      maxSize: parseIntegerEnv(process.env.CACHE_MAX_SIZE),
     },
   };
 
