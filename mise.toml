@@ -1,0 +1,6 @@
+# Runtime versions for local development.
+# node 24 matches the npm publish job (release-please.yml) and the Node line
+# FoundryVTT v14 requires; package.json engines stays ">=18" for consumers.
+[tools]
+node = "24"
+bun = "1.4"
