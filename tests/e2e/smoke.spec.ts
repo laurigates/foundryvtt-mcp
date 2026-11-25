@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 /**
  * Baseline smoke test for the Playwright E2E harness.

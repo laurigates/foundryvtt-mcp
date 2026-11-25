@@ -2,8 +2,8 @@
  * Integration tests for world data loading and querying.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { FoundryClient } from '../../src/foundry/client.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { FoundryClient } from '../../src/foundry/client.js';
 import { createConnectedClient } from './setup.js';
 
 describe('World data', () => {
@@ -37,7 +37,7 @@ describe('World data', () => {
     const summary = client.getWorldSummary();
     expect(Object.keys(summary).length).toBeGreaterThan(0);
 
-    for (const [key, value] of Object.entries(summary)) {
+    for (const value of Object.values(summary)) {
       expect(typeof value).toBe('number');
       expect(value).toBeGreaterThanOrEqual(0);
       expect(Number.isInteger(value)).toBe(true);

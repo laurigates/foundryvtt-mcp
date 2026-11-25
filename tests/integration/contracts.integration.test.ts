@@ -3,9 +3,9 @@
  * Ensures real FoundryVTT data matches our TypeScript interfaces.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { FoundryClient } from '../../src/foundry/client.js';
-import { WorldData } from '../../src/foundry/types.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { FoundryClient } from '../../src/foundry/client.js';
+import type { WorldData } from '../../src/foundry/types.js';
 import { createConnectedClient } from './setup.js';
 
 describe('Data contracts', () => {

@@ -2,16 +2,15 @@
 
 /**
  * Interactive setup wizard for FoundryVTT MCP Server
- * 
+ *
  * This wizard helps users configure their environment and test connectivity
  * to reduce setup friction and improve the onboarding experience.
  */
 
-import * as readline from 'readline';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as readline from 'node:readline';
 import axios from 'axios';
-import { config } from '../src/config/index.js';
 // Not ../src/foundry/client.js: importing that resolves the whole config and
 // exits while FOUNDRY_URL is still unset, the state this wizard exists to fix.
 import { probeRestModule } from '../src/foundry/rest-probe.js';
@@ -31,7 +30,7 @@ class SetupWizard {
   constructor() {
     this.rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
   }
 
@@ -49,7 +48,7 @@ class SetupWizard {
       // Step 2: Test basic connectivity
       const isReachable = await this.testConnectivity();
       if (!isReachable) {
-        console.log('⚠️ Cannot reach FoundryVTT. Please ensure it\'s running and try again.');
+        console.log("⚠️ Cannot reach FoundryVTT. Please ensure it's running and try again.");
         process.exit(1);
       }
 
@@ -73,10 +72,15 @@ class SetupWizard {
       console.log('   1. Run: npm run build');
       console.log('   2. Run: npm start');
       console.log('   3. Connect your AI client to the MCP server');
-      console.log('\n💡 Optional: the REST bridge (https://github.com/laurigates/foundryvtt-local-rest-api)');
-      console.log('   adds prepared actor values, compendium search and diagnostics alongside Socket.IO.');
-      console.log('   It has no published release yet; see docs/guides/configuration.md#optional-rest-bridge-augment.');
-
+      console.log(
+        '\n💡 Optional: the REST bridge (https://github.com/laurigates/foundryvtt-local-rest-api)',
+      );
+      console.log(
+        '   adds prepared actor values, compendium search and diagnostics alongside Socket.IO.',
+      );
+      console.log(
+        '   It has no published release yet; see docs/guides/configuration.md#optional-rest-bridge-augment.',
+      );
     } catch (error) {
       console.error('\n❌ Setup failed:', error instanceof Error ? error.message : error);
       console.log('\n📚 For help, see: SETUP_GUIDE.md');
@@ -99,7 +103,7 @@ class SetupWizard {
     console.log('3. I want to enter a custom URL\n');
 
     const setupType = await this.question('Enter your choice (1, 2, or 3): ');
-    
+
     switch (setupType.trim()) {
       case '1':
         await this.detectLocalFoundryVTT();
@@ -126,12 +130,14 @@ class SetupWizard {
       'http://localhost:30000',
       'http://127.0.0.1:30000',
       'http://localhost:8080',
-      'http://localhost:3000'
+      'http://localhost:3000',
     ];
 
     for (const url of commonUrls) {
       if (await this.testUrl(url)) {
-        const useDetected = await this.question(`✅ Found FoundryVTT at ${url}. Use this URL? (y/n): `);
+        const useDetected = await this.question(
+          `✅ Found FoundryVTT at ${url}. Use this URL? (y/n): `,
+        );
         if (useDetected.toLowerCase().startsWith('y')) {
           this.config.foundryUrl = url;
           console.log(`📍 Using: ${url}\n`);
@@ -149,7 +155,7 @@ class SetupWizard {
    */
   private async configureRemoteFoundryVTT(): Promise<void> {
     console.log('🌐 Remote FoundryVTT Configuration\n');
-    console.log('For remote setups, you\'ll need the full URL including protocol.');
+    console.log("For remote setups, you'll need the full URL including protocol.");
     console.log('Examples:');
     console.log('  • https://foundry.example.com (reverse proxy with HTTPS)');
     console.log('  • http://foundry.example.com (reverse proxy with HTTP)');
@@ -157,7 +163,7 @@ class SetupWizard {
     console.log('  • http://192.168.1.100:30000 (local network IP)\n');
 
     const remoteUrl = await this.question('🌐 Enter your remote FoundryVTT URL: ');
-    
+
     if (!this.isValidUrl(remoteUrl)) {
       throw new Error('Invalid URL format. Please include protocol (http:// or https://)');
     }
@@ -165,7 +171,9 @@ class SetupWizard {
     // Validate it's likely a remote URL
     const parsedUrl = new URL(remoteUrl);
     if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
-      console.log('⚠️  Warning: This appears to be a local URL. Make sure this is correct for your setup.');
+      console.log(
+        '⚠️  Warning: This appears to be a local URL. Make sure this is correct for your setup.',
+      );
     }
 
     this.config.foundryUrl = remoteUrl.trim();
@@ -184,7 +192,7 @@ class SetupWizard {
     console.log('  • https://my-foundry.com:8443 (custom port)\n');
 
     const customUrl = await this.question('🌐 Enter your FoundryVTT URL: ');
-    
+
     if (!this.isValidUrl(customUrl)) {
       throw new Error('Invalid URL format. Please include protocol (http:// or https://)');
     }
@@ -198,19 +206,19 @@ class SetupWizard {
    */
   private async testConnectivity(): Promise<boolean> {
     console.log('🔗 Step 2: Testing Connectivity\n');
-    
+
     if (!this.config.foundryUrl) {
       throw new Error('FoundryVTT URL not configured');
     }
 
     console.log(`Testing connection to ${this.config.foundryUrl}...`);
-    
+
     try {
-      const response = await axios.get(this.config.foundryUrl, { 
+      const response = await axios.get(this.config.foundryUrl, {
         timeout: 5000,
-        validateStatus: () => true // Accept any status code
+        validateStatus: () => true, // Accept any status code
       });
-      
+
       if (response.status === 200 || response.status === 401) {
         console.log('✅ FoundryVTT server is reachable\n');
         return true;
@@ -219,7 +227,9 @@ class SetupWizard {
         return false;
       }
     } catch (error) {
-      console.log(`❌ Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}\n`);
+      console.log(
+        `❌ Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}\n`,
+      );
       return false;
     }
   }
@@ -229,13 +239,15 @@ class SetupWizard {
    */
   private async chooseAuthMethod(): Promise<void> {
     console.log('🔐 Step 3: Authentication Method\n');
-    
+
     console.log('Choose your authentication method:');
-    console.log('1. API Key (deprecated REST-only mode - requires the foundryvtt-local-rest-api module and bridge server)');
+    console.log(
+      '1. API Key (deprecated REST-only mode - requires the foundryvtt-local-rest-api module and bridge server)',
+    );
     console.log('2. Username/Password (Socket.IO, the primary transport)\n');
 
     const choice = await this.question('Enter your choice (1 or 2): ');
-    
+
     switch (choice.trim()) {
       case '1':
         this.config.authMethod = 'api-key';
@@ -259,26 +271,36 @@ class SetupWizard {
 
     if (this.config.authMethod === 'api-key') {
       console.log('🔧 API Key Setup:');
-      console.log('1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api');
-      console.log('   (no published release yet: install the module from a checkout into Data/modules/)');
+      console.log(
+        '1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api',
+      );
+      console.log(
+        '   (no published release yet: install the module from a checkout into Data/modules/)',
+      );
       console.log('2. Enable the module in your world settings');
       console.log('3. Go to Settings → Module Settings → Foundry Local REST API');
       console.log('4. Enable the REST API and copy the generated API key');
-      console.log('5. Start the bridge server (port 3030 by default) and keep a Gamemaster logged in through a browser');
-      console.log('   In this mode FOUNDRY_URL must be the bridge URL. For dual mode (Socket.IO plus the bridge),');
-      console.log('   choose credentials instead and add FOUNDRY_API_KEY and FOUNDRY_REST_URL to .env afterwards.\n');
+      console.log(
+        '5. Start the bridge server (port 3030 by default) and keep a Gamemaster logged in through a browser',
+      );
+      console.log(
+        '   In this mode FOUNDRY_URL must be the bridge URL. For dual mode (Socket.IO plus the bridge),',
+      );
+      console.log(
+        '   choose credentials instead and add FOUNDRY_API_KEY and FOUNDRY_REST_URL to .env afterwards.\n',
+      );
 
       this.config.apiKey = await this.question('🔑 Enter your API key: ');
-      
+
       if (!this.config.apiKey?.trim()) {
         throw new Error('API key is required for API key authentication');
       }
     } else {
       console.log('👤 Username/Password Setup:\n');
-      
+
       this.config.username = await this.question('👤 Username: ');
       this.config.password = await this.questionHidden('🔒 Password: ');
-      
+
       if (!this.config.username?.trim() || !this.config.password?.trim()) {
         throw new Error('Both username and password are required');
       }
@@ -308,14 +330,16 @@ class SetupWizard {
         const world = await probeRestModule((url) =>
           axios.get(`${foundryUrl}${url}`, {
             headers: {
-              'x-api-key': apiKey
+              'x-api-key': apiKey,
             },
-            timeout: 5000
-          })
+            timeout: 5000,
+          }),
         );
 
         console.log('✅ API key authentication successful (REST module answered /api/world)');
-        console.log(`📊 Connected to world: ${typeof world.title === 'string' ? world.title : 'Unknown'}\n`);
+        console.log(
+          `📊 Connected to world: ${typeof world.title === 'string' ? world.title : 'Unknown'}\n`,
+        );
       } else if (this.config.authMethod === 'credentials') {
         // For credentials, we'll just verify they're provided
         // Full authentication test would require WebSocket connection
@@ -326,10 +350,14 @@ class SetupWizard {
         if (error.response?.status === 401) {
           throw new Error('Authentication failed - check your API key or credentials');
         } else if (error.response?.status === 404) {
-          throw new Error('REST API endpoints not found - ensure the module is installed and enabled');
+          throw new Error(
+            'REST API endpoints not found - ensure the module is installed and enabled',
+          );
         }
       }
-      throw new Error(`Authentication test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Authentication test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -388,8 +416,12 @@ class SetupWizard {
       await testConnection();
       console.log('✅ All systems operational!\n');
     } catch (error) {
-      console.log(`⚠️ Validation test encountered issues: ${error instanceof Error ? error.message : error}`);
-      console.log('The configuration has been saved, but you may need to troubleshoot connectivity.\n');
+      console.log(
+        `⚠️ Validation test encountered issues: ${error instanceof Error ? error.message : error}`,
+      );
+      console.log(
+        'The configuration has been saved, but you may need to troubleshoot connectivity.\n',
+      );
     }
   }
 
@@ -405,7 +437,7 @@ class SetupWizard {
     return new Promise((resolve) => {
       process.stdout.write(prompt);
       process.stdin.setRawMode(true);
-      
+
       let input = '';
       const onData = (char: Buffer) => {
         const str = char.toString();
@@ -428,16 +460,16 @@ class SetupWizard {
           process.stdout.write('*');
         }
       };
-      
+
       process.stdin.on('data', onData);
     });
   }
 
   private async testUrl(url: string): Promise<boolean> {
     try {
-      const response = await axios.get(url, { 
+      const response = await axios.get(url, {
         timeout: 2000,
-        validateStatus: () => true 
+        validateStatus: () => true,
       });
       return response.status === 200 || response.status === 401;
     } catch {
@@ -457,11 +489,11 @@ class SetupWizard {
   private updateEnvVariable(content: string, key: string, value: string): string {
     const regex = new RegExp(`^${key}=.*$`, 'm');
     const line = `${key}=${value}`;
-    
+
     if (regex.test(content)) {
       return content.replace(regex, line);
     } else {
-      return content + `\n${line}`;
+      return `${content}\n${line}`;
     }
   }
 

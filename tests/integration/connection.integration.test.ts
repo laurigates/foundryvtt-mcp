@@ -2,9 +2,9 @@
  * Integration tests for connection lifecycle.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { FoundryClient } from '../../src/foundry/client.js';
-import { createTestClient, createConnectedClient } from './setup.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { FoundryClient } from '../../src/foundry/client.js';
+import { createConnectedClient, createTestClient } from './setup.js';
 
 describe('Connection lifecycle', () => {
   let client: FoundryClient | null = null;
