@@ -29,7 +29,7 @@ Troubleshooting a live FoundryVTT session requires access to server logs, health
 
 3. **MCP Resource** - The `foundry://system/diagnostics` resource reads the bridge when it is configured and reports a notice otherwise.
 
-4. **Module Distribution** - The module and bridge server are released from [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api), not from this repository. That repo has no published release yet, so there is no manifest URL to install from (laurigates/foundryvtt-local-rest-api#2).
+4. **Module Distribution** - The module and bridge server are released from [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api), not from this repository. Its first release with the v14 port and route fixes is v2.1.0; the module installs from the manifest URL `https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json`.
 
 ### Non-Functional
 

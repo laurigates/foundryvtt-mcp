@@ -183,6 +183,7 @@ describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
 /** Every install hint names the real module repo, the bridge URL variable, and no install source that does not exist (#327). */
 describe('DiagnosticSystem REST bridge install hints (#327)', () => {
   const MODULE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+  const MANIFEST_URL = `${MODULE_REPO}/releases/latest/download/module.json`;
   const system = new DiagnosticSystem(clientRejectingConnect(404));
 
   it('points the feature diagnostic at the module repo and FOUNDRY_REST_URL', () => {
@@ -195,7 +196,8 @@ describe('DiagnosticSystem REST bridge install hints (#327)', () => {
     expect(result.explanation).toMatch(/REST bridge/);
     expect(result.suggestions).toContain(MODULE_REPO);
     expect(result.suggestions).toContain('FOUNDRY_REST_URL');
-    expect(result.suggestions).toMatch(/no published release/);
+    expect(result.suggestions).toContain(MANIFEST_URL);
+    expect(result.suggestions).not.toMatch(/no published release|install from a checkout/);
     expect(result.suggestions).not.toMatch(/module browser/);
     expect(result.documentationUrl).toMatch(/configuration\.md#optional-rest-bridge-augment$/);
   });
@@ -216,6 +218,8 @@ describe('DiagnosticSystem REST bridge install hints (#327)', () => {
     });
     expect(output).toContain(MODULE_REPO);
     expect(output).toContain('FOUNDRY_REST_URL');
+    expect(output).toContain(MANIFEST_URL);
+    expect(output).not.toMatch(/no published release/);
     expect(output).not.toMatch(/Install the "Foundry Local REST API" module/);
   });
 });
