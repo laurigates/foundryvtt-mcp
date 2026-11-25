@@ -2,7 +2,7 @@
  * Shared setup utilities for integration tests.
  */
 
-import { FoundryClient, FoundryClientConfig } from '../../src/foundry/client.js';
+import { FoundryClient, type FoundryClientConfig } from '../../src/foundry/client.js';
 
 const DEFAULT_CONFIG: FoundryClientConfig = {
   baseUrl: process.env.FOUNDRY_URL || 'http://localhost:30001',

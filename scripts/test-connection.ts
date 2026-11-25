@@ -8,9 +8,8 @@
 // Must precede every other import: see src/load-env.ts (#206).
 import '../src/load-env.js';
 import axios from 'axios';
-import { FoundryClient } from '../src/foundry/client.js';
 import { config } from '../src/config/index.js';
-import { logger } from '../src/utils/logger.js';
+import { FoundryClient } from '../src/foundry/client.js';
 
 /**
  * True when a REST-mode request failed because the target's REST module does
@@ -23,7 +22,7 @@ function isRestRouteMissing(error: unknown): boolean {
 
 function printRestRouteMissing(what: string, route: string): void {
   console.log(`ℹ️  ${what} not exposed by this REST module (404 on ${route}).`);
-  console.log('   The target instance\'s REST module does not serve this endpoint —');
+  console.log("   The target instance's REST module does not serve this endpoint —");
   console.log('   expected with older/other REST module builds; not a client defect.');
   console.log('   Actor/scene reads are canonical over Socket.IO: unset FOUNDRY_API_KEY.\n');
 }
@@ -34,13 +33,13 @@ async function testConnection() {
   try {
     console.log('📋 Configuration:');
     console.log(`   URL: ${config.foundry.url}`);
-    
+
     // Analyze URL type
     const url = new URL(config.foundry.url);
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const isHTTPS = url.protocol === 'https:';
     const hasCustomPort = url.port && url.port !== '80' && url.port !== '443';
-    
+
     if (isLocal) {
       console.log(`   Setup Type: 🏠 Local Development`);
     } else if (isHTTPS) {
@@ -50,7 +49,7 @@ async function testConnection() {
     } else {
       console.log(`   Setup Type: 🖥️  Remote/Network`);
     }
-    
+
     // Transport is selected purely by apiKey presence (client.ts): set → REST
     // API mode; unset → Socket.IO mode (the default, full worldData path).
     console.log(`   Transport: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
@@ -102,7 +101,7 @@ async function testConnection() {
       const { actors, total } = await client.searchActors({ limit: 3 });
       console.log(`   Found ${total} actors (showing ${actors.length})`);
       if (actors.length > 0) {
-        actors.forEach(actor => {
+        actors.forEach((actor) => {
           console.log(`   - ${actor.name} (${actor.type})`);
         });
         console.log('✅ Actor search works!\n');
@@ -139,41 +138,52 @@ async function testConnection() {
       console.log('✅ Socket.IO connection established!\n');
 
       // Give it a moment to connect
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       await client.disconnect();
       console.log('✅ Disconnected cleanly\n');
     } catch (error) {
-      console.log(`⚠️  WebSocket connection issues: ${error instanceof Error ? error.message : error}\n`);
+      console.log(
+        `⚠️  WebSocket connection issues: ${error instanceof Error ? error.message : error}\n`,
+      );
     }
 
     console.log('🎉 Connection test completed!');
     console.log('\n📝 Summary:');
     console.log('   - Basic connection: ✅');
     console.log(`   - Dice rolling: ${diceOk ? '✅' : '❌'}`);
-    console.log(`   - Data access: ${config.foundry.apiKey ? '🌐 REST (coverage depends on the target module; Socket.IO is the full-data path)' : '✅ Full worldData'}`);
+    console.log(
+      `   - Data access: ${config.foundry.apiKey ? '🌐 REST (coverage depends on the target module; Socket.IO is the full-data path)' : '✅ Full worldData'}`,
+    );
     console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
 
     if (!config.foundry.apiKey) {
-      console.log('\n💡 Optional: the REST bridge adds prepared actor values, compendium search and diagnostics.');
-      console.log('   1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api');
+      console.log(
+        '\n💡 Optional: the REST bridge adds prepared actor values, compendium search and diagnostics.',
+      );
+      console.log(
+        '   1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api',
+      );
       console.log('      (no published release yet; install from a checkout)');
       console.log('   2. Enable the module, turn on its REST API and copy the API key');
-      console.log('   3. Start the bridge server (port 3030) and keep a Gamemaster logged in through a browser');
-      console.log('   4. Set FOUNDRY_API_KEY and FOUNDRY_REST_URL (e.g. http://localhost:3030) in .env, keeping');
+      console.log(
+        '   3. Start the bridge server (port 3030) and keep a Gamemaster logged in through a browser',
+      );
+      console.log(
+        '   4. Set FOUNDRY_API_KEY and FOUNDRY_REST_URL (e.g. http://localhost:3030) in .env, keeping',
+      );
       console.log('      the Socket.IO credentials (dual mode)');
       console.log('   5. Restart the MCP server');
     }
-
   } catch (error) {
     console.error('❌ Test failed:', error);
     console.log('\n🔧 Troubleshooting:');
-    
+
     try {
       const url = new URL(config.foundry.url);
       const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
       const isHTTPS = url.protocol === 'https:';
-      
+
       if (isLocal) {
         console.log('   Local Development Issues:');
         console.log('   1. Ensure FoundryVTT is running on your local machine');
@@ -194,19 +204,18 @@ async function testConnection() {
         console.log('   3. Verify the port is open and not blocked by firewall');
         console.log('   4. Test direct browser access to the URL');
       }
-      
+
       console.log('\n   General Steps:');
       console.log('   • Double-check FOUNDRY_URL in .env file');
       console.log('   • Review the setup guide: SETUP_GUIDE.md');
       console.log('   • Run with LOG_LEVEL=debug for detailed logs');
-      
-    } catch (urlError) {
+    } catch {
       console.log('   1. Ensure FoundryVTT is running');
       console.log('   2. Check FOUNDRY_URL in .env file');
       console.log('   3. Verify network connectivity');
       console.log('   4. Review the setup guide: SETUP_GUIDE.md');
     }
-    
+
     process.exit(1);
   }
 }

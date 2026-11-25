@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * Helper functions for FoundryVTT Playwright tests
@@ -28,9 +28,7 @@ export class FoundryTestHelpers {
       const username = process.env.FOUNDRY_USERNAME || 'admin';
       // `.first()` keeps these out of Playwright strict mode while both the
       // v13 and v14 shapes are listed.
-      const userSelect = this.page
-        .locator('select[name="userId"], select[name="userid"]')
-        .first();
+      const userSelect = this.page.locator('select[name="userId"], select[name="userid"]').first();
       const userInput = this.page
         .locator('input[name="userId"], input[name="userid"], input[name="username"]')
         .first();
@@ -58,7 +56,7 @@ export class FoundryTestHelpers {
   async waitForFoundryInterface(): Promise<void> {
     // Wait for main UI elements to be present
     await this.page.waitForSelector('#ui-left, #sidebar', { timeout: 30000 });
-    
+
     // Optional: wait for specific FoundryVTT elements that indicate full load
     try {
       await this.page.waitForSelector('#players, #navigation', { timeout: 10000 });
@@ -80,8 +78,9 @@ export class FoundryTestHelpers {
    */
   async openModuleManagement(): Promise<void> {
     await this.openSettings();
-    
-    const manageModulesSelector = 'button:has-text("Manage Modules"), button:has-text("Module Management"), [data-action="modules"]';
+
+    const manageModulesSelector =
+      'button:has-text("Manage Modules"), button:has-text("Module Management"), [data-action="modules"]';
     await this.page.click(manageModulesSelector);
     await this.page.waitForSelector('.window-app form, .package-list', { timeout: 10000 });
   }
@@ -100,11 +99,11 @@ export class FoundryTestHelpers {
   async isModuleEnabled(moduleName: string): Promise<boolean> {
     const moduleLocator = this.page.locator('.package, .module').filter({ hasText: moduleName });
     const checkbox = moduleLocator.locator('input[type="checkbox"]');
-    
+
     if (await checkbox.isVisible()) {
       return await checkbox.isChecked();
     }
-    
+
     return false;
   }
 
@@ -114,10 +113,10 @@ export class FoundryTestHelpers {
   async takeScreenshot(name: string, options?: { fullPage?: boolean }): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `test-results/${name}-${timestamp}.png`;
-    
-    await this.page.screenshot({ 
+
+    await this.page.screenshot({
       path: filename,
-      fullPage: options?.fullPage ?? true 
+      fullPage: options?.fullPage ?? true,
     });
   }
 
@@ -127,19 +126,19 @@ export class FoundryTestHelpers {
   async testApiEndpoint(endpoint: string): Promise<{ status: number; data?: any; error?: string }> {
     const baseUrl = process.env.FOUNDRY_URL || 'http://localhost:30000';
     const fullUrl = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    
+
     try {
       const response = await this.page.request.get(fullUrl);
       const data = response.ok() ? await response.json() : null;
-      
+
       return {
         status: response.status(),
-        data
+        data,
       };
     } catch (error) {
       return {
         status: 0,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -147,45 +146,49 @@ export class FoundryTestHelpers {
   /**
    * Test REST API endpoint and return raw response for JSON parsing validation
    */
-  async testApiEndpointRaw(endpoint: string): Promise<{ 
-    status: number; 
-    rawText: string; 
-    parsedData?: any; 
+  async testApiEndpointRaw(endpoint: string): Promise<{
+    status: number;
+    rawText: string;
+    parsedData?: any;
     parseError?: string;
     contentType?: string;
   }> {
     const baseUrl = process.env.FOUNDRY_URL || 'http://localhost:30000';
     const fullUrl = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    
+
     try {
       const response = await this.page.request.get(fullUrl);
       const rawText = await response.text();
       const contentType = response.headers()['content-type'] || 'unknown';
-      
-      let parsedData;
-      let parseError;
-      
+
+      let parsedData: unknown;
+      let parseError: string | undefined;
+
       // Attempt to parse JSON
-      if (contentType.includes('application/json') || rawText.trim().startsWith('{') || rawText.trim().startsWith('[')) {
+      if (
+        contentType.includes('application/json') ||
+        rawText.trim().startsWith('{') ||
+        rawText.trim().startsWith('[')
+      ) {
         try {
           parsedData = JSON.parse(rawText);
         } catch (error) {
           parseError = error instanceof Error ? error.message : 'JSON parse error';
         }
       }
-      
+
       return {
         status: response.status(),
         rawText,
         parsedData,
         parseError,
-        contentType
+        contentType,
       };
     } catch (error) {
       return {
         status: 0,
         rawText: '',
-        parseError: error instanceof Error ? error.message : 'Network error'
+        parseError: error instanceof Error ? error.message : 'Network error',
       };
     }
   }
@@ -200,7 +203,7 @@ export class FoundryTestHelpers {
   }> {
     const errors: string[] = [];
     const patterns: string[] = [];
-    
+
     // Check for malformation patterns that could cause "Expected ',' or ']'" errors
     const malformationChecks = [
       { pattern: /\[\s*,/, description: 'Array starts with comma' },
@@ -211,14 +214,14 @@ export class FoundryTestHelpers {
       { pattern: /^[^[]*\]/, description: 'Closing bracket without opening' },
       { pattern: /\[\s*[^{\]"]/, description: 'Invalid array start' },
     ];
-    
+
     for (const check of malformationChecks) {
       if (check.pattern.test(rawJson)) {
         errors.push(check.description);
         patterns.push(check.pattern.toString());
       }
     }
-    
+
     // Try to parse and get specific parsing error
     try {
       JSON.parse(rawJson);
@@ -227,11 +230,11 @@ export class FoundryTestHelpers {
         errors.push(`Parse error: ${parseError.message}`);
       }
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
-      patterns
+      patterns,
     };
   }
 
@@ -239,19 +242,19 @@ export class FoundryTestHelpers {
    * Wait for a specific condition with timeout
    */
   async waitForCondition(
-    condition: () => Promise<boolean>, 
+    condition: () => Promise<boolean>,
     timeout: number = 10000,
-    interval: number = 500
+    interval: number = 500,
   ): Promise<boolean> {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeout) {
       if (await condition()) {
         return true;
       }
       await this.page.waitForTimeout(interval);
     }
-    
+
     return false;
   }
 }

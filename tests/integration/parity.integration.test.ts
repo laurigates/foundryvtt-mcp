@@ -72,8 +72,12 @@ describe.skipIf(missing.length > 0)(title, () => {
   let dual: FoundryClient;
   /** REST-only mode against the bridge: the REST answer, with no Socket.IO login. */
   let rest: FoundryClient;
-  const compared: Array<{ id: string; socket: FoundryActor; rest: FoundryActor; dual: FoundryActor }> =
-    [];
+  const compared: Array<{
+    id: string;
+    socket: FoundryActor;
+    rest: FoundryActor;
+    dual: FoundryActor;
+  }> = [];
 
   /** Assigned in beforeAll with the lazily imported client module (see the header). */
   let worldActorToFoundry: typeof import('../../src/foundry/client.js').worldActorToFoundry;
@@ -149,7 +153,9 @@ describe.skipIf(missing.length > 0)(title, () => {
     const lines = gapDrift('actor', union);
     const note =
       lines.length > 0
-        ? [`(compared ${compared.map(({ id }) => id).join(', ')}; a closed gap may also mean no compared actor exercises that field)`]
+        ? [
+            `(compared ${compared.map(({ id }) => id).join(', ')}; a closed gap may also mean no compared actor exercises that field)`,
+          ]
         : [];
     expect(lines, parityMessage([...lines, ...note])).toEqual([]);
   });
@@ -159,7 +165,9 @@ describe.skipIf(missing.length > 0)(title, () => {
       const report = compareParity(normaliseActor(viaDual), normaliseActor(viaRest));
       return [
         ...mismatchLines('actor', report),
-        ...report.restOnly.map((field) => `actor.${field}: REST-only, and dual mode does not overlay it`),
+        ...report.restOnly.map(
+          (field) => `actor.${field}: REST-only, and dual mode does not overlay it`,
+        ),
       ].map((line) => `${id}: ${line}`);
     });
     expect(lines, parityMessage(lines)).toEqual([]);

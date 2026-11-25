@@ -68,22 +68,30 @@ child.stderr.on('data', (chunk) => {
 });
 
 child.on('exit', (code, signal) => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `server exited prematurely (code=${code}, signal=${signal})`);
 });
 
 child.on('error', (err) => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `failed to spawn server: ${err.message}`);
 });
 
 const timeout = setTimeout(() => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `timed out after ${STARTUP_TIMEOUT_MS}ms waiting for banner`);
 }, STARTUP_TIMEOUT_MS);
 
 function finish(success, message) {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   resolved = true;
   clearTimeout(timeout);
 

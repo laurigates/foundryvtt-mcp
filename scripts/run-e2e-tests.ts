@@ -2,15 +2,15 @@
 
 /**
  * E2E Test Runner Script
- * 
+ *
  * This script helps orchestrate end-to-end testing by:
  * 1. Ensuring FoundryVTT server is running
  * 2. Running Playwright tests
  * 3. Generating reports
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
@@ -23,7 +23,7 @@ interface TestOptions {
 
 class E2ETestRunner {
   private foundryUrl: string;
-  
+
   constructor() {
     this.foundryUrl = process.env.FOUNDRY_URL || 'http://localhost:30000';
   }
@@ -33,8 +33,10 @@ class E2ETestRunner {
    */
   async checkFoundryServer(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync(`curl -s -o /dev/null -w "%{http_code}" ${this.foundryUrl}`);
-      const statusCode = parseInt(stdout.trim());
+      const { stdout } = await execAsync(
+        `curl -s -o /dev/null -w "%{http_code}" ${this.foundryUrl}`,
+      );
+      const statusCode = parseInt(stdout.trim(), 10);
       return statusCode >= 200 && statusCode < 400;
     } catch (error) {
       console.warn('Could not check FoundryVTT server status:', error);
@@ -47,18 +49,18 @@ class E2ETestRunner {
    */
   async waitForFoundryServer(timeout: number = 60000): Promise<boolean> {
     console.log(`Waiting for FoundryVTT server at ${this.foundryUrl}...`);
-    
+
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
       if (await this.checkFoundryServer()) {
         console.log('✅ FoundryVTT server is ready');
         return true;
       }
-      
+
       console.log('⏳ Waiting for server...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-    
+
     console.error('❌ FoundryVTT server not ready within timeout');
     return false;
   }
@@ -68,22 +70,34 @@ class E2ETestRunner {
    */
   async runTests(options: TestOptions = {}): Promise<void> {
     console.log('🧪 Starting E2E tests...');
-    
+
     // Build Playwright command
     let command = 'npx playwright test';
-    
-    if (options.headed) command += ' --headed';
-    if (options.debug) command += ' --debug';
-    if (options.ui) command += ' --ui';
-    if (options.reporter) command += ` --reporter=${options.reporter}`;
-    
+
+    if (options.headed) {
+      command += ' --headed';
+    }
+    if (options.debug) {
+      command += ' --debug';
+    }
+    if (options.ui) {
+      command += ' --ui';
+    }
+    if (options.reporter) {
+      command += ` --reporter=${options.reporter}`;
+    }
+
     try {
       console.log(`Running: ${command}`);
       const { stdout, stderr } = await execAsync(command);
-      
-      if (stdout) console.log(stdout);
-      if (stderr) console.error(stderr);
-      
+
+      if (stdout) {
+        console.log(stdout);
+      }
+      if (stderr) {
+        console.error(stderr);
+      }
+
       console.log('✅ E2E tests completed');
     } catch (error: any) {
       console.error('❌ E2E tests failed:', error.message);
@@ -109,7 +123,7 @@ class E2ETestRunner {
  */
 async function main() {
   const runner = new E2ETestRunner();
-  
+
   // Parse command line arguments
   const args = process.argv.slice(2);
   const options: TestOptions = {
@@ -117,10 +131,10 @@ async function main() {
     debug: args.includes('--debug'),
     ui: args.includes('--ui'),
   };
-  
+
   // Check if server check should be skipped
   const skipServerCheck = args.includes('--skip-server-check');
-  
+
   try {
     // Wait for FoundryVTT server unless skipped
     if (!skipServerCheck) {
@@ -130,15 +144,14 @@ async function main() {
         process.exit(1);
       }
     }
-    
+
     // Run tests
     await runner.runTests(options);
-    
+
     // Show report unless in debug/ui mode
     if (!options.debug && !options.ui) {
       await runner.showReport();
     }
-    
   } catch (error) {
     console.error('E2E test execution failed:', error);
     process.exit(1);
