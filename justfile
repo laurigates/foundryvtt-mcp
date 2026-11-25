@@ -147,7 +147,7 @@ check-types-scripts:
 
 # Run all quality checks (lint, types, tests)
 [group: "quality"]
-qa: lint check-types check-types-scripts test
+qa: lint check-types check-types-scripts test-coverage
 
 ########## Documentation ##########
 
