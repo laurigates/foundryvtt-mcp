@@ -88,17 +88,12 @@ It has two parts, because module code runs in the browser and cannot serve HTTP:
 
 The bridge answers only while a **Gamemaster is logged in through a browser** with the module enabled. Without that client, the bridge answers HTTP 500 after its `REQUEST_TIMEOUT` (5 s by default), and dual mode serves the Socket.IO answers. The MCP then skips the bridge for that capability for 30 seconds, so only the first call in each window waits; `get_health_status` shows the bridge as "Reachable, answering with errors" and lists the pauses.
 
-**Status:** the module has **no published release yet** (laurigates/foundryvtt-local-rest-api#2), so there is no manifest URL to paste into Foundry's module installer. It is verified on Foundry v13; the v14 port is in review (laurigates/foundryvtt-local-rest-api#4). Some routes the MCP uses do not work yet, and dual mode falls back to the Socket.IO answer or an "unavailable" label for them:
+**Status:** the module is released (current release v2.1.2; compatibility minimum 13, verified 14.369, maximum 14). The two bridge defects that blocked dual mode, [laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8) (actor reads and search filters, so no prepared AC, max HP or save totals) and [laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6) (diagnostics routing and the missing compendium route), were fixed in its [PR #4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4) and shipped in v2.1.0. Dual mode has not yet been verified end to end against a live Foundry and bridge; if a route misbehaves, dual mode still falls back to the Socket.IO answer or an "unavailable" label.
 
-- [laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8): `GET /api/actors/:id` through the bridge fails validation, and actor search ignores `query`, `type` and `limit`. Until it is fixed, dual mode cannot deliver prepared actor values (AC, max HP, save totals).
-- [laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6): diagnostics routing and the missing compendium route. Until it is fixed, compendium search, logs and system health report as unavailable even with a working bridge.
+Setup (the module's [usage guide](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/usage.md#installation) has the full bridge-server configuration):
 
-Both are addressed in [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4); the fixes apply once it is merged.
-
-Until a release exists, install from a checkout of that repository and follow its README:
-
-1. Put the module in your Foundry data directory under `Data/modules/foundryvtt-local-rest-api`, enable it in your world, turn on **Enable REST API** in its module settings and copy the generated API key.
-2. Configure the bridge server in the checkout's `bridge-server/` directory: the Foundry URL, the API key, and the world user it logs in as. Start it and check `http://localhost:3030/api/status`.
+1. In Foundry, go to **Setup → Add-on Modules → Install Module** and paste the manifest URL `https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json`. Enable the module in your world, turn on **Enable REST API** in its module settings and copy the generated API key.
+2. Configure the bridge server from the `bridge-server/` directory of a checkout of that repository: the Foundry URL, the API key, and the world user it logs in as. Start it and check `http://localhost:3030/api/status`.
 3. Keep a Gamemaster logged in through a browser.
 4. Add to the MCP's `.env`, alongside the Socket.IO credentials:
    ```env

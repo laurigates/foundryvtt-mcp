@@ -54,7 +54,7 @@ VS Code uses `servers` instead of `mcpServers` for its standard MCP configuratio
 
 ## Optional: dual mode with the REST bridge
 
-Adding the [REST bridge](./configuration.md#optional-rest-bridge-augment) (laurigates/foundryvtt-local-rest-api) to a Socket.IO configuration selects **dual mode**: Socket.IO stays primary, and the bridge adds prepared actor values, Foundry's dice engine, compendium search, logs and system health. Set `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` **in addition to** the Socket.IO credentials; `FOUNDRY_URL` keeps pointing at Foundry. See the [capability matrix](./capabilities.md#connection-modes) for what each mode supports. The module has no published release yet, so set the bridge up from a checkout as the configuration guide describes.
+Adding the [REST bridge](./configuration.md#optional-rest-bridge-augment) (laurigates/foundryvtt-local-rest-api) to a Socket.IO configuration selects **dual mode**: Socket.IO stays primary, and the bridge adds prepared actor values, Foundry's dice engine, compendium search, logs and system health. Set `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL` **in addition to** the Socket.IO credentials; `FOUNDRY_URL` keeps pointing at Foundry. See the [capability matrix](./capabilities.md#connection-modes) for what each mode supports. Install the module from its manifest URL and run the bridge server as the configuration guide describes.
 
 ```json
 {
