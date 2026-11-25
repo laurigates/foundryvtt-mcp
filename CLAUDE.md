@@ -60,8 +60,9 @@ from configuration alone (empty values count as unset); the design is
   bridge call falls back to the Socket.IO answer; `connect()` never fails
   because of the bridge. A transport failure pauses the whole bridge, a 5xx
   (e.g. no GM browser client) pauses that capability, both for 30 s; a 4xx
-  pauses nothing. The prepared values and the diagnostics/compendium routes
-  depend on bridge fixes (foundryvtt-local-rest-api#8, #6; its PR #4).
+  pauses nothing. The bridge fixes the prepared values and the
+  diagnostics/compendium routes depend on (foundryvtt-local-rest-api#8, #6)
+  shipped in its v2.1.0; not yet verified live against this server.
 - **`rest`** (deprecated: the key without Socket.IO credentials, or without
   `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
   startup warning. It probes the bridge's authenticated `/api/world`

@@ -16,7 +16,7 @@ The mode is decided from configuration alone (`src/foundry/transport.ts`); an em
 
 `FOUNDRY_REST_URL` without `FOUNDRY_API_KEY` stays in Socket.IO mode and logs that the augment is off. `FOUNDRY_WRITE_ENABLED=true` enables the write tools only where Socket.IO is connected.
 
-The REST bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api): a Foundry module plus a Node bridge server. It answers only while a GM is logged in through a browser with the module enabled. It has no published release yet; see the [configuration guide](./configuration.md#optional-rest-bridge-augment) for setup.
+The REST bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api): a Foundry module plus a Node bridge server. It answers only while a GM is logged in through a browser with the module enabled. It is released (current release v2.1.2, Foundry v13 and v14); see the [configuration guide](./configuration.md#optional-rest-bridge-augment) for setup.
 
 For **remote Foundry on Linux**, the local MCP client can access a reachable `FOUNDRY_URL` over Socket.IO without opening a Foundry browser tab on the client's computer. Foundry must have an active world and an authorized user; actual network and version compatibility should be tested.
 
@@ -67,10 +67,7 @@ Fallbacks after a failed bridge call are not shown.
 | `move_token` | socket [write opt-in] | socket [write opt-in] | hidden |
 | `apply_status_effect` | socket [write opt-in] | socket [write opt-in] | hidden |
 
-**Bridge routes not working yet.** Both defects are addressed in [laurigates/foundryvtt-local-rest-api#4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4); the fixes apply once it is merged.
-
-- The bridge routes `/api/diagnostics/*` to an action the module rejects and has no compendium route ([laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6)). Until that is fixed, `search_compendium`, `get_recent_logs`, `search_logs`, `get_system_health` and the system-health part of `get_health_status` report as unavailable even with a working bridge.
-- Through the bridge, `GET /api/actors/:id` always fails validation ("id is required"), and actor search ignores `query`, `type` and `limit` and returns the first 50 actors ([laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8)). Until that is fixed, dual mode cannot deliver prepared actor values: `get_actor_details` and `search_actors` return the Socket.IO answer with its "unavailable" labels (search overlays only actors that happen to be among those 50).
+**Bridge route fixes released, live check pending.** Two bridge defects affected these tools: diagnostics routing and the missing compendium route ([laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6); `search_compendium`, `get_recent_logs`, `search_logs`, `get_system_health` and the system-health part of `get_health_status`), and actor reads that failed validation and ignored search filters ([laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8); the prepared values in `get_actor_details` and `search_actors`). Both were fixed in its [PR #4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4) and shipped in v2.1.0. The dual-mode cells above have not yet been verified against a live Foundry and bridge.
 
 ## Read, search, utility and diagnostic tools (22)
 

@@ -53,6 +53,8 @@ export interface HealthReport {
 
 /** Where the optional REST bridge (module + bridge server) lives (#327). */
 const REST_BRIDGE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+/** Manifest URL to paste into Foundry's module installer (latest release). */
+const REST_BRIDGE_MANIFEST = `${REST_BRIDGE_REPO}/releases/latest/download/module.json`;
 /** The setup notes for the REST bridge. */
 const REST_BRIDGE_GUIDE =
   'https://github.com/laurigates/foundryvtt-mcp/blob/main/docs/guides/configuration.md#optional-rest-bridge-augment';
@@ -206,7 +208,8 @@ export class DiagnosticSystem {
 
     if (!report.restApiAvailable) {
       output += '💡 **Unlock Full Features** (optional REST bridge):\n';
-      output += `  → Module and bridge server: ${REST_BRIDGE_REPO} (no published release yet)\n`;
+      output += `  → Module and bridge server: ${REST_BRIDGE_REPO}\n`;
+      output += `  → Module manifest URL: ${REST_BRIDGE_MANIFEST}\n`;
       output +=
         '  → Set FOUNDRY_API_KEY and FOUNDRY_REST_URL alongside the Socket.IO credentials\n';
       output += `  → See setup guide: ${REST_BRIDGE_GUIDE}\n\n`;
@@ -248,7 +251,7 @@ export class DiagnosticSystem {
     return {
       explanation: `${feature.charAt(0).toUpperCase() + feature.slice(1)} search requires the optional REST bridge for full functionality.`,
       suggestions:
-        `• **Install the module and bridge server** - From ${REST_BRIDGE_REPO} (no published release yet; install from a checkout)\n` +
+        `• **Install the module and bridge server** - Install the module in Foundry from the manifest URL ${REST_BRIDGE_MANIFEST}; the bridge server is in ${REST_BRIDGE_REPO}\n` +
         "• **Enable the module** - Activate it in your world's module settings and turn on its REST API\n" +
         '• **Start the bridge server** - Keep a Gamemaster logged in through a browser; the bridge answers through that client\n' +
         '• **Update .env file** - Set FOUNDRY_API_KEY to the module key and FOUNDRY_REST_URL to the bridge (e.g. http://localhost:3030)\n' +
