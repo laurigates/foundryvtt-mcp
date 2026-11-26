@@ -25,7 +25,7 @@ capability in `src/foundry/capabilities.ts` (see ADR-011,
 a Foundry module plus a Node bridge server (`:3030`). It answers only while a
 GM is logged in through a browser. It is released (v2.1.2, Foundry v13 and
 v14); the route fixes for laurigates/foundryvtt-local-rest-api#6 and #8 shipped
-in its v2.1.0 but are not yet verified live against this server. A 5xx from the bridge pauses that capability for 30 s. **Writes never
+in its v2.1.0, and dual mode was checked by hand against a live world on 2026-11-26. A 5xx from the bridge pauses that capability for 30 s. **Writes never
 go through the bridge.** Default deployments are Socket.IO-only, so do not
 assume the bridge is present; a dual-mode read must fall back when it is down.
 

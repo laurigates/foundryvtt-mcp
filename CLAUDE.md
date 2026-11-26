@@ -62,7 +62,8 @@ from configuration alone (empty values count as unset); the design is
   (e.g. no GM browser client) pauses that capability, both for 30 s; a 4xx
   pauses nothing. The bridge fixes the prepared values and the
   diagnostics/compendium routes depend on (foundryvtt-local-rest-api#8, #6)
-  shipped in its v2.1.0; not yet verified live against this server.
+  shipped in its v2.1.0; dual mode was checked by hand against a live world
+  on 2026-11-26 (see `docs/guides/capabilities.md`).
 - **`rest`** (deprecated: the key without Socket.IO credentials, or without
   `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
   startup warning. It probes the bridge's authenticated `/api/world`
