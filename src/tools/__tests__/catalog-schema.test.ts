@@ -5,9 +5,17 @@ import { ToolCatalog } from '../catalog.js';
 
 function catalogFor(schemas: Record<string, unknown>[]): ToolCatalog {
   const sessions = schemas.map(
-    (outputSchema) =>
+    (outputSchema, index) =>
       ({
         state: 'ready',
+        config: {
+          id: String(index),
+          provider: { kind: 'socketio', baseUrl: `http://${index}.test` },
+          writeEnabled: false,
+          pythonExecutable: 'python3',
+          integrationTimeoutMs: 1000,
+          integrationsEnabled: true,
+        },
         provider: { isConnected: () => true, capabilities: new Set<string>() },
         integrations: {
           getTools: () => [

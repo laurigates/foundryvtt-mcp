@@ -13,6 +13,18 @@ const RelativeFile = z
     (value) => !isAbsolute(value) && !value.includes('\\') && !value.split('/').includes('..'),
     'Entrypoints and bindings must be relative paths within the integration directory',
   );
+/**
+ * The worker imports the entrypoint as Python and evaluates bindings and probes
+ * as scripts, so the manifest cannot point them at arbitrary package files.
+ */
+const PythonEntrypoint = RelativeFile.refine(
+  (value) => value.toLowerCase().endsWith('.py'),
+  'The entrypoint must be a .py file inside the integration directory',
+);
+const JavaScriptBinding = RelativeFile.refine(
+  (value) => value.toLowerCase().endsWith('.js'),
+  'Bindings and probes must be .js files inside the integration directory',
+);
 
 const OperationSchema = z
   .object({
@@ -20,8 +32,8 @@ const OperationSchema = z
     description: z.string().min(1),
     inputSchema: z.record(z.string(), z.unknown()),
     outputSchema: z.record(z.string(), z.unknown()),
-    binding: RelativeFile,
-    probe: RelativeFile,
+    binding: JavaScriptBinding,
+    probe: JavaScriptBinding,
     readOnly: z.boolean(),
   })
   .strict();
@@ -35,7 +47,7 @@ export const IntegrationManifestSchema = z
     foundryGeneration: z.number().int().min(13).max(Number.MAX_SAFE_INTEGER).optional(),
     adapterVersion: z.string().min(1),
     updatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    entrypoint: RelativeFile,
+    entrypoint: PythonEntrypoint,
     status: z.enum(['experimental', 'supported']),
     upstream: z
       .object({
@@ -120,7 +132,7 @@ async function containedDirectory(root: string, directory: string): Promise<void
   // Structural directory aliases can turn /14 into /13 or one identity into
   // another. Keep the same canonical paths enforced by the Python worker.
   const expected = resolve(await realpath(root), basename(directory));
-  if (await realpath(directory) !== expected) {
+  if ((await realpath(directory)) !== expected) {
     throw new IntegrationError(
       'invalid_manifest',
       `Integration directory escapes or aliases its expected path: ${directory}`,

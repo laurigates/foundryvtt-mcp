@@ -21,5 +21,5 @@ export const metadata = Object.freeze({
   adapterVersion: '0.2.1', updatedAt: '2026-11-22', entrypoint: 'adapter.py', status: 'experimental',
   upstream: { repository: 'https://github.com/foundryvtt/pf2e',
     reference: 'pf2e-8.7.1@397f125aea87e6d6fa36e878c9c07d0e672826cf', updatedAt: '2026-11-17', verifiedAt: null },
-  compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
+  compatibility: { foundryVersions: ['14'], integrationVersions: [], tested: [] },
 });

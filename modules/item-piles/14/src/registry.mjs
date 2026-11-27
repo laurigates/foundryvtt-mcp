@@ -27,5 +27,5 @@ export const metadata = Object.freeze({
   },
   // Version restrictions for new operations live in the runtime/probes so the
   // existing get_items operation keeps its capability-based compatibility.
-  compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
+  compatibility: { foundryVersions: ['14'], integrationVersions: [], tested: [] },
 });

@@ -2,6 +2,9 @@
 import { createHash } from 'node:crypto';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
+import { type Capability, sourceOrder, TOOL_CAPABILITIES } from '../foundry/capabilities.js';
+import type { TransportMode } from '../foundry/transport.js';
+import type { ProviderConfig } from '../providers/types.js';
 import type { FoundrySession, FoundrySessionManager } from '../sessions/index.js';
 import type { SessionContext } from '../sessions/session.js';
 import type { ToolResult } from './base.js';
@@ -18,43 +21,8 @@ export interface CatalogTool {
   annotations?: { readOnlyHint: boolean; destructiveHint?: boolean };
 }
 
-const WRITES = new Set([
-  'update_actor_attributes',
-  'create_actor_item',
-  'update_actor_item',
-  'delete_actor_item',
-  'next_turn',
-  'end_combat',
-  'set_initiative',
-  'start_combat',
-  'move_token',
-  'apply_status_effect',
-  'create_journal_entry',
-]);
-const DIAGNOSTICS = new Set(['get_recent_logs', 'search_logs', 'get_system_health']);
+/** dnd5e-only demos: local generators whose output is D&D 5e material. */
 const DND5E_DEMOS = new Set(['generate_npc', 'generate_loot', 'lookup_rule']);
-const CACHED = new Set([
-  'get_combat_state',
-  'get_chat_messages',
-  'get_users',
-  'search_journals',
-  'get_journal',
-  'search_world',
-  'refresh_world_data',
-  'get_world_summary',
-]);
-const READS = new Set([
-  'roll_dice',
-  'search_actors',
-  'get_actor_details',
-  'search_items',
-  'get_scene_info',
-  'generate_npc',
-  'generate_loot',
-  'lookup_rule',
-  'diagnose_errors',
-  'get_health_status',
-]);
 const MANAGEMENT = new Set([
   'list_targets',
   'get_target_status',
@@ -62,6 +30,30 @@ const MANAGEMENT = new Set([
   'list_systems',
   'reconnect_target',
 ]);
+
+/**
+ * `TOOL_CAPABILITIES` in `foundry/capabilities.ts` is the single source of
+ * truth: a tool is classified there or it stays hidden, and a write tool is one
+ * whose primary capability is `writes`.
+ */
+function primaryCapability(name: string): Capability | undefined {
+  return TOOL_CAPABILITIES[name]?.[0];
+}
+
+function isWriteTool(name: string): boolean {
+  return primaryCapability(name) === 'writes';
+}
+
+/** The transport mode the target's provider configuration opens. */
+function transportMode(provider: ProviderConfig): TransportMode {
+  if (provider.kind === 'rest-api' || provider.kind === 'legacy-rest') {
+    return 'rest';
+  }
+  if (provider.kind === 'composite') {
+    return 'dual';
+  }
+  return provider.restUrl && provider.restApiKey ? 'dual' : 'socket';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -115,23 +107,6 @@ function integrationOutputSchema(
     required: ['target_id', 'world_id', 'session_generation', 'result'],
     additionalProperties: false,
   };
-}
-
-function requiredCapability(name: string): string | undefined {
-  if (WRITES.has(name)) {
-    return 'core.write';
-  }
-  if (DIAGNOSTICS.has(name)) {
-    return 'diagnostics.read';
-  }
-  if (name === 'search_compendium') {
-    return 'compendium.read';
-  }
-  if (CACHED.has(name)) {
-    return 'core.cache';
-  }
-  // New tools must be classified explicitly before discovery or execution.
-  return READS.has(name) ? 'core.read' : undefined;
 }
 
 function targetArgument(args: Record<string, unknown>): string | undefined {
@@ -190,15 +165,27 @@ export class ToolCatalog {
   }
 
   private available(session: FoundrySession, name: string): boolean {
-    const capability = requiredCapability(name);
-    return (
-      capability !== undefined &&
-      session.state === 'ready' &&
-      session.provider.isConnected() &&
-      session.provider.capabilities.has(capability) &&
-      (!WRITES.has(name) || session.config.writeEnabled) &&
-      (!DND5E_DEMOS.has(name) || session.environment?.system.id === 'dnd5e')
-    );
+    const primary = primaryCapability(name);
+    if (primary === undefined) {
+      // New tools must be classified in the capability table before discovery.
+      return false;
+    }
+    if (sourceOrder(primary, transportMode(session.config.provider)).length === 0) {
+      return false;
+    }
+    if (primary === 'writes' && !session.config.writeEnabled) {
+      return false;
+    }
+    // The demos generate D&D 5e content, so they stay tied to a known system.
+    if (
+      DND5E_DEMOS.has(name) &&
+      session.environment !== undefined &&
+      session.environment.system.id !== 'dnd5e'
+    ) {
+      return false;
+    }
+    // A local tool needs no live connection; everything else does.
+    return primary === 'local' || (session.state === 'ready' && session.provider.isConnected());
   }
 
   /** Conflicting public schemas are withheld, never overwritten by the last target. */
@@ -275,7 +262,7 @@ export class ToolCatalog {
         description: definition.description,
         inputSchema: this.targetSchema(definition.inputSchema, multiple),
         annotations: {
-          readOnlyHint: !WRITES.has(definition.name),
+          readOnlyHint: !isWriteTool(definition.name),
           destructiveHint: definition.name === 'delete_actor_item',
         },
       }));
@@ -333,7 +320,7 @@ export class ToolCatalog {
 
     const definition = this.core.get(name);
     if (definition) {
-      if (WRITES.has(name) && !session.config.writeEnabled) {
+      if (isWriteTool(name) && !session.config.writeEnabled) {
         return this.error(
           context,
           'writes_disabled',
@@ -357,6 +344,19 @@ export class ToolCatalog {
             formatWorldRefreshResult(session.provider.getWorldSummary()),
           );
         }
+        if (primaryCapability(name) === 'local') {
+          // Local generators never touch Foundry, so an offline target still serves them.
+          return this.attribute(
+            context,
+            await routeToolRequest(
+              name,
+              parameters,
+              session.provider,
+              session.diagnosticsClient,
+              session.diagnosticSystem,
+            ),
+          );
+        }
         const result = await session.run(
           () =>
             routeToolRequest(
@@ -366,9 +366,9 @@ export class ToolCatalog {
               session.diagnosticsClient,
               session.diagnosticSystem,
             ),
-          { write: WRITES.has(name), refreshCache: true },
+          { write: isWriteTool(name), refreshCache: true },
         );
-        session.assertContextCurrent(context, WRITES.has(name));
+        session.assertContextCurrent(context, isWriteTool(name));
         return this.attribute(context, result);
       } catch (error) {
         return this.executionError(context, error);

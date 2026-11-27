@@ -91,6 +91,23 @@ describe('integration package failure isolation', () => {
     },
   );
 
+  it.each([
+    ['entrypoint', 'adapter.js'],
+    ['binding', 'binding.py'],
+    ['probe', 'probe.py'],
+  ] as const)('rejects a manifest whose %s is not an allowed file type', async (field, value) => {
+    const root = await fixtureRoot();
+    const directory = await integration(root, 'typed');
+    const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
+    if (field === 'entrypoint') {
+      manifest.entrypoint = value;
+    } else {
+      manifest.operations[0][field] = value;
+    }
+    await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest));
+    await expect(loadIntegrations(root)).rejects.toMatchObject({ code: 'invalid_manifest' });
+  });
+
   it('withholds every owner of a colliding public name while keeping unrelated packages', async () => {
     const root = await fixtureRoot();
     await integration(root, 'alpha_beta', 'read');

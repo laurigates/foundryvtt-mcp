@@ -17,6 +17,27 @@ export interface IntegrationCompatibility {
   integrationVersions: readonly string[];
 }
 
+/**
+ * A declared entry matches the observed version exactly, or by generation when
+ * the entry is a bare integer: `"14"` covers every `14.x` build, while a full
+ * `"14.370"` stays an exact pin. An empty list leaves that axis unconstrained.
+ */
+function matchesDeclaredVersion(
+  declared: readonly string[],
+  observed: string | undefined,
+): boolean {
+  if (declared.length === 0) {
+    return true;
+  }
+  if (observed === undefined) {
+    return false;
+  }
+  const generation = parseFoundryGeneration(observed);
+  return declared.some(
+    (entry) => entry === observed || (/^\d+$/.test(entry) && Number(entry) === generation),
+  );
+}
+
 export function matchesIntegrationCompatibility(
   compatibility: IntegrationCompatibility,
   observed: {
@@ -27,12 +48,8 @@ export function matchesIntegrationCompatibility(
 ): boolean {
   return (
     (!compatibility.systems || compatibility.systems.includes(observed.systemId)) &&
-    (compatibility.foundryVersions.length === 0 ||
-      (observed.foundryVersion !== undefined &&
-        compatibility.foundryVersions.includes(observed.foundryVersion))) &&
-    (compatibility.integrationVersions.length === 0 ||
-      (observed.integrationVersion !== undefined &&
-        compatibility.integrationVersions.includes(observed.integrationVersion)))
+    matchesDeclaredVersion(compatibility.foundryVersions, observed.foundryVersion) &&
+    matchesDeclaredVersion(compatibility.integrationVersions, observed.integrationVersion)
   );
 }
 

@@ -15,7 +15,9 @@
     "verifiedAt": null
   },
   "compatibility": {
-    "foundryVersions": [],
+    "foundryVersions": [
+      "14"
+    ],
     "integrationVersions": [],
     "tested": []
   },

@@ -274,6 +274,26 @@ describe('generation-specific Actor and Item projections', () => {
         { systemId },
       ),
     ).toBe(true);
+    // A bare generation covers every build of that generation, while a full
+    // version stays an exact pin.
+    expect(
+      matchesIntegrationCompatibility(
+        { foundryVersions: ['14'], integrationVersions: [] },
+        { systemId, foundryVersion: '14.370' },
+      ),
+    ).toBe(true);
+    expect(
+      matchesIntegrationCompatibility(
+        { foundryVersions: ['14'], integrationVersions: [] },
+        { systemId, foundryVersion: '13.341' },
+      ),
+    ).toBe(false);
+    expect(
+      matchesIntegrationCompatibility(
+        { foundryVersions: [], integrationVersions: ['1'] },
+        { systemId, integrationVersion: '1.4' },
+      ),
+    ).toBe(true);
     expect(matchesIntegrationCompatibility({ ...compatible, systems: [] }, observed)).toBe(false);
   });
 

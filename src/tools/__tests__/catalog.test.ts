@@ -22,7 +22,8 @@ function fixture(
     write?: boolean;
     outputType?: string;
     stale?: boolean;
-    capabilities?: string[];
+    /** Configure the REST bridge augment, so REST-only capabilities are servable. */
+    dual?: boolean;
   } = {},
 ) {
   let connected = false;
@@ -30,7 +31,12 @@ function fixture(
   let stale = options.stale ?? false;
   const provider = {
     kind: 'socketio',
-    capabilities: new Set(options.capabilities ?? ['core.read', 'core.cache', 'core.write']),
+    capabilities: new Set([
+      'core.read',
+      'core.cache',
+      'core.write',
+      ...(options.dual ? ['diagnostics.read', 'compendium.read'] : []),
+    ]),
     connect: async () => {
       if (options.offline) {
         throw new Error('offline');
@@ -86,7 +92,14 @@ function fixture(
   };
   const target: TargetConfig = {
     id,
-    provider: { kind: 'socketio', baseUrl: 'http://' + id + '.test' },
+    provider: options.dual
+      ? {
+          kind: 'socketio',
+          baseUrl: `http://${id}.test`,
+          restUrl: `http://${id}.test/bridge`,
+          restApiKey: 'fixture-key',
+        }
+      : { kind: 'socketio', baseUrl: `http://${id}.test` },
     writeEnabled: options.write ?? false,
     pythonExecutable: 'python3',
     integrationTimeoutMs: 1000,
@@ -231,16 +244,7 @@ No ability scores available
   });
 
   it('classifies all core tools and blocks unclassified additions', async () => {
-    const a = fixture('a', {
-      write: true,
-      capabilities: [
-        'core.read',
-        'core.cache',
-        'core.write',
-        'diagnostics.read',
-        'compendium.read',
-      ],
-    });
+    const a = fixture('a', { write: true, dual: true });
     const existing = definitions.getAllTools();
     const template = existing[0];
     if (!template) {
@@ -327,16 +331,25 @@ No ability scores available
     expect(session.generation).toBeGreaterThan(refreshedGeneration);
   });
 
-  it('lists management tools while all destinations are offline', async () => {
+  it('lists management and local tools while all destinations are offline', async () => {
     const { catalog } = await setup(fixture('a', { offline: true }));
+    // Local generators need no Foundry connection; every other tool does.
     expect(catalog.list().map((tool) => tool.name)).toEqual([
       'list_targets',
       'get_target_status',
       'list_modules',
       'list_systems',
       'reconnect_target',
+      'generate_npc',
+      'generate_loot',
+      'lookup_rule',
+      'diagnose_errors',
     ]);
     expect(text(await catalog.call('list_targets', {}))).toContain('error');
+    // A local generator is dispatchable even though the target is offline.
+    const generated = await catalog.call('generate_npc', {});
+    expect(generated.isError).toBeUndefined();
+    expect(text(generated)).toContain('Generated NPC');
   });
 
   it('resolves the same document ID independently and attributes results', async () => {

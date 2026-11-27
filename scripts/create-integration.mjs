@@ -108,7 +108,12 @@ export async function createIntegration({ kind, id, foundry, upstream, packageRo
     adapterVersion: '0.1.0', updatedAt: new Date().toISOString().slice(0, 10),
     entrypoint: 'adapter.py', status: 'experimental',
     upstream: { repository: upstream ?? null, reference: null, updatedAt: null, verifiedAt: null },
-    compatibility: { foundryVersions: [], integrationVersions: [], tested: [] }, operations: [operation],
+    compatibility: {
+      foundryVersions: [String(foundryGeneration)],
+      integrationVersions: [],
+      tested: [],
+    },
+    operations: [operation],
   };
   const targetId = 'replace-with-your-target-id';
   const recipes = {

@@ -153,8 +153,13 @@ version or no matching variant does not load that versioned Python adapter or
 probe its bindings. Other targets and independent integrations remain usable.
 
 After generation selection, an empty `foundryVersions` or `integrationVersions`
-filter imposes no further exact-version restriction; it is not a compatibility
-guarantee. Nonempty lists compare full observed strings exactly. `compatibility.tested` records
+filter imposes no further version restriction; it is not a compatibility
+guarantee. A nonempty list accepts an entry that matches the observed version
+exactly or, when the entry is a bare integer such as `"14"`, every build of that
+generation (`14.370` included). A full `"14.370"` entry stays an exact pin, and
+an unknown observed version never matches a nonempty list. The scaffolder writes
+the generation as a bare integer, so a generated package keeps working across
+patch releases of the generation it was built for. `compatibility.tested` records
 actual live combinations and stays empty until they are verified. Optional
 `compatibility.systems` restricts a module to named systems. This restriction
 does not require that our corresponding system adapter is installed.
@@ -164,9 +169,9 @@ inclusive**. Foundry 12 and earlier are outside that scope even if an existing
 probe succeeds. Versioned packages enforce this floor and their exact generation.
 Per-operation build requirements and upstream-version checks can narrow that
 selection. Generic core operations and legacy flat packages retain their existing
-policies. Do not put major numbers or range expressions into exact-match manifest
-arrays: use `foundryGeneration` for the generation and a probe for additional
-build/API requirements.
+policies. Range expressions are not supported in these arrays: use a bare
+generation integer, an exact version, or a probe for additional build/API
+requirements.
 
 Three version identities must stay separate: `foundryGeneration` selects a
 directory; the pinned upstream release identifies the system/module contract;
@@ -292,8 +297,8 @@ manifest's `systems`, `foundryVersions` and `integrationVersions` filters. Cache
 descriptors are checked against each target's observed versions on every use.
 Unknown systems, missing generations and unmet version filters keep raw document
 data and generic patch validation rather than borrowing another version's fields
-or bounds. Empty version-filter arrays impose no exact-version restriction;
-nonempty filters require a known, matching observed version.
+or bounds. Empty version-filter arrays impose no restriction; nonempty filters
+require a known observed version that matches exactly or by bare generation.
 
 For choosing an operation, follow [core, system and module call selection](core-system-module-calls.md).
 Invoke current runtime document methods so participating wrappers can run; do

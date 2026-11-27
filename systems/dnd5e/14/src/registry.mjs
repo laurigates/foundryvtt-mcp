@@ -17,5 +17,5 @@ export const metadata = Object.freeze({
   updatedAt: '2026-11-22', entrypoint: 'adapter.py', status: 'experimental',
   upstream: { repository: 'https://github.com/foundryvtt/dnd5e', reference: 'release-6.1.1@bc1b2c921e2f306dc5079f8de883ad64607118a6', updatedAt: '2026-11-16', verifiedAt: null },
   // Per-operation gates preserve the legacy raw Actor-data operation.
-  compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
+  compatibility: { foundryVersions: ['14'], integrationVersions: [], tested: [] },
 });

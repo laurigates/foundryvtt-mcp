@@ -163,7 +163,9 @@ describe('Python integration lifecycle boundaries', () => {
       packageRoot: root,
       pythonExecutable: python,
       writesEnabled: true,
-      timeoutMs: 250,
+      // Long enough for a Python start on a loaded machine, so the timeout
+      // lands after the write is dispatched and the outcome becomes unknown.
+      timeoutMs: 2500,
       execute: async (script) => {
         if (script.includes('PROBE')) {
           return { ready: true };
@@ -199,7 +201,7 @@ describe('Python integration lifecycle boundaries', () => {
 
   it('preserves a timeout before a mutating adapter invokes its binding', async () => {
     const root = await fixture(
-      'import asyncio\nclass Adapter:\n    async def execute(self, operation, arguments, context):\n        await asyncio.sleep(2)\n        return await context.invoke(operation, arguments)\n',
+      'import asyncio\nclass Adapter:\n    async def execute(self, operation, arguments, context):\n        await asyncio.sleep(5)\n        return await context.invoke(operation, arguments)\n',
     );
     let executions = 0;
     const manager = new IntegrationManager({
@@ -207,7 +209,9 @@ describe('Python integration lifecycle boundaries', () => {
       packageRoot: root,
       pythonExecutable: python,
       writesEnabled: true,
-      timeoutMs: 250,
+      // The timeout must outlast a Python start on a loaded machine but still
+      // expire before the adapter sleep, so the binding never runs.
+      timeoutMs: 2500,
       execute: async (script) => {
         if (script.includes('PROBE')) {
           return { ready: true };
@@ -283,7 +287,9 @@ describe('Python integration lifecycle boundaries', () => {
         writeEnabled: true,
         integrationsEnabled: true,
         pythonExecutable: python,
-        integrationTimeoutMs: 250,
+        // The queue assertion needs the timeout after the write is dispatched,
+        // not during the Python start.
+        integrationTimeoutMs: 2500,
       },
       provider,
       { packageRoot: root, monitorIntervalMs: 0 },
@@ -383,7 +389,7 @@ describe('Python integration lifecycle boundaries', () => {
         packageRoot: root,
         pythonExecutable: python,
         writesEnabled: true,
-        timeoutMs: 1000,
+        timeoutMs: 2500,
         execute: async (script) => {
           if (script.includes('PROBE')) {
             return { ready: true };

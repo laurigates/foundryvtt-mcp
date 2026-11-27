@@ -15,7 +15,7 @@ export const metadata = Object.freeze({
     "verifiedAt": null
   },
   "compatibility": {
-    "foundryVersions": [],
+    "foundryVersions": ["13"],
     "integrationVersions": [],
     "tested": []
   },
