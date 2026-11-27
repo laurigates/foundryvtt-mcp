@@ -48,5 +48,32 @@
         }
       ]
     }
-  ]
+  ],
+  "preparedActorValues": true,
+  "derived": {
+    "abilityModifier": {
+      "offset": 10,
+      "divisor": 2
+    },
+    "level": {
+      "actorType": "character",
+      "itemType": "class",
+      "path": "system.levels"
+    },
+    "proficiency": {
+      "path": "attributes.prof",
+      "levelOffset": 1,
+      "step": 4,
+      "base": 2
+    },
+    "ac": {
+      "calculationPath": "attributes.ac.calc",
+      "flatValuePath": "attributes.ac.flat",
+      "flatMode": "flat"
+    },
+    "unavailable": {
+      "hpMax": "attributes.hp",
+      "ac": "attributes.ac"
+    }
+  }
 }

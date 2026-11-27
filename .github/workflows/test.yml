@@ -26,8 +26,9 @@ jobs:
     - name: Type-check scripts
       run: bunx tsc --noEmit -p tsconfig.scripts.json
 
-    - name: Run tests
-      run: bun run test
+    # Fails when coverage drops below the thresholds in vitest.config.ts.
+    - name: Run tests with coverage
+      run: bun run test:coverage
       env:
         NODE_ENV: test
         FOUNDRY_URL: http://localhost:30000

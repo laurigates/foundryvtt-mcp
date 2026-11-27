@@ -31,15 +31,15 @@ async function probeRest(apiKey: string): Promise<RestProbeResult> {
       axios.get(`${FOUNDRY_URL}${url}`, {
         headers: {
           'x-api-key': apiKey,
-          'User-Agent': 'FoundryMCP-Diagnostic/1.0'
+          'User-Agent': 'FoundryMCP-Diagnostic/1.0',
         },
-        timeout: 10000
-      })
+        timeout: 10000,
+      }),
     );
     const keys = Object.keys(world);
     return {
       ok: true,
-      detail: `Response keys: ${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}`
+      detail: `Response keys: ${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}`,
     };
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : String(error) };
@@ -60,12 +60,12 @@ async function testEndpoint(
   endpoint: string,
   method: 'GET' | 'POST' = 'GET',
   data?: any,
-  authRequired: boolean = true
+  authRequired: boolean = true,
 ): Promise<TestResult> {
   const url = `${FOUNDRY_URL}${endpoint}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'User-Agent': 'FoundryMCP-Diagnostic/1.0'
+    'User-Agent': 'FoundryMCP-Diagnostic/1.0',
   };
 
   // Add auth header if required and available
@@ -80,7 +80,7 @@ async function testEndpoint(
       headers,
       data,
       timeout: 10000,
-      validateStatus: () => true // Don't throw on HTTP error codes
+      validateStatus: () => true, // Don't throw on HTTP error codes
     });
 
     return {
@@ -89,7 +89,7 @@ async function testEndpoint(
       status: response.status < 400 ? 'PASS' : 'FAIL',
       statusCode: response.status,
       response: response.data,
-      authRequired
+      authRequired,
     };
   } catch (error) {
     return {
@@ -97,14 +97,14 @@ async function testEndpoint(
       method,
       status: 'FAIL',
       error: error instanceof Error ? error.message : String(error),
-      authRequired
+      authRequired,
     };
   }
 }
 
 async function runDiagnostics() {
   console.log('🔍 FoundryVTT REST API Module Diagnostics\n');
-  
+
   console.log('📋 Configuration:');
   console.log(`   URL: ${FOUNDRY_URL}`);
   console.log(`   API Key: ${API_KEY ? '✅ Configured' : '❌ Not set'}\n`);
@@ -120,51 +120,51 @@ async function runDiagnostics() {
       name: 'Foundry Reachable (core /api/status, no auth)',
       endpoint: '/api/status',
       method: 'GET',
-      authRequired: false
+      authRequired: false,
     },
     {
       name: 'Actor Search',
       endpoint: '/api/actors',
       method: 'GET',
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'Actor Search with Query',
       endpoint: '/api/actors?query=test&limit=1',
       method: 'GET',
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'Item Search',
       endpoint: '/api/items',
       method: 'GET',
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'Dice Roll',
       endpoint: '/api/dice/roll',
       method: 'POST',
       data: { formula: '1d20', reason: 'Diagnostic test' },
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'Current Scene',
       endpoint: '/api/scenes/current',
       method: 'GET',
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'World Info',
       endpoint: '/api/world',
       method: 'GET',
-      authRequired: true
+      authRequired: true,
     },
     {
       name: 'Diagnostics Logs',
       endpoint: '/api/diagnostics/logs?lines=1',
       method: 'GET',
-      authRequired: true
-    }
+      authRequired: true,
+    },
   ];
 
   const results: TestResult[] = [];
@@ -176,7 +176,7 @@ async function runDiagnostics() {
         method: test.method,
         status: 'SKIP',
         error: 'No API key configured',
-        authRequired: true
+        authRequired: true,
       });
       continue;
     }
@@ -184,9 +184,9 @@ async function runDiagnostics() {
     console.log(`Testing ${test.name}...`);
     const result = await testEndpoint(test.endpoint, test.method, test.data, test.authRequired);
     results.push(result);
-    
+
     // Add small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   let restProbe: RestProbeResult | undefined;
@@ -205,30 +205,36 @@ async function runDiagnostics() {
   for (const result of results) {
     const icon = result.status === 'PASS' ? '✅' : result.status === 'FAIL' ? '❌' : '⏭️';
     const auth = result.authRequired ? '🔐' : '🔓';
-    
+
     console.log(`${icon} ${auth} ${result.method} ${result.endpoint}`);
-    
+
     if (result.statusCode) {
       console.log(`   Status: ${result.statusCode}`);
     }
-    
+
     if (result.error) {
       console.log(`   Error: ${result.error}`);
     }
-    
+
     if (result.response && result.status === 'PASS') {
       // Show a preview of successful responses
       if (typeof result.response === 'object') {
         const keys = Object.keys(result.response);
-        console.log(`   Response keys: ${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}`);
+        console.log(
+          `   Response keys: ${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}`,
+        );
       }
     }
-    
+
     console.log();
-    
-    if (result.status === 'PASS') passCount++;
-    else if (result.status === 'FAIL') failCount++;
-    else skipCount++;
+
+    if (result.status === 'PASS') {
+      passCount++;
+    } else if (result.status === 'FAIL') {
+      failCount++;
+    } else {
+      skipCount++;
+    }
   }
 
   console.log('📈 Summary:');
@@ -238,14 +244,16 @@ async function runDiagnostics() {
   console.log(`   📊 Total: ${results.length}\n`);
 
   // Analyze results and provide recommendations
-  const statusTest = results.find(r => r.endpoint === '/api/status');
-  const authTests = results.filter(r => r.authRequired && r.status !== 'SKIP');
-  
+  const statusTest = results.find((r) => r.endpoint === '/api/status');
+  const authTests = results.filter((r) => r.authRequired && r.status !== 'SKIP');
+
   console.log('🔍 Analysis:');
-  
+
   if (statusTest?.status === 'PASS') {
     console.log('   ✅ FoundryVTT server is accessible (core /api/status)');
-    console.log('   ℹ️  /api/status is served by FoundryVTT core without auth; it says nothing about the REST module');
+    console.log(
+      '   ℹ️  /api/status is served by FoundryVTT core without auth; it says nothing about the REST module',
+    );
   } else if (statusTest?.status === 'FAIL') {
     console.log('   ❌ FoundryVTT server connection issues');
     console.log('   💡 Check if FoundryVTT is running and accessible');
@@ -259,20 +267,22 @@ async function runDiagnostics() {
   }
 
   if (authTests.length > 0) {
-    const authPassed = authTests.filter(r => r.status === 'PASS').length;
-    const authFailed = authTests.filter(r => r.status === 'FAIL').length;
+    const authPassed = authTests.filter((r) => r.status === 'PASS').length;
+    const authFailed = authTests.filter((r) => r.status === 'FAIL').length;
 
     if (authPassed > 0 && restProbe?.ok) {
       console.log('   ✅ API authentication is working');
       console.log('   ✅ REST API module is properly configured');
     } else if (authPassed > 0) {
-      console.log(`   ⚠️  ${authPassed} authenticated endpoint(s) answered HTTP < 400, but /api/world did not return JSON`);
+      console.log(
+        `   ⚠️  ${authPassed} authenticated endpoint(s) answered HTTP < 400, but /api/world did not return JSON`,
+      );
       console.log('   💡 Those responses may come from FoundryVTT core, not the REST API module');
     } else if (authFailed > 0) {
       console.log('   ❌ API authentication issues detected');
-      const auth404 = authTests.filter(r => r.statusCode === 404).length;
-      const auth401 = authTests.filter(r => r.statusCode === 401).length;
-      
+      const auth404 = authTests.filter((r) => r.statusCode === 404).length;
+      const auth401 = authTests.filter((r) => r.statusCode === 401).length;
+
       if (auth404 > 0) {
         console.log('   💡 HTTP 404 errors suggest REST API module not enabled');
         console.log('   💡 Check FoundryVTT module settings');
@@ -283,7 +293,7 @@ async function runDiagnostics() {
       }
     }
   }
-  
+
   if (skipCount > 0) {
     console.log('   ⚠️  Some tests skipped due to missing API key');
     console.log('   💡 Set FOUNDRY_API_KEY environment variable');
@@ -291,7 +301,10 @@ async function runDiagnostics() {
 
   console.log('\n🔧 Troubleshooting Steps:');
   console.log('1. Verify FoundryVTT is running and accessible');
-  console.log('2. Check if "Foundry REST API" module is installed');
+  console.log(
+    '2. Check the foundryvtt-local-rest-api module is installed and its bridge server is running',
+  );
+  console.log('   (https://github.com/laurigates/foundryvtt-local-rest-api)');
   console.log('3. Enable "REST API" in module settings');
   console.log('4. Copy API key from module settings');
   console.log('5. Set FOUNDRY_API_KEY environment variable');

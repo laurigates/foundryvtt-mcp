@@ -279,28 +279,40 @@ describe('searchWorldDocuments', () => {
     );
   });
 
-  it.each(['hr', 'table', 'thead', 'tbody', 'tfoot', 'pre', 'dt', 'dd', 'figcaption'])(
-    'separates words across block-level %s tags',
-    (tag) => {
-      const world = sampleWorld();
-      const actor = world.actors.find((entry) => entry._id === 'actor1');
-      expect(actor).toBeDefined();
-      Object.assign(actor, {
-        system: {
-          details: {
-            biography: {
-              value: tag === 'hr' ? 'alpha<hr>beta' : `alpha<${tag}>beta</${tag}>gamma`,
-            },
+  it.each([
+    'hr',
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'pre',
+    'dt',
+    'dd',
+    'figcaption',
+    'header',
+    'footer',
+    'nav',
+    'aside',
+    'main',
+  ])('separates words across block-level %s tags', (tag) => {
+    const world = sampleWorld();
+    const actor = world.actors.find((entry) => entry._id === 'actor1');
+    expect(actor).toBeDefined();
+    Object.assign(actor, {
+      system: {
+        details: {
+          biography: {
+            value: tag === 'hr' ? 'alpha<hr>beta' : `alpha<${tag}>beta</${tag}>gamma`,
           },
         },
-      });
-      expect(searchWorldDocuments(world, 'alphabeta').actors).toEqual([]);
-      const visible = tag === 'hr' ? 'alpha beta' : 'alpha beta gamma';
-      const result = searchWorldDocuments(world, visible);
-      expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
-      expect(result.matchDetails.actors.actor1?.excerpt).toBe(visible);
-    },
-  );
+      },
+    });
+    expect(searchWorldDocuments(world, 'alphabeta').actors).toEqual([]);
+    const visible = tag === 'hr' ? 'alpha beta' : 'alpha beta gamma';
+    const result = searchWorldDocuments(world, visible);
+    expect(result.actors.map((a) => a._id)).toEqual(['actor1']);
+    expect(result.matchDetails.actors.actor1?.excerpt).toBe(visible);
+  });
 
   it.each(['<', '<a', '<p'])(
     'strips 100 KB of crafted "%s" markup within the time bound',

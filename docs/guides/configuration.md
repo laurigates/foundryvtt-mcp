@@ -28,7 +28,8 @@ With no `FOUNDRY_API_KEY` or explicit `FOUNDRY_PROVIDER`, this uses authenticate
 | `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD` | Foundry world account for Socket.IO |
 | `FOUNDRY_USER_ID` | Optional world user ID instead of username lookup |
 | `FOUNDRY_SOCKET_PATH` | Socket.IO path (default `/socket.io/`) |
-| `FOUNDRY_API_KEY` | **Historical** `/api/*` bridge key; chooses `legacy-rest` by default, not the relay |
+| `FOUNDRY_API_KEY` | **Historical** `/api/*` bridge key; with `FOUNDRY_REST_URL` and native credentials, enables read augmentation on the single Socket.IO target |
+| `FOUNDRY_REST_URL` | Historical bridge URL; a key without this URL or native credentials retains the `legacy-rest` provider |
 | `FOUNDRY_PROVIDER` | Optional explicit `socketio`, `legacy-rest`, `rest-api` or `composite` |
 | `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY`, `FOUNDRY_REST_CLIENT_ID` | Paired runtime relay configuration (separate from `FOUNDRY_API_KEY`) |
 | `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional relay execution endpoint path |
@@ -75,18 +76,41 @@ Put the following in a **local, private** JSON file, for example `foundry-target
 
 The `.invalid` URLs are placeholders; do not use them as live endpoints. `FOUNDRY_TARGETS_JSON` accepts the same JSON inline as an alternative to a file. Each provider may use `usernameEnv`, `passwordEnv` and `apiKeyEnv` instead of literal credentials; do not specify a literal value and an environment reference for the same field.
 
-Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`), `pythonExecutable` (default `python3`), `integrationTimeoutMs` (default `10000`), and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
+Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`), `pythonExecutable` (default `python3`), `integrationTimeoutMs` (default `10000`), and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. A Socket.IO provider can additionally configure `restUrl` together with `restApiKey` or `restApiKeyEnv` for historical bridge augmentation; native credentials remain required. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
 
 ## Providers and capabilities
 
 | Provider kind | Connection model | Capabilities and limits |
 |---|---|---|
-| `socketio` | Authenticated native Foundry session | World cache, read tools, native `modifyDocument` writes when permitted |
+| `socketio` | Authenticated native Foundry session, optionally augmented by its historical REST bridge | World cache, read tools, native `modifyDocument` writes when permitted; bridge-provided prepared values, compendium search and diagnostics when configured |
 | `legacy-rest` | Historical `/api/*` bridge | Bridge reads, compendium and REST diagnostics; not equivalent to a Socket.IO world cache |
 | `rest-api` | Paired relay with `clientId` and authenticated runtime | Snapshot reads and package-owned JS bindings; may perform target-enabled document writes through runtime APIs |
 | `composite` | Socket.IO core + relay execution | Core documents via Socket.IO, integration bindings through paired relay; remote identity must agree |
 
 Capability support is **checked per target** by `src/tools/catalog.ts`. A tool can appear in discovery because one target supports it but still be unavailable when called for a different target. For exact implemented operations see [Capability matrix](capabilities.md). No automatic provider failover occurs after a failed write.
+
+## Optional REST bridge augment
+
+The historical bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api). It has a Foundry module running in a browser client and a separate Node bridge server (port `3030` by default). It needs a Gamemaster logged into the world through a browser with the module enabled. It is distinct from the ThreeHats paired relay used by `rest-api` and `composite` integration execution.
+
+1. Install the Foundry module using `https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json`, enable it in the world, enable its REST API setting and copy its API key.
+2. Configure the repository's `bridge-server/` component with the Foundry URL, that API key and the world user it should use, then start the bridge server.
+3. Keep a Gamemaster logged into the world through a browser with the module enabled. See the bridge's [usage guide](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/usage.md#installation) for its complete installation configuration.
+
+For the legacy single-target environment, keep `FOUNDRY_URL` and the native credentials pointing at Foundry, then set:
+
+```dotenv
+FOUNDRY_API_KEY=your-historical-bridge-key
+FOUNDRY_REST_URL=http://localhost:3030
+```
+
+For an explicit target, set `provider.kind` to `socketio`, keep its native connection fields, and add `restUrl` plus `restApiKeyEnv` (or `restApiKey`). The bridge URL and key must be supplied together. These settings belong to that target; explicit targets do not inherit a global bridge configuration.
+
+The bridge augments prepared actor values, dice rolling, compendium search and diagnostics. Socket.IO remains the source for native document mutations and the live world cache. A bridge read failure falls back to the native answer where one exists, or reports the unavailable capability. A transport failure pauses the bridge; a server error pauses the affected capability. Those pauses last 30 seconds and do not replay writes. Native connection startup does not depend on a successful bridge response.
+
+A legacy environment key without the complete combination of bridge URL and native credentials keeps the historical `legacy-rest` mode. In that mode `FOUNDRY_URL` points to the bridge, and native world-cache operations and Socket.IO writes are unavailable. `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` continue to configure the separate paired relay.
+
+The historical bridge is authenticated by probing `/api/world`; a successful `/api/status` response from Foundry itself does not establish that the bridge or the API key works.
 
 ## Resources and diagnostics
 

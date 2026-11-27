@@ -265,7 +265,7 @@ The detailed manifest and binding contract is in [Writing integrations](writing-
 
 ```bash
 bun install --frozen-lockfile
-just qa                    # Biome, src/ + scripts/ TypeScript, Vitest, Python tests
+just qa                    # Biome, src/ + scripts/ TypeScript, bindings, Vitest coverage, Python
 just build                 # TypeScript -> dist/
 bun run smoke              # Installed entry point startup
 bun run smoke:dotenv       # dotenv load order

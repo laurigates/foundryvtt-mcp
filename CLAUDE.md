@@ -13,7 +13,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 ## Essential Commands
 
 ```bash
-just qa                # Pre-commit lint, TypeScript (src + scripts), Vitest and Python tests
+just qa                # Lint, TypeScript (src + scripts), bindings, Vitest coverage and Python
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
@@ -53,14 +53,21 @@ bun run test-connection # Test MCP→FoundryVTT connection
 ### Authentication & transport selection
 
 Providers are selected per target before dispatch: `socketio`, `legacy-rest`,
-`rest-api`, or `composite`. The composite explicitly combines native core access
-with relay execution and verifies their remote identities. Operations never
-switch providers or retry automatically after an uncertain mutation.
+`rest-api`, or `composite`. A Socket.IO target may add the historical REST bridge
+with `restUrl` and `restApiKey`; the bridge augments reads within that target.
+Socket.IO remains primary, and a failed bridge read falls back to the native
+answer or an unavailable value. The composite instead combines native core
+access with ThreeHats relay execution and verifies their remote identities.
+Operations never change target or retry automatically after an uncertain mutation.
 
 Without explicit target configuration, legacy environment settings become one
-target: an API key selects the historical `/api/*` bridge; otherwise Socket.IO is
-used. `FOUNDRY_PROVIDER` selects a provider explicitly. ThreeHats relay credentials
-use separate `FOUNDRY_REST_*` settings. `USE_REST_MODULE` remains a no-op.
+target. `resolveTransportPlan` selects native Socket.IO by default, Socket.IO
+with the optional bridge when `FOUNDRY_API_KEY`, `FOUNDRY_REST_URL` and native
+credentials are present, and the historical `legacy-rest` provider for a key
+without that complete combination. `FOUNDRY_PROVIDER` selects a provider
+explicitly. ThreeHats uses separate `FOUNDRY_REST_RELAY_URL`,
+`FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` settings.
+`USE_REST_MODULE` remains a no-op.
 
 `src/foundry/client.ts` is only a compatibility export. Application code uses
 provider interfaces. See [ADR-011](docs/adrs/0011-provider-session-integration-overhaul.md)
@@ -72,7 +79,7 @@ readiness, provider capabilities, target-local writes, and D&D 5e-only demo
 helpers. A tool may be listed because one configured target supports it but
 remain unavailable for a different target; every call is rechecked.
 
-`src/tools/availability.ts` is retained for older two-transport helpers and
+`src/tools/availability.ts` is retained for transport-only compatibility helpers and
 tests, **not** used as the multi-target MCP gateway. The server exposes 33
 static core tools, 5 management tools and any compatible dynamically loaded
 system/module operations. Management discovery remains available while worlds
@@ -97,7 +104,8 @@ See [capabilities](docs/guides/capabilities.md),
 | `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user |
 | `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT password |
 | `FOUNDRY_USER_ID` | No | Bypass username→ID resolution |
-| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; selects `legacy-rest` by default |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; paired with `FOUNDRY_REST_URL` and native credentials, augments the single Socket.IO target |
+| `FOUNDRY_REST_URL` | No | Historical bridge URL; a key without this URL or native credentials retains `legacy-rest` |
 | `FOUNDRY_WRITE_ENABLED` | No | Legacy single-target write opt-in; explicit targets use their own `writeEnabled` (default `false`) |
 | `FOUNDRY_PROVIDER` | No | Select `socketio`, `legacy-rest`, `rest-api` or `composite` in legacy configuration |
 | `FOUNDRY_REST_RELAY_URL` / `FOUNDRY_REST_API_KEY` / `FOUNDRY_REST_CLIENT_ID` | Relay | Paired runtime relay settings, distinct from `FOUNDRY_API_KEY` |
@@ -111,7 +119,7 @@ See [capabilities](docs/guides/capabilities.md),
 See `.claude/rules/` for detailed guidelines:
 - `development.md` — TDD workflow, commit conventions, build commands
 - `testing.md` — Test tiers (unit, integration, E2E) and requirements
-- `foundry-write-protocol.md` — transport (Socket.IO vs REST) and the `modifyDocument` write protocol
+- `foundry-write-protocol.md` — target providers, optional REST read augmentation and the native/relay write protocols
 - `document-management.md` — Document detection and organization
 
 ## Reference

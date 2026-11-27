@@ -27,8 +27,11 @@ function probe(system: InstanceType<typeof DiagnosticSystem>): Promise<boolean> 
 }
 
 describe('DiagnosticSystem.testRestApiAvailability (#230)', () => {
-  it('is true when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is true when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(probe(new DiagnosticSystem(client))).resolves.toBe(true);
     expect(client.get).toHaveBeenCalledWith('/api/world');
     expect(client.get).not.toHaveBeenCalledWith('/api/status');
@@ -64,8 +67,11 @@ function authenticate(system: InstanceType<typeof DiagnosticSystem>): Promise<Au
 }
 
 describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
-  it('is valid when /api/world answers with a JSON object', async () => {
-    const client = clientWithGet(async () => ({ status: 200, data: { id: 'w', title: 'World' } }));
+  it('is valid when /api/world answers with the module envelope', async () => {
+    const client = clientWithGet(async () => ({
+      status: 200,
+      data: { success: true, data: { id: 'w', title: 'World' } },
+    }));
     await expect(authenticate(new DiagnosticSystem(client))).resolves.toEqual({ valid: true });
     expect(client.get).toHaveBeenCalledWith('/api/world');
   });
@@ -86,6 +92,96 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
     const result = await authenticate(new DiagnosticSystem(client));
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/FOUNDRY_API_KEY was rejected.*HTTP 401/);
+  });
+});
+
+describe('DiagnosticSystem authentication stays target-scoped', () => {
+  it('checks the native connection even when compatibility settings contain another target key', async () => {
+    const provider = new FoundryClient({ baseUrl: 'http://native.test' });
+    vi.spyOn(provider, 'isConnected').mockReturnValue(true);
+    const get = vi
+      .spyOn(provider, 'get')
+      .mockRejectedValue(new Error('Native HTTP must not be probed'));
+    const connect = vi.spyOn(provider, 'connect').mockResolvedValue(undefined);
+    const system = new DiagnosticSystem(provider, {
+      url: 'http://native.test',
+      apiKey: 'stale-key',
+    });
+
+    await expect(authenticate(system)).resolves.toEqual({ valid: true });
+    expect(get).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('does not probe REST availability for a native provider without diagnostics capability', async () => {
+    const provider = new FoundryClient({ baseUrl: 'http://native.test' });
+    const get = vi.spyOn(provider, 'get').mockRejectedValue(new Error('Unexpected request'));
+
+    await expect(
+      probe(new DiagnosticSystem(provider, { url: 'http://native.test' })),
+    ).resolves.toBe(false);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('reports the configured bridge URL for a REST-only connection failure', async () => {
+    const provider = new FoundryClient({
+      baseUrl: 'http://native.test:30000',
+      apiKey: 'bridge-key',
+      restUrl: 'http://bridge.test:3030',
+    });
+    vi.spyOn(provider, 'testConnection').mockResolvedValue(false);
+    const system = new DiagnosticSystem(provider, {
+      url: 'http://native.test:30000',
+      apiKey: 'bridge-key',
+    });
+
+    const result = await system.diagnoseFeatureProblem('actors');
+
+    expect(result.suggestions).toContain('http://bridge.test:3030');
+    expect(result.suggestions).not.toContain('http://native.test:30000');
+  });
+});
+
+/**
+ * A REST-mode client whose transport answers /api/world with `status`, so
+ * `testConnection()` rejects through the real `connect()` → `probeRestModule`.
+ */
+function clientRejectingConnect(status: number) {
+  const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+  const http = Reflect.get(client, 'rest') as { get: (url: string) => Promise<unknown> };
+  vi.spyOn(http, 'get').mockRejectedValue(
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      response: { status },
+    }),
+  );
+  return client;
+}
+
+describe('DiagnosticSystem.diagnoseFeatureProblem, rejected API key (#301)', () => {
+  it.each([401, 403])('keeps the rejection cause for HTTP %i (#288)', async (status) => {
+    const result = await new DiagnosticSystem(
+      clientRejectingConnect(status),
+    ).diagnoseFeatureProblem('actors');
+    expect(result.explanation).toMatch(new RegExp(`FOUNDRY_API_KEY was rejected.*HTTP ${status}`));
+  });
+
+  it('reports an API-key authentication failure, not an unexpected error', async () => {
+    const result = await new DiagnosticSystem(clientRejectingConnect(401)).diagnoseFeatureProblem(
+      'actors',
+    );
+    expect(result.explanation).toMatch(/^Authentication failed using API key/);
+    expect(result.explanation).not.toMatch(/unexpected error/);
+    expect(result.suggestions).toMatch(/Check API key/);
+    expect(result.suggestions).toMatch(/module is enabled, the bridge server is running/);
+    expect(result.suggestions).not.toMatch(/Restart services/);
+    expect(result.documentationUrl).toMatch(/#authentication-issues$/);
+  });
+
+  it('still uses the generic diagnostic when the module is missing (HTTP 404)', async () => {
+    const result = await new DiagnosticSystem(clientRejectingConnect(404)).diagnoseFeatureProblem(
+      'actors',
+    );
+    expect(result.explanation).toMatch(/unexpected error.*did not answer \/api\/world with JSON/);
   });
 });
 
@@ -144,5 +240,49 @@ describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
     await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(true);
     vi.spyOn(provider, 'kind', 'get').mockReturnValue('rest-api');
     await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(false);
+  });
+});
+
+/** Every install hint names the real module repo, the bridge URL variable, and no install source that does not exist (#327). */
+describe('DiagnosticSystem REST bridge install hints (#327)', () => {
+  const MODULE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+  const MANIFEST_URL = `${MODULE_REPO}/releases/latest/download/module.json`;
+  const system = new DiagnosticSystem(clientRejectingConnect(404));
+
+  it('points the feature diagnostic at the module repo and FOUNDRY_REST_URL', () => {
+    const create = Reflect.get(system, 'createRestApiDiagnostic') as (feature: string) => {
+      explanation: string;
+      suggestions: string;
+      documentationUrl?: string;
+    };
+    const result = create.call(system, 'compendium');
+    expect(result.explanation).toMatch(/REST bridge/);
+    expect(result.suggestions).toContain(MODULE_REPO);
+    expect(result.suggestions).toContain('FOUNDRY_REST_URL');
+    expect(result.suggestions).toContain(MANIFEST_URL);
+    expect(result.suggestions).not.toMatch(/no published release|install from a checkout/);
+    expect(result.suggestions).not.toMatch(/module browser/);
+    expect(result.documentationUrl).toMatch(/configuration\.md#optional-rest-bridge-augment$/);
+  });
+
+  it('points the health report hint at the module repo and FOUNDRY_REST_URL', () => {
+    const output = system.formatHealthReport({
+      connectivity: { status: 'limited', emoji: '⚠️', details: 'limited' },
+      authentication: { method: 'credentials', status: 'valid', emoji: '✅' },
+      features: {
+        diceRolling: true,
+        actorSearch: true,
+        itemSearch: true,
+        sceneData: true,
+        diagnostics: false,
+      },
+      restApiAvailable: false,
+      websocketAvailable: true,
+    });
+    expect(output).toContain(MODULE_REPO);
+    expect(output).toContain('FOUNDRY_REST_URL');
+    expect(output).toContain(MANIFEST_URL);
+    expect(output).not.toMatch(/no published release/);
+    expect(output).not.toMatch(/Install the "Foundry Local REST API" module/);
   });
 });

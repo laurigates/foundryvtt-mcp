@@ -13,14 +13,16 @@ The static catalog defines **33 core tools** (22 read/query/utility tools and 11
 - exposes integration operations only when their manifests, runtime probes and schemas are compatible; conflicting public schemas are withheld;
 - emits catalog change notifications on session/integration state changes.
 
-`src/tools/availability.ts` retains the older two-transport availability helpers for compatibility and corresponding tests. It is **not** the target-aware MCP dispatch gate. A tool visible in the global catalog may be unavailable on an individual target.
+`src/tools/availability.ts` retains transport-only availability helpers for compatibility and corresponding tests. It is **not** the target-aware MCP dispatch gate. A tool visible in the global catalog may be unavailable on an individual target.
 
-## Providers are not interchangeable
+## Connection modes
+
+Connection modes are resolved within a target. Provider kinds have separate capabilities and execution contracts:
 
 | Provider | How it connects | Relevant operations |
 |---|---|---|
-| `socketio` | Authenticated native Foundry session with live world-data cache | Core read/cache operations; core writes via Socket.IO `modifyDocument` if enabled |
-| `legacy-rest` | Historical `/api/*` bridge selected by `FOUNDRY_API_KEY` in legacy configuration | Shared core reads, compendium search and legacy REST diagnostics; no native Socket.IO world-cache capability |
+| `socketio` | Authenticated native Foundry session with live world-data cache; optional historical REST augmentation | Core read/cache operations; native writes via `modifyDocument` if enabled; bridge-backed capabilities when configured |
+| `legacy-rest` | Historical `/api/*` bridge selected by a legacy environment key without a full native-plus-bridge configuration | Shared core reads, compendium search and legacy REST diagnostics; no native Socket.IO world-cache capability |
 | `rest-api` | Paired ThreeHats relay, runtime bindings and refreshed world snapshot | Core read/cache and optional target-enabled document writes through Foundry runtime APIs; runtime integration bindings |
 | `composite` | Native Socket.IO core plus a separately authenticated paired relay | Socket.IO core operations and relay integration execution for one identity-verified world |
 
@@ -31,6 +33,12 @@ Capabilities used for the core include `core.read`, `core.cache`, `core.write`, 
 A `composite` is ready only when both connections are available. Its core tools
 are also withheld if the relay fails; no degraded native-only mode is provided.
 Configure an independent `socketio` target for separately available native access.
+
+### Optional historical bridge on a Socket.IO target
+
+`restUrl` and `restApiKey` add the historical `/api/*` bridge to one native target. This corresponds to upstream's dual transport mode and is independent of the ThreeHats relay used for integration bindings. The legacy environment selects this native-plus-bridge combination when `FOUNDRY_API_KEY`, `FOUNDRY_REST_URL` and native credentials are present. Explicit targets use only their own provider configuration.
+
+Socket.IO continues to serve the world cache, combat, journals and native writes. The optional bridge supplies prepared actor values, Foundry's dice engine, compendium search and REST diagnostics. Failed reads fall back where a native/local answer exists. A bridge transport failure pauses bridge requests, while a server error pauses that capability, for 30 seconds. Neither mechanism changes target or retries an uncertain write. Native reads remain available when the optional bridge is unavailable; this differs from the two required connections of a `composite` provider.
 
 ## Core read, query and utility tools (22)
 
@@ -54,12 +62,18 @@ Configure an independent `socketio` target for separately available native acces
 | `search_world` | Search actors, items, scenes and journals by names **and selected narrative fields** | Needs `core.cache`; plain-text match excerpts, no semantic ranking or compendium-wide search |
 | `get_world_summary` | World metadata and collection counts | Needs `core.cache` |
 | `refresh_world_data` | Explicit resynchronization of the selected world | Needs `core.cache`; may invalidate session/integration state |
-| `search_compendium` | Pack search with filters | Requires `compendium.read` (historical bridge capability) |
+| `search_compendium` | Pack search with filters | Requires `compendium.read` from a historical bridge, standalone or augmenting Socket.IO |
 | `get_recent_logs` | Historical REST backend logs | Requires `diagnostics.read` |
 | `search_logs` | Historical REST backend log search | Requires `diagnostics.read` |
 | `get_system_health` | Historical REST backend health metrics | Requires `diagnostics.read` |
 
 `search_world` uses `src/foundry/world-search.ts` and returns the matching field/excerpt for content hits. It searches selected actor descriptions/biographies, item descriptions, scene annotations/tokens and journal page content, with HTML converted to plain text. It does not index arbitrary module fields or use an external search engine.
+
+### Source data and prepared game values
+
+The native `world` snapshot contains stored source data rather than all values prepared by a running game system. Actor projections stay owned by the selected system package and Foundry generation. D&D 5e values that can be derived from source data include ability modifiers, character class levels and proficiency; runtime-dependent armor class, character maximum HP and saving-throw totals must not be presented as invented defaults. The optional historical bridge can supply its prepared actor fields. A missing field remains unavailable when no valid source provides it. See [derived values](../adrs/0012-derived-values-from-source-data.md).
+
+Native cache updates follow both `modifyDocument` broadcasts and v14 `modifyDocumentBatch` events. An explicit `refresh_world_data` resynchronizes after missed updates; generic cache updates do not fully cover synthetic unlinked-token actors. See [live cache](../adrs/0013-live-world-cache-from-broadcasts.md) and [version-specific wire shapes](../adrs/0014-foundry-v13-v14-wire-shapes.md).
 
 ## Core mutating tools (11)
 
@@ -86,6 +100,8 @@ reconnect, shutdown or completed call. Ordinary same-target work waits for
 locally tracked provider requests even if a Python worker fails first. A local
 timeout still cannot establish whether a remote mutation completed. Invalid
 native acknowledgement data is also an unknown outcome, not success.
+
+Foundry v14 may acknowledge a native write with `{ results: [...] }`, containing a primary response and side effects. The provider checks all response entries for errors and returns the primary result. This does not turn multiple target operations into a transaction or authorize replay after a timeout.
 
 ## Management and dynamic integration tools
 

@@ -33,8 +33,12 @@ FOUNDRY_PASSWORD=your-world-user-password
 FOUNDRY_WRITE_ENABLED=false
 ```
 
-With no API key this chooses `socketio`. The historical `FOUNDRY_API_KEY` selects
-`legacy-rest`, the existing `/api/*` bridge. It is not the ThreeHats relay key.
+With no API key this chooses `socketio`. When `FOUNDRY_API_KEY`,
+`FOUNDRY_REST_URL` and native credentials are all present, the historical
+`/api/*` bridge augments that Socket.IO target. A key without the complete
+combination keeps `legacy-rest`. `FOUNDRY_PROVIDER=socketio` explicitly keeps
+native access; a key alone does not switch an explicitly selected native provider.
+The historical bridge key is not the ThreeHats relay key.
 
 Select the new relay provider explicitly:
 
@@ -89,7 +93,8 @@ Each target has:
 | `integrationTimeoutMs` | Worker operation timeout, default `10000` |
 | `integrationsEnabled` | Whether to load system/module integrations, default `true` |
 
-Credentials can be supplied as `usernameEnv`, `passwordEnv`, or `apiKeyEnv` in a
+Credentials can be supplied as `usernameEnv`, `passwordEnv`, `apiKeyEnv`, or
+`restApiKeyEnv` (the native provider's optional historical bridge key) in a
 provider object. These fields name environment variables; their values are
 resolved locally. A literal credential and its environment reference cannot be
 specified together. Explicit targets do not inherit `FOUNDRY_WRITE_ENABLED`.
@@ -98,10 +103,27 @@ specified together. Explicit targets do not inherit `FOUNDRY_WRITE_ENABLED`.
 
 | Kind | Configuration | Execution model |
 |---|---|---|
-| `socketio` | `baseUrl`, world user credentials, optional socket/timeouts | Native documents and world cache |
+| `socketio` | `baseUrl`, world user credentials, optional socket/timeouts and paired `restUrl` / `restApiKey` | Native documents and world cache, optionally augmented by historical bridge reads |
 | `legacy-rest` | `baseUrl`, `apiKey` | Historical `/api/*` bridge; capability-limited |
 | `rest-api` | `relayUrl`, `apiKey`, `clientId`, optional `executeJsPath` | Paired runtime through the relay |
 | `composite` | `core` socket configuration and `execution` relay configuration | Deterministic core/runtime composition |
+
+### Historical bridge read augmentation
+
+A `socketio` provider, including the `core` of a composite, can set `restUrl`
+and `restApiKey` (or `restApiKeyEnv`). The URL and key must be configured
+together with native Socket.IO credentials. This optional bridge supplies
+prepared actor fields, remote dice evaluation, compendium search and diagnostics;
+Socket.IO still owns the native cache and writes. A failed bridge read can fall
+back within the same provider where a native/local answer exists, without
+changing target or retrying a write. Bridge failures and cooldowns are local to
+that provider. See [bridge configuration](configuration.md#optional-rest-bridge-augment).
+
+This optional augmentation does not change the composite's required paired-relay
+contract. The historical bridge cannot execute the ThreeHats integration
+bindings or replace the composite's `execution` provider.
+
+### Paired runtime relay
 
 The REST provider currently uses `POST /execute-js`, with the configured client
 ID in the query and body, and expects a JSON `{ "success": true, "result": ... }`

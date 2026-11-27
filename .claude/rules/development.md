@@ -17,9 +17,9 @@ Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test
 
 This project uses **Bun** for dependency management (`bun.lock`) and **Just** for task recipes (`justfile`). Prefer Just for local/CI parity.
 
-- `just qa` — pre-commit gate: Biome lint, `tsc --noEmit` for `src/`, script typecheck via `tsconfig.scripts.json`, Vitest and Python unittest.
+- `just qa` — pre-commit gate: Biome lint, `tsc --noEmit` for `src/`, script typecheck via `tsconfig.scripts.json`, integration bindings, Vitest coverage and Python unittest.
 - `just check-types` / `just check-types-scripts` — standalone TypeScript checks.
-- `just test` / `just test-coverage` — Vitest unit tests/coverage.
+- `just test` / `just test-coverage` — integration bindings followed by Vitest unit tests/coverage.
 - `just test-python` — Python worker/adapter unit tests.
 - `just lint` / `just lint-fix` — Biome check (fix only when intended).
 - `just build` — compile TypeScript.

@@ -70,7 +70,9 @@ describe('Integration Tests', () => {
     });
 
     it('should handle connection lifecycle', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: { status: 'connected' } });
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { success: true, data: { id: 'w', title: 'World' } },
+      });
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',
@@ -86,11 +88,13 @@ describe('Integration Tests', () => {
 
     it('should handle API operations with proper error handling', async () => {
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })
+        .mockResolvedValueOnce({ data: { success: true, data: { id: 'w', title: 'World' } } })
         .mockRejectedValueOnce(new Error('Temporary error'))
         .mockResolvedValueOnce({
           data: {
-            actors: [{ _id: '1', name: 'Test Actor', type: 'character' }],
+            success: true,
+            data: [{ id: 'actoraaaaaaaaaaa', name: 'Test Actor', type: 'character' }],
+            total: 1,
           },
         });
 
@@ -129,27 +133,25 @@ describe('Integration Tests', () => {
 
   describe('Data Flow Integration', () => {
     it('should process complete actor search workflow', async () => {
+      // The module's `{ success, data }` envelope around `formatActorSummary` (#310).
       const mockActorData = {
-        actors: [
+        success: true,
+        data: [
           {
-            _id: 'actor-1',
+            id: 'actor-1',
             name: 'Gandalf',
             type: 'npc',
             level: 20,
-            hp: { value: 165, max: 165 },
-            abilities: {
-              str: { value: 10, mod: 0 },
-              int: { value: 20, mod: 5 },
-            },
+            hp: { current: 165, max: 165 },
+            ac: 15,
           },
         ],
         total: 1,
-        page: 1,
-        limit: 10,
+        query: { query: 'Gandalf', type: 'npc', limit: 10 },
       };
 
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })
+        .mockResolvedValueOnce({ data: { success: true, data: { id: 'w', title: 'World' } } })
         .mockResolvedValueOnce({ data: mockActorData });
 
       client = new FoundryClient({
@@ -164,34 +166,30 @@ describe('Integration Tests', () => {
 
       expect(result.actors).toHaveLength(1);
       expect(result.actors[0].name).toBe('Gandalf');
-      expect(result.actors[0].abilities?.int?.mod).toBe(5);
+      expect(result.actors[0].hp).toEqual({ value: 165, max: 165 });
+      expect(result.actors[0].ac).toEqual({ value: 15 });
       expect(result.total).toBe(1);
     });
 
     it('should handle complex item search with filtering', async () => {
+      // The module's `{ success, data }` envelope around `formatItemSummary` (#310).
       const mockItemData = {
-        items: [
+        success: true,
+        data: [
           {
-            _id: 'item-1',
+            id: 'item-1',
             name: 'Flame Tongue',
             type: 'weapon',
             rarity: 'rare',
-            damage: {
-              parts: [
-                ['1d8', 'slashing'],
-                ['2d6', 'fire'],
-              ],
-            },
-            price: { value: 5000, denomination: 'gp' },
+            cost: { value: 5000, denomination: 'gp' },
           },
         ],
         total: 1,
-        page: 1,
-        limit: 10,
+        query: { query: 'Flame', type: 'weapon', rarity: 'rare', limit: 10 },
       };
 
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })
+        .mockResolvedValueOnce({ data: { success: true, data: { id: 'w', title: 'World' } } })
         .mockResolvedValueOnce({ data: mockItemData });
 
       client = new FoundryClient({
@@ -212,7 +210,7 @@ describe('Integration Tests', () => {
   describe('Error Handling Integration', () => {
     it('should handle cascading failures gracefully', async () => {
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })
+        .mockResolvedValueOnce({ data: { success: true, data: { id: 'w', title: 'World' } } })
         .mockRejectedValue(new Error('Service unavailable'));
 
       client = new FoundryClient({
@@ -230,10 +228,10 @@ describe('Integration Tests', () => {
 
     it('should maintain system stability after errors', async () => {
       mockAxiosInstance.get
-        .mockResolvedValueOnce({ data: { status: 'connected' } })
+        .mockResolvedValueOnce({ data: { success: true, data: { id: 'w', title: 'World' } } })
         .mockRejectedValueOnce(new Error('Temporary failure'))
-        .mockResolvedValueOnce({ data: { actors: [] } })
-        .mockResolvedValueOnce({ data: { items: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } })
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       client = new FoundryClient({
         baseUrl: 'http://localhost:30000',

@@ -567,3 +567,74 @@ describe('authenticateFoundry — POST /join body key spellings (#222)', () => {
     );
   });
 });
+
+describe('authenticateFoundry — Origin header on /join (#305)', () => {
+  /**
+   * FoundryVTT 14.369 rejects a POST /join that carries no `Origin` header with
+   * HTTP 400 `{"error":"The request could not be processed."}`; the same
+   * request with `Origin: <server origin>` succeeds. Origin is scheme + host +
+   * port only, so a routePrefix in the base URL must not leak into it.
+   */
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+    mockJoinPostSuccess();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('sends the base URL origin as the Origin header on POST /join', async () => {
+    await authenticateFoundry('https://dnd.example.com', 'abc123DEF456ghij', 'pw');
+
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'https://dnd.example.com/join',
+      expect.anything(),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Origin: 'https://dnd.example.com' }),
+      }),
+    );
+  });
+
+  it('keeps the port and drops a routePrefix path from the Origin header', async () => {
+    await authenticateFoundry('https://host.example:8443/foundry', 'abc123DEF456ghij', 'pw');
+
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'https://host.example:8443/foundry/join',
+      expect.anything(),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Origin: 'https://host.example:8443' }),
+      }),
+    );
+  });
+
+  it('sends the same Origin header on GET /join', async () => {
+    await authenticateFoundry('https://host.example/foundry', 'abc123DEF456ghij', 'pw');
+
+    expect(mockAxios.get).toHaveBeenCalledWith(
+      'https://host.example/foundry/join',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Origin: 'https://host.example' }),
+      }),
+    );
+  });
+
+  it('surfaces the server’s JSON { error } text from an HTTP 400 instead of a bare AxiosError', async () => {
+    mockAxios.post = vi.fn().mockResolvedValue({
+      status: 400,
+      data: { error: 'The request could not be processed.' },
+    });
+
+    await expect(
+      authenticateFoundry('https://dnd.example.com', 'abc123DEF456ghij', 'pw'),
+    ).rejects.toThrow(
+      'FoundryVTT authentication failed (HTTP 400): The request could not be processed.',
+    );
+
+    const validateStatus = mockAxios.post.mock.calls[0]?.[2]?.validateStatus;
+    expect(validateStatus?.(400)).toBe(true);
+    expect(validateStatus?.(500)).toBe(false);
+  });
+});

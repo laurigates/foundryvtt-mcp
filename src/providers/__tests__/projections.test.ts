@@ -8,7 +8,12 @@ import {
   type IntegrationCompatibility,
   matchesIntegrationCompatibility,
 } from '../../integrations/types.js';
-import { projectActor, projectItem, validateSystemPatch } from '../projections.js';
+import {
+  projectActor,
+  projectItem,
+  supportsPreparedActorProjection,
+  validateSystemPatch,
+} from '../projections.js';
 import { SocketIOProvider } from '../socketio.js';
 
 const roots: string[] = [];
@@ -16,6 +21,55 @@ const systemId = 'projection-fixture';
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+describe('system-owned source derivation', () => {
+  const source: WorldActor = {
+    _id: 'aaaaaaaaaaaaaaaa', name: 'Paladin', type: 'character',
+    system: {
+      details: { level: null },
+      abilities: { str: { value: 18 }, dex: { value: 11 } },
+      attributes: { hp: { value: 51, max: null, temp: 0 }, ac: { calc: 'default', flat: 19 } },
+    },
+    items: [
+      { _id: 'classaaaaaaaaaaa', name: 'Paladin', type: 'class', system: { levels: 5 } },
+      { _id: 'classbbbbbbbbbbb', name: 'Fighter', type: 'class', system: { levels: 2 } },
+    ],
+  };
+
+  it.each(['13.348', '14.369'])('derives declared D&D values for %s', (version) => {
+    const actor = projectActor(source, 'dnd5e', version);
+    expect(actor.abilities?.str).toEqual({ value: 18, mod: 4 });
+    expect(actor.abilities?.dex).toEqual({ value: 11, mod: 0 });
+    expect(actor.level).toBe(7);
+    expect(actor.attributes).toEqual({ prof: 3 });
+    expect(actor.ac).toBeUndefined();
+    expect(actor.derivedUnavailable).toEqual(['hpMax', 'ac']);
+    expect(actor.data).toBe(source.system);
+    expect(supportsPreparedActorProjection('dnd5e', version)).toBe(true);
+
+    const flat = structuredClone(source);
+    Reflect.set(flat.system, 'attributes', {
+      hp: { value: 51, max: 64 },
+      ac: { calc: 'flat', flat: 19 },
+    });
+    expect(projectActor(flat, 'dnd5e', version).ac).toEqual({ value: 19 });
+    expect(projectActor(flat, 'dnd5e', version).derivedUnavailable).toBeUndefined();
+  });
+
+  it.each([['another-system', '14.369'], ['dnd5e', '15.400']])(
+    'keeps raw data for unsupported system/generation %s %s',
+    (system, version) => {
+      const actor = projectActor(source, system, version);
+      expect(actor).toEqual({
+        _id: source._id,
+        name: source.name,
+        type: source.type,
+        data: source.system,
+      });
+      expect(supportsPreparedActorProjection(system, version)).toBe(false);
+    },
+  );
 });
 
 async function fixtureRoot(): Promise<string> {

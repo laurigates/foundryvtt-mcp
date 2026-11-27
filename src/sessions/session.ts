@@ -9,6 +9,7 @@ import {
 } from '../providers/operation-context.js';
 import type { FoundryEnvironment, FoundryProvider } from '../providers/types.js';
 import { DiagnosticSystem } from '../utils/diagnostics.js';
+import { logger } from '../utils/logger.js';
 
 export type SessionState = 'idle' | 'connecting' | 'ready' | 'offline' | 'error' | 'closed';
 export type SessionIntegrations = Pick<
@@ -83,6 +84,9 @@ export class FoundrySession {
     readonly provider: FoundryProvider,
     private readonly options: SessionOptions = {},
   ) {
+    for (const warning of provider.getTransportWarnings?.() ?? []) {
+      logger.warn(warning, { target_id: config.id });
+    }
     this.diagnosticsClient = new DiagnosticsClient(provider);
     const connection = legacyConfigForTarget(config);
     this.diagnosticSystem = new DiagnosticSystem(provider, {

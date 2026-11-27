@@ -9,12 +9,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { DiagnosticsClient } from '../client.js';
 import type { ErrorDiagnosis, LogEntry, LogPatternSearchParams, SystemHealth } from '../types.js';
 
-// Mock the FoundryClient
-vi.mock('../../foundry/client.js');
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -24,15 +22,15 @@ vi.mock('../../utils/logger.js', () => ({
 
 describe('DiagnosticsClient', () => {
   let diagnosticsClient: DiagnosticsClient;
-  let mockFoundryClient: vi.Mocked<FoundryClient>;
+  let mockProvider: vi.Mocked<Pick<FoundryCore, 'get' | 'requestRestDiagnostics'>>;
 
   beforeEach(() => {
-    // Create mocked FoundryClient
-    mockFoundryClient = {
+    // Create the selected target's diagnostic HTTP port
+    mockProvider = {
       get: vi.fn(),
-    } as unknown as vi.Mocked<FoundryClient>;
+    } as unknown as vi.Mocked<Pick<FoundryCore, 'get' | 'requestRestDiagnostics'>>;
 
-    diagnosticsClient = new DiagnosticsClient(mockFoundryClient);
+    diagnosticsClient = new DiagnosticsClient(mockProvider);
   });
 
   describe('getRecentLogs', () => {
@@ -53,11 +51,11 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue(mockResponse);
 
       const result = await diagnosticsClient.getRecentLogs();
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/logs');
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/logs');
       expect(result.logs).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(result.logs[0].message).toBe('Test log message');
@@ -73,7 +71,7 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue(mockResponse);
 
       await diagnosticsClient.getRecentLogs({
         lines: 100,
@@ -83,18 +81,43 @@ describe('DiagnosticsClient', () => {
         includeStack: true,
       });
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith(
+      expect(mockProvider.get).toHaveBeenCalledWith(
         '/api/diagnostics/logs?lines=100&level=error&since=2024-01-01T00%3A00%3A00.000Z&source=module&includeStack=true',
       );
     });
 
     it('should handle API errors gracefully', async () => {
       const error = new Error('API Error');
-      mockFoundryClient.get.mockRejectedValue(error);
+      mockProvider.get.mockRejectedValue(error);
 
       await expect(diagnosticsClient.getRecentLogs()).rejects.toThrow(
         'Failed to retrieve recent logs: API Error',
       );
+    });
+
+    it('accepts the bridge success envelope without changing log contents', async () => {
+      const logs = {
+        logs: [
+          {
+            timestamp: '2026-11-27T12:00:00.000Z',
+            level: 'warn',
+            message: 'Slow response',
+            source: 'foundry',
+          },
+        ],
+        total: 1,
+      };
+      mockProvider.get.mockResolvedValue({ data: { success: true, data: logs } });
+
+      await expect(diagnosticsClient.getRecentLogs()).resolves.toEqual(logs);
+    });
+
+    it('preserves a bridge failure even when the HTTP request succeeds', async () => {
+      mockProvider.get.mockResolvedValue({
+        data: { success: false, error: 'Unavailable', message: 'No connected GM client' },
+      });
+
+      await expect(diagnosticsClient.getRecentLogs()).rejects.toThrow('No connected GM client');
     });
   });
 
@@ -116,11 +139,11 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue({ data: { success: true, data: mockResponse.data } });
 
       const result = await diagnosticsClient.searchLogs({ pattern: 'TypeError' });
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith(
+      expect(mockProvider.get).toHaveBeenCalledWith(
         '/api/diagnostics/search?pattern=TypeError',
       );
       expect(result.matches).toBe(1);
@@ -137,7 +160,7 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue(mockResponse);
 
       await diagnosticsClient.searchLogs({
         pattern: 'Error',
@@ -146,7 +169,7 @@ describe('DiagnosticsClient', () => {
         caseSensitive: true,
       });
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith(
+      expect(mockProvider.get).toHaveBeenCalledWith(
         '/api/diagnostics/search?pattern=Error&timeframe=3600&level=error&caseSensitive=true',
       );
     });
@@ -196,18 +219,18 @@ describe('DiagnosticsClient', () => {
         status: 'healthy',
       };
 
-      mockFoundryClient.get.mockResolvedValue({ data: mockHealth });
+      mockProvider.get.mockResolvedValue({ data: { success: true, data: mockHealth } });
 
       const result = await diagnosticsClient.getSystemHealth();
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/health');
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/health');
       expect(result.status).toBe('healthy');
       expect(result.server.foundryVersion).toBe('11.315');
       expect(result.users.active).toBe(3);
     });
 
     it('should handle API errors', async () => {
-      mockFoundryClient.get.mockRejectedValue(new Error('Server Error'));
+      mockProvider.get.mockRejectedValue(new Error('Server Error'));
 
       await expect(diagnosticsClient.getSystemHealth()).rejects.toThrow(
         'Failed to retrieve system health: Server Error',
@@ -246,11 +269,13 @@ describe('DiagnosticsClient', () => {
         healthScore: 75,
       };
 
-      mockFoundryClient.get.mockResolvedValue({ data: mockDiagnosis });
+      mockProvider.get.mockResolvedValue({ data: { success: true, data: mockDiagnosis } });
 
       const result = await diagnosticsClient.diagnoseErrors(3600);
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
+      expect(mockProvider.get).toHaveBeenCalledWith(
+        '/api/diagnostics/errors?timeframe=3600',
+      );
       expect(result.healthScore).toBe(75);
       expect(result.summary.totalErrors).toBe(5);
       expect(result.suggestions).toHaveLength(1);
@@ -266,11 +291,13 @@ describe('DiagnosticsClient', () => {
         healthScore: 100,
       };
 
-      mockFoundryClient.get.mockResolvedValue({ data: mockDiagnosis });
+      mockProvider.get.mockResolvedValue({ data: mockDiagnosis });
 
       await diagnosticsClient.diagnoseErrors();
 
-      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
+      expect(mockProvider.get).toHaveBeenCalledWith(
+        '/api/diagnostics/errors?timeframe=3600',
+      );
     });
   });
 
@@ -291,7 +318,7 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue(mockResponse);
 
       const result = await diagnosticsClient.getErrorsOnly(3600);
 
@@ -315,7 +342,7 @@ describe('DiagnosticsClient', () => {
         },
       };
 
-      mockFoundryClient.get.mockResolvedValue(mockResponse);
+      mockProvider.get.mockResolvedValue(mockResponse);
 
       const result = await diagnosticsClient.getErrorsOnly(1800, 'warn');
 
@@ -340,7 +367,7 @@ describe('DiagnosticsClient', () => {
         status: 'healthy',
       };
 
-      mockFoundryClient.get.mockResolvedValue({ data: mockHealth });
+      mockProvider.get.mockResolvedValue({ data: mockHealth });
 
       const result = await diagnosticsClient.getHealthStatus();
 
@@ -348,7 +375,7 @@ describe('DiagnosticsClient', () => {
     });
 
     it('should return critical status on error', async () => {
-      mockFoundryClient.get.mockRejectedValue(new Error('API Error'));
+      mockProvider.get.mockRejectedValue(new Error('API Error'));
 
       const result = await diagnosticsClient.getHealthStatus();
 
@@ -363,10 +390,10 @@ describe('DiagnosticsClient', () => {
      * result carries `status` and nothing else, on both paths.
      */
     it.each([
-      { path: 'success', arrange: () => mockFoundryClient.get.mockResolvedValue({ data: {} }) },
+      { path: 'success', arrange: () => mockProvider.get.mockResolvedValue({ data: {} }) },
       {
         path: 'failure',
-        arrange: () => mockFoundryClient.get.mockRejectedValue(new Error('API Error')),
+        arrange: () => mockProvider.get.mockRejectedValue(new Error('API Error')),
       },
     ])('returns status alone on the $path path — no score field', async ({ arrange }) => {
       arrange();
@@ -379,20 +406,71 @@ describe('DiagnosticsClient', () => {
 
   describe('isAvailable', () => {
     it('should return true when API is available', async () => {
-      mockFoundryClient.get.mockResolvedValue({ data: {} });
+      mockProvider.get.mockResolvedValue({ data: {} });
 
       const result = await diagnosticsClient.isAvailable();
 
       expect(result).toBe(true);
-      expect(mockFoundryClient.get).toHaveBeenCalledWith('/api/diagnostics/health');
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/health');
     });
 
     it('should return false when API is not available', async () => {
-      mockFoundryClient.get.mockRejectedValue(new Error('Not Found'));
+      mockProvider.get.mockRejectedValue(new Error('Not Found'));
 
       const result = await diagnosticsClient.isAvailable();
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('target diagnostic transport', () => {
+    it('uses the selected provider bridge port instead of its generic HTTP client', async () => {
+      const requestRestDiagnostics = vi.fn().mockResolvedValue({
+        data: { success: true, data: { logs: [], total: 0 } },
+      });
+      const genericGet = vi.fn();
+      const selected = new DiagnosticsClient({ get: genericGet, requestRestDiagnostics });
+
+      await expect(selected.getRecentLogs()).resolves.toEqual({ logs: [], total: 0 });
+      expect(requestRestDiagnostics).toHaveBeenCalledWith('/api/diagnostics/logs');
+      expect(genericGet).not.toHaveBeenCalled();
+    });
+
+    it('does not bypass a provider bridge pause through the generic HTTP client', async () => {
+      const requestRestDiagnostics = vi
+        .fn()
+        .mockRejectedValue(new Error('The REST bridge is paused'));
+      const genericGet = vi.fn();
+      const selected = new DiagnosticsClient({ get: genericGet, requestRestDiagnostics });
+
+      await expect(selected.getRecentLogs()).rejects.toThrow('The REST bridge is paused');
+      expect(genericGet).not.toHaveBeenCalled();
+    });
+
+    it('keeps two targets diagnostic responses and requests independent', async () => {
+      const firstGet = vi.fn().mockResolvedValue({ data: { logs: [], total: 0 } });
+      const secondGet = vi.fn().mockResolvedValue({
+        data: {
+          logs: [
+            {
+              timestamp: '2026-11-27T12:00:00.000Z',
+              level: 'error',
+              message: 'Second world',
+              source: 'foundry',
+            },
+          ],
+          total: 1,
+        },
+      });
+      const first = new DiagnosticsClient({ get: firstGet });
+      const second = new DiagnosticsClient({ get: secondGet });
+
+      const results = await Promise.all([first.getRecentLogs(), second.getRecentLogs()]);
+
+      expect(results.map((result) => result.total)).toEqual([0, 1]);
+      expect(results[1].logs[0].message).toBe('Second world');
+      expect(firstGet).toHaveBeenCalledTimes(1);
+      expect(secondGet).toHaveBeenCalledTimes(1);
     });
   });
 });

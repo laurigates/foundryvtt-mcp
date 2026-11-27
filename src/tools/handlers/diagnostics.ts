@@ -8,7 +8,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { LogEntry } from '../../diagnostics/types.js';
 import { LogEntrySchema } from '../../diagnostics/types.js';
-import type { FoundryCore } from '../../providers/types.js';
+import type { ConnectionReport, FoundryCore } from '../../providers/types.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
 import { withToolError } from './utils.js';
 
@@ -353,6 +353,63 @@ ${diagnosis.recommendations.map((rec: string) => `- ${rec}`).join('\n')}
  * connection line legitimately reads "✅ Connected" while the cache is still
  * missing every broadcast the outage swallowed.
  */
+const TRANSPORT_LABELS: Readonly<Record<ConnectionReport['mode'], string>> = {
+  socket: 'Socket.IO',
+  dual: 'Socket.IO + REST bridge (dual)',
+  rest: 'REST only (deprecated)',
+};
+
+/**
+ * The REST line by the state of the last request: no answer at all
+ * (unreachable) reads differently from an answer that was an error, so a bridge
+ * that is up but has no GM client is not reported as down.
+ */
+function formatRestState(rest: ConnectionReport['rest']): string {
+  const where = rest.baseUrl ? ` (${rest.baseUrl})` : '';
+  const error = rest.lastError ?? 'last request failed';
+  switch (rest.state) {
+    case 'ok':
+      return `✅ Reachable${where}`;
+    case 'unreachable':
+      return `❌ Unreachable: ${error}`;
+    case 'server-error':
+      return `⚠️ Reachable, answering with errors${where}: ${error}`;
+    case 'rejected':
+      return `⚠️ Reachable, last request rejected${where}: ${error}`;
+    case 'invalid-response':
+      return `⚠️ Reachable, unusable response${where}: ${error}`;
+    default:
+      return `⏳ Not checked yet${where}`;
+  }
+}
+
+/**
+ * The connection lines of `get_health_status`. The report is read after the
+ * world and system-health requests, so the REST line reflects them.
+ */
+function formatConnectionReport(report: ConnectionReport): string {
+  const socket = !report.socket.used
+    ? 'not used'
+    : report.socket.connected
+      ? '✅ Connected'
+      : '❌ Disconnected';
+
+  const lines = [
+    `**Transport:** ${TRANSPORT_LABELS[report.mode]}`,
+    `**Socket.IO:** ${socket}`,
+    `**REST bridge:** ${report.rest.configured ? formatRestState(report.rest) : 'not configured'}`,
+  ];
+  const paused = report.rest.paused ?? [];
+  if (paused.length > 0) {
+    const entries = paused.map(
+      (pause) =>
+        `${pause.scope === 'bridge' ? 'all bridge calls' : pause.scope} for ${pause.retryInSeconds} s (${pause.error})`,
+    );
+    lines.push(`**REST bridge paused:** ${entries.join('; ')}`);
+  }
+  return lines.join('\n');
+}
+
 export async function handleGetHealthStatus(
   _args: Record<string, unknown>,
   provider: FoundryCore,
@@ -395,6 +452,16 @@ export async function handleGetHealthStatus(
       healthSection = `\n${healthLines.join('\n')}`;
     }
 
+    // The historical report describes native sockets and the /api bridge.
+    // A runtime relay inherits the document engine, but is not a socket transport.
+    const runtimeRelay = Reflect.get(provider, 'kind') === 'rest-api';
+    const connectionReport = runtimeRelay ? undefined : provider.getConnectionReport?.();
+    const transportDetails = runtimeRelay
+      ? '\n**Provider:** REST API relay'
+      : connectionReport
+        ? `\n${formatConnectionReport(connectionReport)}`
+        : '';
+
     return {
       content: [
         {
@@ -402,7 +469,7 @@ export async function handleGetHealthStatus(
           text: `\u{1FA7A} **Comprehensive Health Status**
 
 **FoundryVTT Connection:**
-${provider.isConnected() ? '✅ Connected' : '❌ Disconnected'}
+${provider.isConnected() ? '✅ Connected' : '❌ Disconnected'}${transportDetails}
 
 **World Information:**
 ${worldLines.join('\n')}

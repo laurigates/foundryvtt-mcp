@@ -1,6 +1,6 @@
 {
   "name": "foundryvtt-mcp",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Model Context Protocol server for FoundryVTT integration",
   "main": "dist/index.js",
   "bin": {
@@ -35,9 +35,9 @@
     "test:integration:docker": "docker compose -f docker-compose.test.yml up -d --wait && bun run test:integration; docker compose -f docker-compose.test.yml down -v",
     "test-connection": "tsx scripts/test-connection.ts",
     "setup-wizard": "tsx scripts/setup-wizard.ts",
-    "lint": "biome check src",
-    "lint:fix": "biome check --write src",
-    "format": "biome format --write src",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
     "docs:check": "typedoc --emit none",
     "clean": "rimraf dist",
     "docs": "typedoc src/index.ts --out build/docs --exclude '**/*.test.ts'",
@@ -144,11 +144,8 @@
     "qs": "6.17.1"
   },
   "lint-staged": {
-    "src/**/*.{ts,tsx,js,jsx}": [
-      "biome check --write"
-    ],
-    "src/**/*.{json,css,md}": [
-      "biome format --write"
+    "*.{ts,tsx,js,jsx,json,css}": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   }
 }

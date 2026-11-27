@@ -6,7 +6,7 @@
  */
 
 import { config } from '../config/index.js';
-import { probeRestModule } from '../foundry/rest-probe.js';
+import { probeRestModule, RestKeyRejectedError } from '../foundry/rest-probe.js';
 import type { FoundryCore, FoundryProvider } from '../providers/types.js';
 import { logger } from './logger.js';
 
@@ -50,6 +50,14 @@ export interface HealthReport {
   restApiAvailable: boolean;
   websocketAvailable: boolean;
 }
+
+/** Where the optional REST bridge (module + bridge server) lives (#327). */
+const REST_BRIDGE_REPO = 'https://github.com/laurigates/foundryvtt-local-rest-api';
+/** Manifest URL to paste into Foundry's module installer (latest release). */
+const REST_BRIDGE_MANIFEST = `${REST_BRIDGE_REPO}/releases/latest/download/module.json`;
+/** The setup notes for the REST bridge. */
+const REST_BRIDGE_GUIDE =
+  'https://github.com/laurigates/foundryvtt-mcp/blob/main/docs/guides/configuration.md#optional-rest-bridge-augment';
 
 /**
  * Enhanced diagnostic system for FoundryVTT MCP integration
@@ -99,6 +107,11 @@ export class DiagnosticSystem {
       return await this.createFeatureSpecificDiagnostic(feature);
     } catch (error) {
       logger.error('Error during diagnosis:', error);
+      // testConnection() throws on a rejected FOUNDRY_API_KEY (#288); that is
+      // an authentication failure, not an unexpected error (#301).
+      if (error instanceof RestKeyRejectedError) {
+        return this.createAuthenticationDiagnostic({ valid: false, error: error.message });
+      }
       return this.createGenericErrorDiagnostic(error);
     }
   }
@@ -130,13 +143,13 @@ export class DiagnosticSystem {
         report.connectivity = {
           status: 'connected',
           emoji: '✅',
-          details: `Connected to ${this.connection.url}`,
+          details: `Connected to ${this.connectionUrl()}`,
         };
       } else {
         report.connectivity = {
           status: 'offline',
           emoji: '❌',
-          details: `Cannot reach ${this.connection.url}`,
+          details: `Cannot reach ${this.connectionUrl()}`,
         };
         return report; // Early return if not connected
       }
@@ -147,7 +160,7 @@ export class DiagnosticSystem {
       // Test authentication
       const authResult = await this.testAuthentication();
       report.authentication = {
-        method: this.connection.apiKey ? 'api-key' : 'credentials',
+        method: this.usesApiKeyAuthentication() ? 'api-key' : 'credentials',
         status: authResult.valid ? 'valid' : 'invalid',
         emoji: authResult.valid ? '✅' : '❌',
       };
@@ -206,10 +219,12 @@ export class DiagnosticSystem {
     output += `  • System Diagnostics: ${report.features.diagnostics ? '✅ Available' : '❌ Unavailable'}\n\n`;
 
     if (!report.restApiAvailable) {
-      output += '💡 **Unlock Full Features**:\n';
-      output += '  → Install the "Foundry Local REST API" module in FoundryVTT\n';
-      output += '  → Enable the module and configure API key\n';
-      output += '  → See setup guide: https://github.com/laurigates/foundryvtt-mcp#setup\n\n';
+      output += '💡 **Unlock Full Features** (optional REST bridge):\n';
+      output += `  → Module and bridge server: ${REST_BRIDGE_REPO}\n`;
+      output += `  → Module manifest URL: ${REST_BRIDGE_MANIFEST}\n`;
+      output +=
+        '  → Set FOUNDRY_API_KEY and FOUNDRY_REST_URL alongside the Socket.IO credentials\n';
+      output += `  → See setup guide: ${REST_BRIDGE_GUIDE}\n\n`;
     }
 
     if (report.connectivity.status === 'offline') {
@@ -231,7 +246,7 @@ export class DiagnosticSystem {
       explanation: 'Unable to connect to FoundryVTT server.',
       suggestions:
         "• **Check if FoundryVTT is running** - Start FoundryVTT and ensure it's accessible\n" +
-        `• **Verify server URL** - Check that \`${this.connection.url}\` is correct\n` +
+        `• **Verify server URL** - Check that \`${this.connectionUrl()}\` is correct\n` +
         '• **Test connectivity** - Run `npm run test-connection` for detailed diagnostics\n' +
         '• **Check firewall** - Ensure no firewall is blocking the connection',
       severity: 'critical',
@@ -246,35 +261,37 @@ export class DiagnosticSystem {
    */
   private createRestApiDiagnostic(feature: string): DiagnosticResult {
     return {
-      explanation: `${feature.charAt(0).toUpperCase() + feature.slice(1)} search requires the REST API module for full functionality.`,
+      explanation: `${feature.charAt(0).toUpperCase() + feature.slice(1)} search requires the optional REST bridge for full functionality.`,
       suggestions:
-        '• **Install REST API module** - Get it from the FoundryVTT module browser\n' +
-        "• **Enable the module** - Activate it in your world's module settings\n" +
-        '• **Configure API key** - Generate and copy the API key from module settings\n' +
-        '• **Update .env file** - Set FOUNDRY_API_KEY with your generated key\n' +
+        `• **Install the module and bridge server** - Install the module in Foundry from the manifest URL ${REST_BRIDGE_MANIFEST}; the bridge server is in ${REST_BRIDGE_REPO}\n` +
+        "• **Enable the module** - Activate it in your world's module settings and turn on its REST API\n" +
+        '• **Start the bridge server** - Keep a Gamemaster logged in through a browser; the bridge answers through that client\n' +
+        '• **Update .env file** - Set FOUNDRY_API_KEY to the module key and FOUNDRY_REST_URL to the bridge (e.g. http://localhost:3030)\n' +
         '• **Restart MCP server** - Restart to pick up the new configuration',
       severity: 'warning',
       canContinue: true,
-      documentationUrl:
-        'https://github.com/laurigates/foundryvtt-mcp/blob/main/SETUP_GUIDE.md#rest-api-setup',
+      documentationUrl: REST_BRIDGE_GUIDE,
     };
   }
 
   /**
    * Create diagnostic for authentication issues
    */
-  private createAuthenticationDiagnostic(_authResult: {
+  private createAuthenticationDiagnostic(authResult: {
     valid: boolean;
     error?: string;
   }): DiagnosticResult {
-    const isApiKey = !!this.connection.apiKey;
+    const isApiKey = this.usesApiKeyAuthentication();
+    const method = isApiKey ? 'API key' : 'username/password';
 
     return {
-      explanation: `Authentication failed using ${isApiKey ? 'API key' : 'username/password'}.`,
+      explanation: authResult.error
+        ? `Authentication failed using ${method}: ${authResult.error}`
+        : `Authentication failed using ${method}.`,
       suggestions: isApiKey
         ? "• **Check API key** - Verify the key is correct and hasn't expired\n" +
           '• **Regenerate key** - Generate a new API key in FoundryVTT module settings\n' +
-          '• **Module status** - Ensure the REST API module is enabled and running\n' +
+          '• **Bridge status** - Ensure the module is enabled, the bridge server is running and a Gamemaster is logged in\n' +
           '• **Restart FoundryVTT** - Sometimes a restart resolves authentication issues'
         : '• **Check credentials** - Verify username and password are correct\n' +
           '• **User permissions** - Ensure the user has required permissions\n' +
@@ -335,6 +352,22 @@ export class DiagnosticSystem {
     return feature === 'diagnostics';
   }
 
+  private connectionUrl(): string {
+    const report = this.provider.getConnectionReport?.();
+    return report?.mode === 'rest' && report.rest.baseUrl
+      ? report.rest.baseUrl
+      : this.connection.url;
+  }
+
+  /** Provider selection takes precedence over unrelated legacy environment credentials. */
+  private usesApiKeyAuthentication(): boolean {
+    if (this.provider.kind !== undefined) {
+      return this.provider.kind === 'legacy-rest' || this.provider.kind === 'rest-api';
+    }
+    const mode = this.provider.getTransportMode?.();
+    return mode === undefined ? Boolean(this.connection.apiKey) : mode === 'rest';
+  }
+
   /**
    * Test REST API availability: the module answers its authenticated
    * /api/world route with JSON (#230). Same probe as `FoundryCore.connect()`.
@@ -360,7 +393,7 @@ export class DiagnosticSystem {
       if (this.provider.kind === 'rest-api' || this.provider.kind === 'composite') {
         return { valid: this.provider.isConnected() };
       }
-      if (this.connection.apiKey) {
+      if (this.usesApiKeyAuthentication()) {
         // Test API key authentication: only a JSON-object /api/world body
         // proves the module accepted the key (#230); probeRestModule throws
         // otherwise, and the catch below reports it as invalid.

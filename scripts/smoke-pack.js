@@ -25,8 +25,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -63,7 +63,9 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 
 function fail(message, extra = '') {
   console.error(`❌ smoke-pack failed: ${message}`);
-  if (extra) console.error(extra);
+  if (extra) {
+    console.error(extra);
+  }
   cleanupAll();
   process.exit(1);
 }
@@ -74,8 +76,11 @@ function walk(dir) {
   for (const name of readdirSync(dir)) {
     const abs = join(dir, name);
     const st = statSync(abs);
-    if (st.isDirectory()) out.push(...walk(abs));
-    else out.push(abs);
+    if (st.isDirectory()) {
+      out.push(...walk(abs));
+    } else {
+      out.push(abs);
+    }
   }
   return out;
 }
@@ -109,7 +114,9 @@ function validateFilesEntries() {
   const entries = pkgJson.files ?? [];
   const checked = [];
   for (const entry of entries) {
-    if (entry.startsWith('!')) continue;
+    if (entry.startsWith('!')) {
+      continue;
+    }
     const cleaned = entry.replace(/\/$/, '');
     const hasGlob = /[*?[\]]/.test(cleaned);
     if (!hasGlob) {
@@ -126,7 +133,9 @@ function validateFilesEntries() {
     const segments = cleaned.split('/');
     const literalSegments = [];
     for (const seg of segments) {
-      if (/[*?[\]]/.test(seg)) break;
+      if (/[*?[\]]/.test(seg)) {
+        break;
+      }
       literalSegments.push(seg);
     }
     const rootDir = join(repoRoot, ...literalSegments);
@@ -283,7 +292,9 @@ function runInstalledServer({ consumer, serverPath }) {
     let bannerSeen = false;
 
     const finish = (success, message) => {
-      if (resolved) return;
+      if (resolved) {
+        return;
+      }
       resolved = true;
       clearTimeout(timeout);
 
@@ -310,7 +321,9 @@ function runInstalledServer({ consumer, serverPath }) {
     const terminate = (exitCode) => {
       if (child.exitCode !== null || child.signalCode !== null) {
         cleanupAll();
-        if (exitCode !== 0) process.exit(exitCode);
+        if (exitCode !== 0) {
+          process.exit(exitCode);
+        }
         resolve();
         return;
       }
@@ -323,7 +336,9 @@ function runInstalledServer({ consumer, serverPath }) {
       child.once('exit', () => {
         clearTimeout(killTimer);
         cleanupAll();
-        if (exitCode !== 0) process.exit(exitCode);
+        if (exitCode !== 0) {
+          process.exit(exitCode);
+        }
         resolve();
       });
     };
@@ -339,16 +354,22 @@ function runInstalledServer({ consumer, serverPath }) {
       }
     });
     child.on('exit', (code, signal) => {
-      if (resolved) return;
+      if (resolved) {
+        return;
+      }
       finish(false, `server exited prematurely (code=${code}, signal=${signal})`);
     });
     child.on('error', (err) => {
-      if (resolved) return;
+      if (resolved) {
+        return;
+      }
       finish(false, `failed to spawn server: ${err.message}`);
     });
 
     const timeout = setTimeout(() => {
-      if (resolved) return;
+      if (resolved) {
+        return;
+      }
       finish(false, `timed out after ${STARTUP_TIMEOUT_MS}ms waiting for banner`);
     }, STARTUP_TIMEOUT_MS);
   });

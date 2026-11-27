@@ -1,7 +1,16 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { loadTargetConfiguration, normalizeLegacyTarget } from '../targets.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LegacyRestProvider } from '../../providers/legacy-rest.js';
+import {
+  legacyConfigForTarget,
+  loadTargetConfiguration,
+  normalizeLegacyTarget,
+} from '../targets.js';
+
+vi.mock('../../utils/logger.js', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
 
 const directories: string[] = [];
 afterEach(() => {
@@ -11,6 +20,185 @@ afterEach(() => {
 });
 
 describe('target configuration', () => {
+  it('keeps an explicit native bridge bound to its own target and credential reference', () => {
+    const targets = loadTargetConfiguration({
+      BRIDGE_KEY: 'bridge-a',
+      FOUNDRY_API_KEY: 'unrelated-global-key',
+      FOUNDRY_TARGETS_JSON: JSON.stringify([
+        {
+          id: 'a',
+          writeEnabled: true,
+          provider: {
+            kind: 'socketio',
+            baseUrl: 'https://a.test',
+            username: 'GM',
+            password: 'password-a',
+            restUrl: 'https://bridge-a.test',
+            restApiKeyEnv: 'BRIDGE_KEY',
+          },
+        },
+        { id: 'b', provider: { kind: 'socketio', baseUrl: 'https://b.test' } },
+      ]),
+    });
+    const first = targets?.[0];
+    expect(first?.provider).toMatchObject({
+      kind: 'socketio',
+      restUrl: 'https://bridge-a.test',
+      restApiKey: 'bridge-a',
+      writeEnabled: true,
+    });
+    expect(first?.provider).not.toHaveProperty('restApiKeyEnv');
+    expect(first?.provider).not.toHaveProperty('apiKey');
+    expect(targets?.[1]?.provider).not.toHaveProperty('restApiKey');
+    expect(targets?.[1]?.provider).not.toHaveProperty('restUrl');
+    if (!first) {
+      throw new Error('Expected a configured target');
+    }
+    expect(legacyConfigForTarget(first)).toMatchObject({
+      url: 'https://a.test',
+      restUrl: 'https://bridge-a.test',
+      apiKey: 'bridge-a',
+    });
+  });
+
+  it('rejects incomplete bridge configuration rather than silently changing transport', () => {
+    const provider = {
+      kind: 'socketio',
+      baseUrl: 'https://foundry.test',
+      username: 'GM',
+      password: 'native-password',
+      restUrl: 'https://bridge.test',
+    };
+    expect(() =>
+      loadTargetConfiguration({
+        FOUNDRY_TARGETS_JSON: JSON.stringify([{ id: 'a', provider }]),
+      }),
+    ).toThrow(/both restUrl and restApiKey/);
+    expect(() =>
+      loadTargetConfiguration({
+        FOUNDRY_TARGETS_JSON: JSON.stringify([
+          {
+            id: 'a',
+            provider: { ...provider, password: '', restApiKey: 'bridge-key' },
+          },
+        ]),
+      }),
+    ).toThrow(/native username or userId and password/);
+  });
+
+  it('normalizes upstream dual settings without losing target writes or native credentials', () => {
+    const target = normalizeLegacyTarget(
+      {
+        url: 'https://foundry.test',
+        apiKey: 'bridge-key',
+        restUrl: 'https://bridge.test',
+        username: 'GM',
+        password: 'native-password',
+        socketPath: '/socket.io/',
+        timeout: 10000,
+        retryAttempts: 3,
+        retryDelay: 1000,
+        writeEnabled: true,
+      },
+      {},
+    );
+    expect(target.provider).toMatchObject({
+      kind: 'socketio',
+      baseUrl: 'https://foundry.test',
+      username: 'GM',
+      password: 'native-password',
+      restUrl: 'https://bridge.test',
+      restApiKey: 'bridge-key',
+      writeEnabled: true,
+    });
+    expect(target.provider).not.toHaveProperty('apiKey');
+  });
+
+  it('uses the separate REST URL for a legacy bridge without native credentials', () => {
+    const target = normalizeLegacyTarget(
+      {
+        url: 'https://foundry.test',
+        apiKey: 'bridge-key',
+        restUrl: 'https://bridge.test',
+        socketPath: '/socket.io/',
+        timeout: 10000,
+        retryAttempts: 3,
+        retryDelay: 1000,
+        writeEnabled: false,
+      },
+      {},
+    );
+    expect(target.provider).toMatchObject({
+      kind: 'legacy-rest',
+      baseUrl: 'https://bridge.test',
+      apiKey: 'bridge-key',
+      writeEnabled: false,
+    });
+  });
+
+  it.each([
+    { name: 'restUrl', augment: { restUrl: 'https://other-bridge.test' } },
+    { name: 'restApiKey', augment: { restApiKey: 'augment-key' } },
+    { name: 'restApiKeyEnv', augment: { restApiKeyEnv: 'AUGMENT_KEY' } },
+    {
+      name: 'both bridge fields',
+      augment: { restUrl: 'https://other-bridge.test', restApiKey: 'augment-key' },
+    },
+  ])('rejects $name on an explicitly selected legacy REST provider', ({ augment }) => {
+    expect(() =>
+      loadTargetConfiguration({
+        AUGMENT_KEY: 'resolved-augment-key',
+        FOUNDRY_TARGETS_JSON: JSON.stringify([
+          {
+            id: 'legacy',
+            writeEnabled: true,
+            provider: {
+              kind: 'legacy-rest',
+              baseUrl: 'https://bridge.test',
+              apiKey: 'legacy-key',
+              username: 'GM',
+              password: 'native-password',
+              ...augment,
+            },
+          },
+        ]),
+      }),
+    ).toThrow(/Unrecognized key/);
+  });
+
+  it.each([undefined, false, true])(
+    'keeps a valid legacy provider read-only with target writeEnabled=%s',
+    (writeEnabled) => {
+      const targets = loadTargetConfiguration({
+        FOUNDRY_WRITE_ENABLED: 'true',
+        FOUNDRY_TARGETS_JSON: JSON.stringify([
+          {
+            id: 'legacy',
+            ...(writeEnabled === undefined ? {} : { writeEnabled }),
+            provider: {
+              kind: 'legacy-rest',
+              baseUrl: 'https://bridge.test',
+              apiKey: 'legacy-key',
+              username: 'GM',
+              password: 'native-password',
+            },
+          },
+        ]),
+      });
+      const target = targets?.[0];
+      if (!target || target.provider.kind !== 'legacy-rest') {
+        throw new Error('Expected a configured legacy REST target');
+      }
+      const provider = new LegacyRestProvider(target.provider);
+
+      expect(target.writeEnabled).toBe(writeEnabled ?? false);
+      expect(provider.kind).toBe('legacy-rest');
+      expect(provider.getTransportMode()).toBe('rest');
+      expect(provider.capabilities.has('core.write')).toBe(false);
+      expect(provider.getConnectionReport().socket.used).toBe(false);
+    },
+  );
+
   it('keeps target credentials and write permissions isolated', () => {
     const env = {
       FOUNDRY_WRITE_ENABLED: 'true',

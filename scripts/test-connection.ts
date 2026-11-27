@@ -30,6 +30,9 @@ export async function testConnection(): Promise<void> {
         try {
           const actors = await session.run((provider) => provider.searchActors({ limit: 3 }));
           console.log(`Actor read succeeded: ${actors.actors.length} result(s)`);
+          if (actors.total === 0) {
+            console.log('No actors found (the world may have none)');
+          }
         } catch (error) {
           failures++;
           console.log(`Actor read failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

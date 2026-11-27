@@ -2,8 +2,8 @@
  * Integration tests for FoundryVTT authentication flow.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { FoundryClient } from '../../src/foundry/client.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { FoundryClient } from '../../src/foundry/client.js';
 import { createTestClient } from './setup.js';
 
 describe('Authentication', () => {

@@ -74,6 +74,7 @@ test-watch:
 # Generate test coverage report
 [group: "test"]
 test-coverage:
+    bun run test:bindings
     bun run test:coverage
 
 # Test connection to FoundryVTT server
@@ -157,7 +158,7 @@ check-types-scripts:
 
 # Run all quality checks (lint, types, tests)
 [group: "quality"]
-qa: lint check-types check-types-scripts test test-python
+qa: lint check-types check-types-scripts test-coverage test-python
 
 ########## Documentation ##########
 

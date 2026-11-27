@@ -9,6 +9,7 @@
  */
 
 import type { z } from 'zod';
+import { unwrapOptionalEnvelope } from '../foundry/rest-mappers.js';
 import type { FoundryCore } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 import type { LogPatternSearchParams, LogSearchParams } from './types.js';
@@ -53,7 +54,12 @@ export class DiagnosticsClient {
    *
    * @param provider - The FoundryCore instance to use for API calls
    */
-  constructor(private provider: FoundryCore) {}
+  constructor(private provider: Pick<FoundryCore, 'get' | 'requestRestDiagnostics'>) {}
+
+  /** Let the selected provider apply its bridge URL and transport availability rules. */
+  private request(url: string) {
+    return this.provider.requestRestDiagnostics?.(url) ?? this.provider.get(url);
+  }
 
   /**
    * Get recent log entries with optional filtering
@@ -104,8 +110,10 @@ export class DiagnosticsClient {
       const queryString = searchParams.toString();
       const url = `/api/diagnostics/logs${queryString ? `?${queryString}` : ''}`;
 
-      const response = await this.provider.get(url);
-      const parsed = LogResponseSchema.parse(response.data);
+      const response = await this.request(url);
+      const parsed = LogResponseSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/logs'),
+      );
 
       logger.debug('DiagnosticsClient | Retrieved logs', {
         count: parsed.total,
@@ -166,8 +174,10 @@ export class DiagnosticsClient {
       }
 
       const url = `/api/diagnostics/search?${searchParams.toString()}`;
-      const response = await this.provider.get(url);
-      const parsed = LogSearchResponseSchema.parse(response.data);
+      const response = await this.request(url);
+      const parsed = LogSearchResponseSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/search'),
+      );
 
       logger.debug('DiagnosticsClient | Search completed', {
         pattern: params.pattern,
@@ -205,8 +215,10 @@ export class DiagnosticsClient {
     try {
       logger.debug('DiagnosticsClient | Getting system health');
 
-      const response = await this.provider.get('/api/diagnostics/health');
-      const parsed = SystemHealthSchema.parse(response.data);
+      const response = await this.request('/api/diagnostics/health');
+      const parsed = SystemHealthSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/health'),
+      );
 
       logger.debug('DiagnosticsClient | System health retrieved', {
         status: parsed.status,
@@ -254,8 +266,10 @@ export class DiagnosticsClient {
       searchParams.set('timeframe', timeframe.toString());
 
       const url = `/api/diagnostics/errors?${searchParams.toString()}`;
-      const response = await this.provider.get(url);
-      const parsed = ErrorDiagnosisSchema.parse(response.data);
+      const response = await this.request(url);
+      const parsed = ErrorDiagnosisSchema.parse(
+        unwrapOptionalEnvelope(response.data, '/api/diagnostics/errors'),
+      );
 
       logger.debug('DiagnosticsClient | Error diagnosis completed', {
         totalErrors: parsed.summary?.totalErrors,
@@ -355,7 +369,7 @@ export class DiagnosticsClient {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      await this.provider.get('/api/diagnostics/health');
+      await this.request('/api/diagnostics/health');
       return true;
     } catch (error) {
       logger.debug('DiagnosticsClient | Diagnostics API not available:', error);

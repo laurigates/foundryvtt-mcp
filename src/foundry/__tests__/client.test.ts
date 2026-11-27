@@ -84,7 +84,9 @@ describe('FoundryClient', () => {
   describe('testConnection authentication', () => {
     it('checks a connected REST client without replacing its session generation', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200, data: { success: true, data: { id: 'world-1' } },
+      });
       await client.connect();
       const generation = client.getGeneration();
       const connect = vi.spyOn(client, 'connect');
@@ -113,7 +115,7 @@ describe('FoundryClient', () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockResolvedValue({
         status: 200,
-        data: { id: 'world-1', title: 'Test World' },
+        data: { success: true, data: { id: 'world-1', title: 'Test World' } },
       });
 
       await expect(client.testConnection()).resolves.toBe(true);
@@ -175,7 +177,10 @@ describe('FoundryClient', () => {
         username: 'gm',
         password: 'gm-password',
       });
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { id: 'world-1' } });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { success: true, data: { id: 'world-1' } },
+      });
 
       await expect(client.testConnection()).resolves.toBe(true);
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
@@ -232,15 +237,33 @@ describe('FoundryClient', () => {
     // #230: `/api/status` is served unauthenticated by Foundry core, so a 200
     // there proves neither the REST module nor the key. The probe must hit an
     // authenticated module route and validate the body shape.
-    it('should connect via REST API when /api/world answers with a JSON object', async () => {
+    it('should connect via REST API when /api/world answers with the module envelope', async () => {
       mockAxiosInstance.get.mockResolvedValue({
         status: 200,
-        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+        data: { success: true, data: { id: 'world-1', title: 'Test World', system: 'dnd5e' } },
       });
       await client.connect();
       expect(client.isConnected()).toBe(true);
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
       expect(mockAxiosInstance.get).not.toHaveBeenCalledWith('/api/status');
+    });
+
+    it('should reject a bare JSON object: it is not the module envelope (#310)', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 'world-1', title: 'Test World', system: 'dnd5e' },
+      });
+      await expect(client.connect()).rejects.toThrow(/\{success: true, data\} envelope/);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it('should reject a success: false envelope', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { success: false, error: 'Unauthorized', message: 'Valid API key required' },
+      });
+      await expect(client.connect()).rejects.toThrow(/envelope/);
+      expect(client.isConnected()).toBe(false);
     });
 
     it('should reject and stay disconnected when /api/world answers 200 with HTML', async () => {
@@ -306,35 +329,72 @@ describe('FoundryClient', () => {
       expect(reqConfig.headers['x-api-key']).toBe('test-api-key');
     });
 
-    it('should search actors via REST API', async () => {
-      const mockData = { actors: [{ _id: '1', name: 'Hero', type: 'character' }] };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
+    it('should search actors via REST API and map the module summary (#310)', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          success: true,
+          data: [
+            {
+              id: 'heroaaaaaaaaaaaa',
+              name: 'Hero',
+              type: 'character',
+              hp: { current: 7, max: 12 },
+              ac: 15,
+            },
+          ],
+          total: 1,
+        },
+      });
 
       const result = await client.searchActors({ query: 'Hero' });
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/actors', {
         params: { query: 'Hero' },
       });
-      expect(result.actors).toEqual(mockData.actors);
+      expect(result.actors).toEqual([
+        {
+          _id: 'heroaaaaaaaaaaaa',
+          name: 'Hero',
+          type: 'character',
+          hp: { value: 7, max: 12 },
+          ac: { value: 15 },
+        },
+      ]);
     });
 
-    it('should search items via REST API', async () => {
-      const mockData = { items: [{ _id: '1', name: 'Sword', type: 'weapon' }] };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockData });
+    it('should search items via REST API and map the module summary', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          success: true,
+          data: [{ id: 'swordaaaaaaaaaaa', name: 'Sword', type: 'weapon' }],
+          total: 1,
+        },
+      });
 
       const result = await client.searchItems({ query: 'Sword', type: 'weapon', limit: 10 });
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/items', {
         params: { query: 'Sword', type: 'weapon', limit: 10 },
       });
-      expect(result.items).toEqual(mockData.items);
+      expect(result.items).toEqual([{ _id: 'swordaaaaaaaaaaa', name: 'Sword', type: 'weapon' }]);
     });
 
-    it('should get world info via REST API', async () => {
-      const mockWorld = { id: 'world-1', title: 'Test World', system: 'dnd5e' };
-      mockAxiosInstance.get.mockResolvedValue({ data: mockWorld });
+    it('should get world info via REST API and map it', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { success: true, data: { id: 'world-1', title: 'Test World', system: 'dnd5e' } },
+      });
 
       const result = await client.getWorldInfo();
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/world');
-      expect(result).toEqual(mockWorld);
+      expect(result).toMatchObject({ id: 'world-1', title: 'Test World', system: 'dnd5e' });
+    });
+
+    it('should reject an unmapped REST actor shape with a clear error', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { actors: [{ _id: '1', name: 'Hero', type: 'character' }] },
+      });
+
+      await expect(client.searchActors({ query: 'Hero' })).rejects.toThrow(
+        /unexpected response shape/,
+      );
     });
 
     it('should retry failed requests', async () => {
@@ -348,7 +408,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'test' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
@@ -402,7 +462,7 @@ describe('FoundryClient', () => {
       }
 
       beforeEach(async () => {
-        mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+        mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { success: true, data: {} } });
         await client.connect();
         expect(client.isConnected()).toBe(true);
       });
@@ -516,7 +576,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(429))
         .mockRejectedValueOnce(build4xxError(429))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
@@ -533,7 +593,7 @@ describe('FoundryClient', () => {
 
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(500))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const result = await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
@@ -550,7 +610,7 @@ describe('FoundryClient', () => {
 
       mockAxiosInstance.get
         .mockRejectedValueOnce(build4xxError(503))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       await client.searchActors({ query: 'x' });
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
@@ -569,7 +629,7 @@ describe('FoundryClient', () => {
       mockAxiosInstance.get
         .mockRejectedValueOnce(new Error('transient'))
         .mockRejectedValueOnce(new Error('transient'))
-        .mockResolvedValueOnce({ data: { actors: [] } });
+        .mockResolvedValueOnce({ data: { success: true, data: [], total: 0 } });
 
       const start = Date.now();
       await client.searchActors({ query: 'x' });
@@ -736,14 +796,17 @@ describe('FoundryClient', () => {
 
       it('lets a parenthesised formula through to FoundryVTT over REST', async () => {
         mockAxiosInstance.post.mockResolvedValue({
-          data: { total: 21, terms: [{ results: [16] }] },
+          data: {
+            success: true,
+            data: { total: 21, breakdown: [{ dice: '1d20', results: [16], total: 16 }] },
+          },
         });
 
         const result = await restClient().rollDice('(1d20+5)', 'Attack');
 
         expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/dice/roll', {
           formula: '(1d20+5)',
-          flavor: 'Attack',
+          reason: 'Attack',
         });
         expect(result.total).toBe(21);
       });
@@ -823,7 +886,10 @@ describe('FoundryClient', () => {
 
       it('marks a roll FoundryVTT evaluated as source "server" and warns about nothing', async () => {
         mockAxiosInstance.post.mockResolvedValue({
-          data: { total: 21, terms: [{ results: [16] }] },
+          data: {
+            success: true,
+            data: { total: 21, breakdown: [{ dice: '1d20', results: [16], total: 16 }] },
+          },
         });
 
         const result = await restClient().rollDice('1d20+5');
@@ -1031,8 +1097,8 @@ describe('FoundryClient', () => {
     const WORLD_DATA = {
       userId: 'test-user-id',
       world: { id: 'w', title: 'Test World' },
-      system: { id: 'dnd5e', version: '3.3.1' },
-      release: { version: '12.331' },
+      system: { id: 'dnd5e', version: '6.0.6' },
+      release: { version: '14.369' },
       actors: [],
       scenes: [],
       items: [],
@@ -1138,6 +1204,152 @@ describe('FoundryClient', () => {
 
       expect(actor.hp?.value).toBe(20);
       expect(actor.hp?.max).toBeUndefined();
+    });
+
+    describe('dnd5e source data without derived values (#308)', () => {
+      /**
+       * A character as the `world` payload carries it under dnd5e 6.x: source
+       * data only. `details.level`, ability `mod`, `attributes.ac.value` and
+       * `attributes.prof` are computed client-side in `prepareData` and absent.
+       */
+      function sourceCharacter(overrides: Record<string, unknown> = {}) {
+        return {
+          _id: 'actor0000000000c',
+          name: 'Source Paladin',
+          type: 'character',
+          system: {
+            details: { level: null },
+            abilities: {
+              str: { value: 18 },
+              dex: { value: 11 },
+              con: { value: 14 },
+              int: { value: 9 },
+              wis: { value: 10 },
+              cha: { value: 1 },
+            },
+            attributes: {
+              ac: { flat: 16, calc: 'default', formula: '' },
+              hp: { value: 51, max: null, temp: 0 },
+            },
+          },
+          items: [
+            { _id: 'class000000000p1', name: 'Paladin', type: 'class', system: { levels: 7 } },
+            { _id: 'class000000000w1', name: 'Warlock', type: 'class', system: { levels: 3 } },
+            { _id: 'weapon0000000001', name: 'Longsword', type: 'weapon', system: {} },
+          ],
+          ...overrides,
+        };
+      }
+
+      async function mapActor(raw: Record<string, unknown>) {
+        const { client: connected } = await connectWithMockSocket(
+          undefined,
+          structuredClone({ ...WORLD_DATA, actors: [raw] }),
+        );
+        return connected.getActor(String(raw._id));
+      }
+
+      it('computes ability modifiers from the score when mod is absent', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.abilities).toEqual({
+          str: { value: 18, mod: 4 },
+          dex: { value: 11, mod: 0 },
+          con: { value: 14, mod: 2 },
+          int: { value: 9, mod: -1 },
+          wis: { value: 10, mod: 0 },
+          cha: { value: 1, mod: -5 },
+        });
+      });
+
+      it('keeps a source-provided ability mod', async () => {
+        const raw = sourceCharacter();
+        raw.system.abilities.str = { value: 18, mod: 7 } as { value: number };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.abilities?.str).toEqual({ value: 18, mod: 7 });
+      });
+
+      it('sums class levels across multiclass items and derives the proficiency bonus', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.level).toBe(10);
+        expect(actor.attributes).toEqual({ prof: 4 });
+      });
+
+      it('keeps a source-provided details.level and does not compute proficiency', async () => {
+        const raw = sourceCharacter();
+        raw.system.details = { level: 5 } as { level: null };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.level).toBe(5);
+        expect(actor.attributes).toBeUndefined();
+      });
+
+      it('shows a flat AC, which dnd5e uses as-is', async () => {
+        const raw = sourceCharacter();
+        raw.system.attributes.ac = { flat: 17, calc: 'flat', formula: '' };
+
+        const actor = await mapActor(raw);
+
+        expect(actor.ac).toEqual({ value: 17 });
+        expect(actor.derivedUnavailable).not.toContain('ac');
+      });
+
+      it('marks a non-flat AC unavailable instead of using the stored flat value', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.ac).toBeUndefined();
+        expect(actor.derivedUnavailable).toContain('ac');
+      });
+
+      it('marks a null HP maximum unavailable', async () => {
+        const actor = await mapActor(sourceCharacter());
+
+        expect(actor.hp).toEqual({ value: 51, temp: 0 });
+        expect(actor.derivedUnavailable).toContain('hpMax');
+      });
+
+      it('leaves derivedUnavailable unset when every displayed value is present', async () => {
+        const raw = sourceCharacter();
+        raw.system.attributes = {
+          ac: { value: 15, flat: null, calc: 'default', formula: '' },
+          hp: { value: 51, max: 79, temp: 0 },
+        } as typeof raw.system.attributes;
+
+        const actor = await mapActor(raw);
+
+        expect(actor.ac).toEqual({ value: 15 });
+        expect(actor.hp?.max).toBe(79);
+        expect(actor.derivedUnavailable).toBeUndefined();
+      });
+
+      it('does not invent a level or proficiency bonus for an NPC', async () => {
+        const npc = {
+          _id: 'actor0000000000n',
+          name: 'Source Ogre',
+          type: 'npc',
+          system: {
+            details: { cr: 2 },
+            abilities: { str: { value: 19 }, int: { value: 5 } },
+            attributes: { hp: { value: 59, max: 59 } },
+          },
+          items: [],
+        };
+
+        const actor = await mapActor(npc);
+
+        expect(actor.level).toBeUndefined();
+        expect(actor.attributes).toBeUndefined();
+        expect(actor.hp).toEqual({ value: 59, max: 59 });
+        expect(actor.abilities).toEqual({
+          str: { value: 19, mod: 4 },
+          int: { value: 5, mod: -3 },
+        });
+        expect(actor.derivedUnavailable).toBeUndefined();
+      });
     });
 
     it('handshakes with the session cookie and the default socket path (#206, #231)', async () => {
@@ -1408,7 +1620,7 @@ describe('FoundryClient', () => {
         baseUrl: 'http://localhost:30000',
         apiKey: 'test-api-key',
       });
-      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: {} });
+      mockAxiosInstance.get.mockResolvedValue({ status: 200, data: { success: true, data: {} } });
 
       await restClient.connect();
       expect(restClient.isConnected()).toBe(true);

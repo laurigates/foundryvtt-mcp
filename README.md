@@ -58,6 +58,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
 - **MCP Resources** — target-qualified `foundry://targets/<target_id>/...` URIs; unqualified aliases remain available with one configured target.
 - **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
+- **Optional REST read augmentation** — a Socket.IO target can also use the [historical REST bridge](https://github.com/laurigates/foundryvtt-local-rest-api) for prepared actor values, Foundry's dice engine, compendium search and diagnostics. Native writes and the world cache stay on that target's Socket.IO connection; see [bridge configuration](docs/guides/configuration.md#optional-rest-bridge-augment).
 - **System and module bridges** — optional packages with fixed API operations, JSON results, target-scoped activation and package-specific compatibility checks.
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
@@ -171,7 +172,8 @@ providers, relay credentials, and several worlds, use the
 | `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user account |
 | `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT user password |
 | `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; selects `legacy-rest` by default |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; with `FOUNDRY_REST_URL` and native credentials, augments the single Socket.IO target |
+| `FOUNDRY_REST_URL` | No | Historical bridge URL (e.g. `http://localhost:3030`); without this URL or native credentials, a key retains `legacy-rest` |
 | `FOUNDRY_PROVIDER` | No | Explicit `socketio`, `legacy-rest`, `rest-api`, or `composite` |
 | `FOUNDRY_TARGETS_FILE` | No | JSON configuration for one or several explicit targets |
 | `FOUNDRY_TARGETS_JSON` | No | Inline alternative to `FOUNDRY_TARGETS_FILE` |
@@ -201,7 +203,7 @@ availability; `reconnect_target` recovers an individual configured connection.
 - `search_actors` — find characters, NPCs, monsters
 - `get_actor_details` — detailed character information
 - `search_items` — find equipment, spells, consumables
-- `search_compendium` — search enabled compendium packs by name/metadata (**requires REST mode with `FOUNDRY_API_KEY`**)
+- `search_compendium` — search enabled compendium packs by name/metadata (**requires the REST bridge**)
 - `get_scene_info` — current scene details
 - `search_journals` — search notes and handouts
 - `get_journal` — retrieve a specific journal entry
@@ -245,7 +247,9 @@ The selected connection/runtime user needs the appropriate permissions. Set
 - `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
   unsupported notation (`4d6kh3`, `1d20r1`, `*`) rejected rather than dropped.
   Additional notation depends on the provider: native local rolling is limited,
-  while the relay executes a Foundry Roll in its paired runtime
+  while the relay executes a Foundry Roll in its paired runtime. The historical
+  bridge also uses Foundry's dice engine; parentheses require that remote engine
+  and are rejected by the native local roller
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
@@ -257,7 +261,7 @@ records their availability and limitations. They do not implement game rules.
 - `generate_npc` — generate NPC text (not written to the world)
 - `generate_loot` — generate treasure text from a challenge rating (not written to the world)
 
-### Diagnostics (requires REST API module)
+### Diagnostics (logs and system health require the REST bridge)
 
 - `get_recent_logs` — retrieve filtered FoundryVTT logs
 - `search_logs` — search logs by pattern, listing the matching entries
@@ -284,7 +288,7 @@ and session information is added in `_meta`.
 - `foundry://combat` — active combat state; `combatants` are in initiative order, so
   `combat.turn` indexes them directly
 - `foundry://world/settings` — world and campaign settings
-- `foundry://system/diagnostics` — system diagnostics (requires REST API module)
+- `foundry://system/diagnostics` — system diagnostics (requires the REST bridge)
 
 ## Troubleshooting
 

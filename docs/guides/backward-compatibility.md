@@ -11,12 +11,19 @@ overhaul at `c3a729e86f452408c38d6fad9706157e812c1747`. It concerns this branch'
 configuration and application API, not a claim about a published npm release or
 support for additional Foundry versions.
 
+The upstream synchronization at `c410bd275705c168230335713c3ec6c4316bf825`
+also brings optional historical REST augmentation into the native provider.
+It retains the target-scoped catalog, sessions and integration runtime; the
+upstream single-client transport plan is applied within the selected provider.
+
 ## Preserved contracts
 
 | Existing usage | Behavior on this branch |
 |---|---|
 | `FOUNDRY_URL`, username/user ID, password and existing transport settings | Normalized into one target, `default` unless `FOUNDRY_TARGET_ID` is set; no target file is required |
-| `FOUNDRY_API_KEY` | Selects the historical `/api/*` bridge when no provider override is given; it is never reinterpreted as a relay credential |
+| `FOUNDRY_API_KEY` | Selects the historical `/api/*` bridge when no provider override is given; with `FOUNDRY_REST_URL` and native credentials it augments Socket.IO, otherwise it retains `legacy-rest`; it is never reinterpreted as a relay credential |
+| `FOUNDRY_REST_URL` with a historical bridge key and native credentials | Normalized into one Socket.IO target with `restUrl` and `restApiKey`; bridge reads augment that target, while native writes remain on Socket.IO |
+| Explicit native provider selection | `FOUNDRY_PROVIDER=socketio` is not switched to `legacy-rest` by a key alone; explicit target files keep their own provider/credential choices |
 | `FOUNDRY_WRITE_ENABLED=true` | Enables writes for the legacy single target only; the selected provider and remote permissions must also allow the operation |
 | Existing core tool names and parameters | Retained for supported operations; `target_id` is optional with exactly one configured target |
 | Core tool `content`, including `content[0]` | Kept in the handler's original order and shape; target information is added in `_meta`, without a text preamble |

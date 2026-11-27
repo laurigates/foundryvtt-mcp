@@ -1,6 +1,7 @@
 /** Transport-independent provider contracts. Every instance belongs to one target session. */
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { WorldSearchResults } from '../foundry/world-search.js';
+import type { Capability } from '../foundry/capabilities.js';
+import type { TransportMode } from '../foundry/transport.js';
 import type {
   ActorAttributeUpdateResult,
   ActorItemCreateSource,
@@ -23,10 +24,47 @@ import type {
   WorldScene,
   WorldUser,
 } from '../foundry/types.js';
+import type { WorldSearchResults } from '../foundry/world-search.js';
+
+/** Outcome of the last REST request; for the historical REST bridge. */
+export type RestState = 'ok' | 'unreachable' | 'server-error' | 'rejected' | 'invalid-response';
+
+/** Dual mode: bridge calls skipped until a cooldown ends. */
+export interface RestPause {
+  /** One capability (after its 5xx), or `bridge` for every call. */
+  scope: Capability | 'bridge';
+  /** The failure that started the pause. */
+  error: string;
+  retryInSeconds: number;
+}
+
+/** Both connections as `get_health_status` reports them. */
+export interface ConnectionReport {
+  mode: TransportMode;
+  socket: { used: boolean; connected: boolean };
+  rest: {
+    configured: boolean;
+    /** Origin and path of the REST base URL; credentials in it are never shown. */
+    baseUrl?: string;
+    /**
+     * The last REST request got an HTTP answer (any state but `unreachable`).
+     * Undefined until the first REST request (or the connect probe) completes.
+     */
+    reachable?: boolean;
+    /** Outcome of the last REST request; undefined before the first. */
+    state?: RestState;
+    /** Why the last REST request failed; absent when it succeeded. */
+    lastError?: string;
+    /** Dual mode: pauses still running; absent when none. */
+    paused?: RestPause[];
+  };
+}
 
 export interface FoundryClientConfig {
   baseUrl: string;
   apiKey?: string;
+  /** Optional historical bridge endpoint; explicit targets use restApiKey. */
+  restUrl?: string;
   username?: string;
   password?: string;
   userId?: string;
@@ -119,6 +157,13 @@ export interface FoundryCore {
   getWorldSummary(): Record<string, number>;
   rollDice(formula: string, reason?: string): Promise<DiceRoll>;
   testConnection(): Promise<boolean>;
+  getTransportMode?(): TransportMode;
+  getConnectionReport?(): ConnectionReport;
+  getTransportWarnings?(): readonly string[];
+  requestRestDiagnostics?<T = unknown>(
+    url: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<T>>;
   /** Historical diagnostics HTTP port; providers lacking diagnostics.read reject it. */
   get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>>;
 }
@@ -150,6 +195,8 @@ export interface FoundryProvider extends FoundryCore {
 }
 export interface SocketIOProviderConfig extends Omit<FoundryClientConfig, 'apiKey'> {
   kind: 'socketio';
+  /** Separate, explicit key for the optional historical REST bridge. */
+  restApiKey?: string;
 }
 export interface LegacyRestProviderConfig extends FoundryClientConfig {
   kind: 'legacy-rest';

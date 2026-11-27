@@ -14,7 +14,7 @@ The decisions below set the conventions that every Wave 4 mutation tool will inh
 
 ### Constraints already in place
 
-- **Transport**: Socket.IO is the canonical path. The REST API module (`apiKey` mode) is a secondary surface used today only for diagnostics and a few `/api/actors`-style queries.
+- **Transport**: Socket.IO is the canonical path. The REST API module (`apiKey` mode) is a secondary surface used today only for diagnostics and a few `/api/actors`-style queries. *(Note 2026-11-24: since [ADR-011](0011-dual-mode-transport.md) the REST bridge is an optional augment alongside Socket.IO; writes remain Socket.IO-only.)*
 - **No mutation methods on `FoundryClient`** today. Methods `searchActors`, `getActor`, `searchItems`, `getCombatState` are reads from the cached `WorldData`.
 - **Existing tool naming**: verb-first, snake_case, per-resource — `search_actors`, `get_actor_details`, `roll_dice`, `get_world_summary`.
 - **Game system targeted**: D&D 5e (`dnd5e` system in `WorldData`). Other systems are out of scope for Wave 4 but the conventions must not bake in 5e specifics where it's avoidable.

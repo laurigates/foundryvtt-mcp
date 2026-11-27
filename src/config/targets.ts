@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
+import { resolveTransportPlan } from '../foundry/transport.js';
 import type {
   ProviderConfig,
   RestApiProviderConfig,
@@ -20,13 +21,18 @@ const SocketProviderSchema = z
     username: z.string().optional(),
     password: z.string().optional(),
     userId: z.string().optional(),
+    restUrl: HttpUrl.optional(),
+    restApiKey: z.string().min(1).optional(),
     socketPath: z.string().default('/socket.io/'),
     timeout: z.number().int().positive().default(10000),
     retryAttempts: z.number().int().nonnegative().default(3),
     retryDelay: z.number().int().nonnegative().default(1000),
   })
   .strict();
-const LegacyRestProviderSchema = SocketProviderSchema.extend({
+const LegacyRestProviderSchema = SocketProviderSchema.omit({
+  restUrl: true,
+  restApiKey: true,
+}).extend({
   kind: z.literal('legacy-rest'),
   apiKey: z.string().min(1),
 });
@@ -75,6 +81,26 @@ const TargetSchema = z
   })
   .strict()
   .superRefine((target, ctx) => {
+    const socket =
+      target.provider.kind === 'composite'
+        ? target.provider.core
+        : target.provider.kind === 'socketio'
+          ? target.provider
+          : undefined;
+    if (socket && Boolean(socket.restUrl) !== Boolean(socket.restApiKey)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['provider'],
+        message: 'Socket.IO bridge augmentation requires both restUrl and restApiKey',
+      });
+    }
+    if (socket?.restUrl && !((socket.username || socket.userId) && socket.password)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['provider'],
+        message: 'Socket.IO bridge augmentation requires native username or userId and password',
+      });
+    }
     if (
       target.provider.kind === 'composite' &&
       !target.expectedWorldId &&
@@ -137,6 +163,7 @@ export interface TargetConfig {
 export interface LegacyFoundryConfig {
   url: string;
   apiKey?: string | undefined;
+  restUrl?: string | undefined;
   username?: string | undefined;
   password?: string | undefined;
   userId?: string | undefined;
@@ -157,7 +184,7 @@ function resolveProviderSecrets(input: unknown, env: NodeJS.ProcessEnv): unknown
     return input;
   }
   const result = { ...input };
-  for (const field of ['username', 'password', 'apiKey']) {
+  for (const field of ['username', 'password', 'apiKey', 'restApiKey']) {
     const reference = result[`${field}Env`];
     if (reference === undefined) {
       continue;
@@ -199,6 +226,8 @@ function socketConfig(
     ...(input.username !== undefined ? { username: input.username } : {}),
     ...(input.password !== undefined ? { password: input.password } : {}),
     ...(input.userId !== undefined ? { userId: input.userId } : {}),
+    ...(input.restUrl !== undefined ? { restUrl: input.restUrl } : {}),
+    ...(input.restApiKey !== undefined ? { restApiKey: input.restApiKey } : {}),
   };
 }
 
@@ -307,9 +336,15 @@ export function normalizeLegacyTarget(
   foundry: LegacyFoundryConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): TargetConfig {
-  const { url, apiKey, writeEnabled, ...socket } = foundry;
-  const kind = env.FOUNDRY_PROVIDER ?? (apiKey ? 'legacy-rest' : 'socketio');
-  const direct = { kind: 'socketio', baseUrl: url, ...socket };
+  const { url, apiKey, restUrl, writeEnabled, ...socket } = foundry;
+  const plan = resolveTransportPlan(foundry);
+  const kind = env.FOUNDRY_PROVIDER ?? (plan.mode === 'rest' ? 'legacy-rest' : 'socketio');
+  const direct = {
+    kind: 'socketio',
+    baseUrl: url,
+    ...socket,
+    ...(plan.mode === 'dual' ? { restUrl, restApiKey: apiKey } : {}),
+  };
   const relay = {
     kind: 'rest-api',
     relayUrl: env.FOUNDRY_REST_RELAY_URL,
@@ -324,7 +359,7 @@ export function normalizeLegacyTarget(
   if (kind === 'socketio') {
     provider = direct;
   } else if (kind === 'legacy-rest') {
-    provider = { ...direct, kind, apiKey };
+    provider = { kind, baseUrl: plan.restBaseUrl ?? url, ...socket, apiKey };
   } else if (kind === 'rest-api') {
     provider = relay;
   } else if (kind === 'composite') {
@@ -363,7 +398,11 @@ export function legacyConfigForTarget(target: TargetConfig): LegacyFoundryConfig
     retryAttempts: provider.kind === 'rest-api' ? 0 : (provider.retryAttempts ?? 3),
     retryDelay: provider.kind === 'rest-api' ? 0 : (provider.retryDelay ?? 1000),
     writeEnabled: target.writeEnabled,
-    ...('apiKey' in provider ? { apiKey: provider.apiKey } : {}),
+    ...(provider.kind === 'socketio' && provider.restApiKey !== undefined
+      ? { apiKey: provider.restApiKey, restUrl: provider.restUrl }
+      : 'apiKey' in provider
+        ? { apiKey: provider.apiKey }
+        : {}),
     ...('username' in provider && provider.username !== undefined
       ? { username: provider.username }
       : {}),

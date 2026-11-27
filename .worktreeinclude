@@ -1,0 +1,6 @@
+# Gitignored files Claude Code copies into new worktrees.
+# .env holds the Socket.IO credentials; .env.integration holds the license key
+# and foundryvtt.com login the integration tier's container needs (#251).
+.env
+.env.integration
+.claude/settings.local.json

@@ -150,6 +150,27 @@ describe('handleSearchActors', () => {
     expect(text).toContain('HP: Unknown/Unknown');
   });
 
+  it('labels an HP maximum the game system derives client-side (#308)', async () => {
+    const actors: FoundryActor[] = [
+      buildActor({ name: 'Source Paladin', hp: { value: 51 }, derivedUnavailable: ['hpMax'] }),
+    ];
+    const client = {
+      searchActors: vi.fn().mockResolvedValue({
+        actors,
+        total: 1,
+        page: 1,
+        limit: 10,
+      } satisfies ActorSearchResult),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleSearchActors({ query: '' }, client));
+
+    expect(text).toContain(
+      '**Source Paladin** (character) - Level 3 - HP: 51 (max not available in Socket.IO mode)',
+    );
+    expect(text).not.toContain('Unknown');
+  });
+
   it('wraps client errors in McpError', async () => {
     const client = {
       searchActors: vi.fn().mockRejectedValue(new Error('boom')),
@@ -271,11 +292,81 @@ describe('handleGetActorDetails', () => {
     expect(text).toContain('**STR:** 8 (-1)');
   });
 
+  describe('values the game system derives client-side (#308)', () => {
+    const LABEL = 'not available in Socket.IO mode (computed client-side by the game system)';
+
+    it('labels an unavailable armor class instead of printing Unknown', async () => {
+      const actor = buildActor({ ac: undefined, derivedUnavailable: ['ac'] });
+      const client = { getActor: vi.fn().mockResolvedValue(actor) } as unknown as FoundryClient;
+
+      const text = getText(await handleGetActorDetails({ actorId: actor._id }, client));
+
+      expect(text).toContain(`**Armor Class:** ${LABEL}`);
+      expect(text).not.toContain('**Armor Class:** Unknown');
+    });
+
+    it('labels an unavailable HP maximum and keeps the current HP', async () => {
+      const actor = buildActor({ hp: { value: 51 }, derivedUnavailable: ['hpMax'] });
+      const client = { getActor: vi.fn().mockResolvedValue(actor) } as unknown as FoundryClient;
+
+      const text = getText(await handleGetActorDetails({ actorId: actor._id }, client));
+
+      expect(text).toContain(`**Hit Points:** 51, max ${LABEL}`);
+    });
+
+    it('prints the proficiency bonus when it is known', async () => {
+      const actor = buildActor({ level: 10, attributes: { prof: 4 } });
+      const client = { getActor: vi.fn().mockResolvedValue(actor) } as unknown as FoundryClient;
+
+      const text = getText(await handleGetActorDetails({ actorId: actor._id }, client));
+
+      expect(text).toContain('**Proficiency Bonus:** +4');
+    });
+
+    it('omits the proficiency bonus line when it is not known', async () => {
+      const actor = buildActor();
+      const client = { getActor: vi.fn().mockResolvedValue(actor) } as unknown as FoundryClient;
+
+      const text = getText(await handleGetActorDetails({ actorId: actor._id }, client));
+
+      expect(text).not.toContain('Proficiency Bonus');
+    });
+  });
+
   it('wraps fetch errors in McpError', async () => {
     const client = {
       getActor: vi.fn().mockRejectedValue(new Error('not found')),
     } as unknown as FoundryClient;
 
     await expect(handleGetActorDetails({ actorId: 'actor-1' }, client)).rejects.toThrow(McpError);
+  });
+});
+
+describe('handleGetActorDetails saving throws (REST bridge augment)', () => {
+  it('lists save totals when the actor carries them', async () => {
+    const client = {
+      getActor: vi.fn().mockResolvedValue(
+        buildActor({
+          abilities: {
+            str: { value: 16, mod: 3, save: 5 },
+            dex: { value: 14, mod: 2, save: -1 },
+          },
+        }),
+      ),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleGetActorDetails({ actorId: 'actor-1' }, client));
+
+    expect(text).toContain('**Saving Throws:** STR +5, DEX -1');
+  });
+
+  it('omits the line when no save total is known (Socket.IO source data)', async () => {
+    const client = {
+      getActor: vi.fn().mockResolvedValue(buildActor()),
+    } as unknown as FoundryClient;
+
+    const text = getText(await handleGetActorDetails({ actorId: 'actor-1' }, client));
+
+    expect(text).not.toContain('Saving Throws');
   });
 });

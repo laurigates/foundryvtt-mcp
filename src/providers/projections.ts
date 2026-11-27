@@ -2,7 +2,13 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import type { FoundryActor, FoundryItem, WorldActor, WorldItem } from '../foundry/types.js';
+import type {
+  DerivedActorField,
+  FoundryActor,
+  FoundryItem,
+  WorldActor,
+  WorldItem,
+} from '../foundry/types.js';
 import { defaultPackageRoot, IntegrationManifestSchema } from '../integrations/manifest.js';
 import {
   type IntegrationCompatibility,
@@ -33,6 +39,30 @@ const ProjectionSchema = z.object({
   fields: z.record(z.string(), z.string()).default({}),
   itemFields: z.record(z.string(), z.string()).default({}),
   abilities: z.string().optional(),
+  /** Only system packages that declare compatible display fields accept prepared overlays. */
+  preparedActorValues: z.boolean().default(false),
+  derived: z
+    .object({
+      abilityModifier: z.object({ offset: z.number(), divisor: z.number().positive() }).optional(),
+      level: z.object({ actorType: z.string(), itemType: z.string(), path: z.string() }).optional(),
+      proficiency: z
+        .object({
+          path: z.string(),
+          levelOffset: z.number(),
+          step: z.number().positive(),
+          base: z.number(),
+        })
+        .optional(),
+      ac: z
+        .object({
+          calculationPath: z.string(),
+          flatValuePath: z.string(),
+          flatMode: z.string(),
+        })
+        .optional(),
+      unavailable: z.object({ hpMax: z.string().optional(), ac: z.string().optional() }).optional(),
+    })
+    .optional(),
   bounds: z.array(BoundSchema).default([]),
 });
 type Projection = z.infer<typeof ProjectionSchema>;
@@ -195,13 +225,42 @@ export function projectActor(
   if (Object.keys(hp).length > 0) {
     actor.hp = hp;
   }
-  const ac = value('ac');
+  let ac = value('ac');
+  const acRule = config.derived?.ac;
+  if (
+    typeof ac !== 'number' &&
+    acRule &&
+    readPath(raw.system, acRule.calculationPath) === acRule.flatMode
+  ) {
+    ac = readPath(raw.system, acRule.flatValuePath);
+  }
   if (typeof ac === 'number') {
     actor.ac = { value: ac };
   }
-  const level = value('level');
+  let level = value('level');
+  const levelRule = config.derived?.level;
+  if (typeof level !== 'number' && levelRule && raw.type === levelRule.actorType) {
+    const levels = (raw.items ?? [])
+      .filter((item) => item.type === levelRule.itemType)
+      .map((item) => readPath(item, levelRule.path))
+      .filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry));
+    if (levels.length > 0) {
+      level = levels.reduce((total, entry) => total + entry, 0);
+    }
+  }
   if (typeof level === 'number') {
     actor.level = level;
+  }
+  const proficiencyRule = config.derived?.proficiency;
+  if (proficiencyRule && raw.type === levelRule?.actorType && typeof level === 'number') {
+    const prepared = readPath(raw.system, proficiencyRule.path);
+    actor.attributes = {
+      prof:
+        typeof prepared === 'number'
+          ? prepared
+          : Math.floor((level - proficiencyRule.levelOffset) / proficiencyRule.step) +
+            proficiencyRule.base,
+    };
   }
   const bio = value('biography');
   if (typeof bio === 'string') {
@@ -212,8 +271,12 @@ export function projectActor(
     actor.abilities = {};
     for (const [key, entry] of Object.entries(abilities)) {
       const score = readPath(entry, 'value');
-      const modifier = readPath(entry, 'mod');
+      let modifier = readPath(entry, 'mod');
       const save = readPath(entry, 'save');
+      const modifierRule = config.derived?.abilityModifier;
+      if (typeof modifier !== 'number' && typeof score === 'number' && modifierRule) {
+        modifier = Math.floor((score - modifierRule.offset) / modifierRule.divisor);
+      }
       if (typeof score !== 'number' || typeof modifier !== 'number') {
         continue;
       }
@@ -223,7 +286,36 @@ export function projectActor(
       }
     }
   }
+  const unavailable: DerivedActorField[] = [];
+  if (
+    config.derived?.unavailable?.hpMax &&
+    readPath(raw.system, config.derived.unavailable.hpMax) &&
+    typeof hpMax !== 'number'
+  ) {
+    unavailable.push('hpMax');
+  }
+  if (
+    config.derived?.unavailable?.ac &&
+    readPath(raw.system, config.derived.unavailable.ac) &&
+    typeof ac !== 'number'
+  ) {
+    unavailable.push('ac');
+  }
+  if (unavailable.length > 0) {
+    actor.derivedUnavailable = unavailable;
+  }
   return actor;
+}
+
+export function supportsPreparedActorProjection(
+  systemId: string,
+  foundryVersion?: string,
+  packageRoot?: string,
+  systemVersion?: string,
+): boolean {
+  return (
+    descriptor(systemId, foundryVersion, packageRoot, systemVersion)?.preparedActorValues === true
+  );
 }
 
 export function projectItem(

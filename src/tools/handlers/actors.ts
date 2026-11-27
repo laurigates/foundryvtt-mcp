@@ -5,8 +5,27 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { FoundryActor } from '../../foundry/types.js';
 import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
+
+/**
+ * Printed for a value the game system computes client-side and the Socket.IO
+ * source data does not carry (#308). `Unknown` or `+0` would read as real data.
+ */
+const DERIVED_UNAVAILABLE =
+  'not available in Socket.IO mode (computed client-side by the game system)';
+
+function formatBonus(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
+function isDerivedUnavailable(
+  actor: FoundryActor,
+  field: NonNullable<FoundryActor['derivedUnavailable']>[number],
+): boolean {
+  return actor.derivedUnavailable?.includes(field) ?? false;
+}
 
 /**
  * Handles actor search requests
@@ -32,10 +51,12 @@ export async function handleSearchActors(
     const result = await provider.searchActors(searchParams);
 
     const actorList = result.actors
-      .map(
-        (actor) =>
-          `- **${actor.name}** (${actor.type}) - Level ${actor.level ?? 'Unknown'} - HP: ${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}`,
-      )
+      .map((actor) => {
+        const hpText = isDerivedUnavailable(actor, 'hpMax')
+          ? `${actor.hp?.value ?? 'Unknown'} (max not available in Socket.IO mode)`
+          : `${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}`;
+        return `- **${actor.name}** (${actor.type}) - Level ${actor.level ?? 'Unknown'} - HP: ${hpText}`;
+      })
       .join('\n');
 
     return {
@@ -83,18 +104,33 @@ export async function handleGetActorDetails(
           .join('\n')
       : 'No ability scores available';
 
+    const hitPoints = isDerivedUnavailable(actor, 'hpMax')
+      ? `${actor.hp?.value ?? 'Unknown'}, max ${DERIVED_UNAVAILABLE}`
+      : `${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}`;
+    const armorClass = isDerivedUnavailable(actor, 'ac')
+      ? DERIVED_UNAVAILABLE
+      : (actor.ac?.value ?? 'Unknown');
+    const prof = actor.attributes?.prof;
+    const proficiencyLine =
+      typeof prof === 'number' ? `\n**Proficiency Bonus:** ${formatBonus(prof)}` : '';
+    // Save totals are prepared values: only the REST bridge reports them.
+    const saves = Object.entries(actor.abilities ?? {}).flatMap(([key, ability]) =>
+      typeof ability.save === 'number' ? [`${key.toUpperCase()} ${formatBonus(ability.save)}`] : [],
+    );
+    const savesLine = saves.length > 0 ? `\n**Saving Throws:** ${saves.join(', ')}` : '';
+
     return {
       content: [
         {
           type: 'text',
           text: `🎭 **Actor Details: ${actor.name}**
 **Type:** ${actor.type}
-**Level:** ${actor.level ?? 'Unknown'}
-**Hit Points:** ${actor.hp?.value ?? 'Unknown'}/${actor.hp?.max ?? 'Unknown'}
-**Armor Class:** ${actor.ac?.value ?? 'Unknown'}
+**Level:** ${actor.level ?? 'Unknown'}${proficiencyLine}
+**Hit Points:** ${hitPoints}
+**Armor Class:** ${armorClass}
 
 **Ability Scores:**
-${abilities}
+${abilities}${savesLine}
 
 **Description:** ${(actor as { description?: string }).description || 'No description available.'}`,
         },

@@ -17,12 +17,14 @@ Read this before changing document reads, writes, providers, integration binding
 
 | Provider | Core reads/writes | Integration execution |
 |---|---|---|
-| `socketio` | Direct authenticated Foundry world; cache with native document broadcasts; opt-in core writes through `modifyDocument` | No generic runtime binding executor |
+| `socketio` | Direct authenticated Foundry world; cache with native document broadcasts; opt-in core writes through `modifyDocument`; optional historical REST read augmentation | No generic runtime binding executor |
 | `legacy-rest` | Historical `/api/*` bridge; different capabilities, no native Socket.IO write path | No paired relay execution |
 | `rest-api` | Paired runtime/relay snapshot and opt-in document writes using Foundry's runtime document APIs | Fixed package-owned JS bindings over `execute-js` |
 | `composite` | Socket.IO for core operations and write protocol | Paired relay for packaged integration bindings on the same identity-verified world |
 
-In legacy environment configuration, `FOUNDRY_API_KEY` chooses **`legacy-rest`**, not the ThreeHats relay. The relay uses separate `FOUNDRY_REST_*` settings or an explicit target provider. Explicit target lists do not inherit the global write flag. Verify remote world/origin and permissions before enabling writes.
+In legacy environment configuration, `FOUNDRY_API_KEY` with `FOUNDRY_REST_URL` and native credentials augments the Socket.IO target with the historical bridge. A key without that complete combination retains **`legacy-rest`**. An explicit native target uses `restUrl` and `restApiKey` (or `restApiKeyEnv`) for the same augmentation. The ThreeHats relay uses separate `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` settings. Explicit target lists do not inherit global credentials or the global write flag. Verify remote world/origin and permissions before enabling writes.
+
+Historical bridge reads may fall back to their native/local answer. Transport failures pause the optional bridge and server failures pause a capability for 30 seconds. This read policy does not apply to mutations: writes stay on their selected native/relay path and an unknown outcome must never trigger fallback or replay. A native target remains usable when its optional historical bridge fails; a composite still requires its paired relay.
 
 ## Native Socket.IO document writes
 
@@ -44,11 +46,14 @@ socket.emit("modifyDocument", {
 }, acknowledgement)
 ```
 
-The response includes `result` and may include `error`. Actor `system` changes use dot-notated `system.*` keys. Do not invent packet shapes or bypass the provider's write guard. The exact wire contract may change by Foundry version.
+The response includes `type`, `action`, `operation`, `userId` and `result`, and may include `error`. Foundry v14 adds `timestamp` and `sideEffect`. When the operation causes further server-side changes, v14 can return `{ results: [...] }` with side-effect responses and the primary response. Check every entry for an error; the wrapper need not have a top-level error. The provider returns the primary entry's result. Creating an active Combat while another is active is one source of this response shape.
+
+Actor `system` changes use dot-notated `system.*` keys. Do not invent packet shapes or bypass the provider's write guard. The exact wire contract may change by Foundry version.
 
 ### Cache and acknowledgements
 
-- `src/foundry/world-cache.ts` applies native `modifyDocument` broadcasts; do **not** also mutate the cache manually in a document method. Map new supported document types into the cache helper.
+- `src/foundry/world-cache.ts` applies native `modifyDocument` broadcasts and the ordered entries of v14 `modifyDocumentBatch` events (`{ results: [...] }`). Do **not** mutate the cache manually in an individual document method; keep common acknowledgement and broadcast handling centralized.
+- Add new supported document types to `TOP_LEVEL_COLLECTIONS` or `EMBEDDED_COLLECTIONS`. Unmapped and invalid payloads must not corrupt unrelated cached collections.
 - Synthetic unlinked-token actors (`Scene.<sid>.Token.<tid>.Actor.<aid>`) cannot be fully updated by the generic world cache and may require `refresh_world_data`.
 - A timeout, lost acknowledgement or connection change after dispatch can leave a mutation's outcome **unknown**. Report `outcome_unknown`; never automatically resend the write.
 - Every target has its own cache, serialized operation queue, generation and pending-work set. A reconnect may invalidate an old response; it must not cancel another target's work.
@@ -65,9 +70,9 @@ There is no free-form JavaScript MCP tool. The Python worker is an optional per-
 
 ## Verify the native protocol against Foundry itself
 
-The historic native protocol implementation was checked against unminified **Foundry v13.348** application source (`client/data/client-backend.mjs`, `client/helpers/socket-interface.mjs` and common socket types). The repository's later test container is pinned to **v14.367**, and the wire contract has not been confirmed against that version by the historical check.
+The upstream [wire-shape record](../../docs/adrs/0014-foundry-v13-v14-wire-shapes.md) compares Foundry **v13.348** and **v14.369** application source. It records the v14 side-effect acknowledgement and batch-broadcast shapes; it does not establish a live round-trip result for this target-scoped branch. The regression coverage is in `src/foundry/__tests__/modify-document-v14.test.ts` and the provider/cache suites.
 
-Do **not** claim current v14 write compatibility based on the v13 verification. Obtain a licensed, disposable v14 build for verification rather than upgrading or mutating an unrelated persistent Foundry installation; inspect the actual runtime source and test one reversible round-trip in an isolated world.
+Relevant application files are `client/data/client-backend.mjs`, `common/abstract/socket.mjs`, `common/abstract/_types.mjs` and `dist/database/backend/server-backend.mjs`; v13 and v14 archives have different root layouts. Inspect a licensed build matching the target version without copying proprietary runtime source into this repository. A new write feature also needs a reversible round-trip in a disposable world before live compatibility is claimed.
 
 ## Other operations and safety boundaries
 

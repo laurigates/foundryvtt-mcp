@@ -62,9 +62,7 @@ writeFileSync(
 // source of configuration — an inherited FOUNDRY_URL would make this pass
 // regardless of whether the file was read.
 const childEnv = Object.fromEntries(
-  Object.entries(process.env).filter(
-    ([key]) => !key.startsWith('FOUNDRY_') && key !== 'LOG_LEVEL',
-  ),
+  Object.entries(process.env).filter(([key]) => !key.startsWith('FOUNDRY_') && key !== 'LOG_LEVEL'),
 );
 
 const child = spawn('node', [serverPath], {
@@ -83,7 +81,9 @@ child.stdout.on('data', (chunk) => {
 
 child.stderr.on('data', (chunk) => {
   stderr += chunk.toString();
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   if (stderr.includes(CONFIG_FAILURE)) {
     finish(false, 'configuration validation failed — the .env file was not loaded in time');
     return;
@@ -94,22 +94,30 @@ child.stderr.on('data', (chunk) => {
 });
 
 child.on('exit', (code, signal) => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `server exited prematurely (code=${code}, signal=${signal})`);
 });
 
 child.on('error', (err) => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `failed to spawn server: ${err.message}`);
 });
 
 const timeout = setTimeout(() => {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   finish(false, `timed out after ${STARTUP_TIMEOUT_MS}ms waiting for banner`);
 }, STARTUP_TIMEOUT_MS);
 
 function finish(success, message) {
-  if (resolved) return;
+  if (resolved) {
+    return;
+  }
   resolved = true;
   clearTimeout(timeout);
 
