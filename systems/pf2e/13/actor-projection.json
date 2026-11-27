@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "fields": {
+    "hpValue": "attributes.hp.value",
+    "hpMax": "attributes.hp.max",
+    "hpTemp": "attributes.hp.temp",
+    "ac": "attributes.ac.value"
+  },
+  "derived": {
+    "unavailable": {
+      "hpMax": "attributes.hp",
+      "ac": "attributes.ac"
+    }
+  }
+}

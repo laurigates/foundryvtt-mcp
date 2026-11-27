@@ -2,8 +2,8 @@ import { access, readFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
+import { createContractAjv } from '../ajv.js';
 import { loadIntegrations } from '../manifest.js';
 
 async function runBinding(path: string, context: Record<string, unknown>): Promise<unknown> {
@@ -13,19 +13,30 @@ async function runBinding(path: string, context: Record<string, unknown>): Promi
 
 const packageRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const packages = await loadIntegrations(packageRoot);
-const packageDirectories = packages.map((pkg) => relative(packageRoot, pkg.root).replaceAll('\\', '/'));
-const recipeDirectories = (await Promise.all(packageDirectories.map(async (directory) => {
-  try {
-    await access(new URL(`../../../${directory}/examples/workflows.json`, import.meta.url));
-    return directory;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined;
-    throw error;
-  }
-}))).filter((directory): directory is string => directory !== undefined);
+const packageDirectories = packages.map((pkg) =>
+  relative(packageRoot, pkg.root).replaceAll('\\', '/'),
+);
+const recipeDirectories = (
+  await Promise.all(
+    packageDirectories.map(async (directory) => {
+      try {
+        await access(new URL(`../../../${directory}/examples/workflows.json`, import.meta.url));
+        return directory;
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          return undefined;
+        }
+        throw error;
+      }
+    }),
+  )
+).filter((directory): directory is string => directory !== undefined);
 const systemDirectories = packages
   .filter(({ manifest }) => manifest.kind === 'system' && ['dnd5e', 'pf2e'].includes(manifest.id))
-  .map(({ manifest, root }) => [manifest.id, relative(packageRoot, root).replaceAll('\\', '/')] as const);
+  .map(
+    ({ manifest, root }) =>
+      [manifest.id, relative(packageRoot, root).replaceAll('\\', '/')] as const,
+  );
 const itemPilesDirectories = packages
   .filter(({ manifest }) => manifest.kind === 'module' && manifest.id === 'item-piles')
   .map(({ root }) => relative(packageRoot, root).replaceAll('\\', '/'));
@@ -43,7 +54,7 @@ describe('fixed runtime bindings', () => {
           outputSchema: Record<string, unknown>;
         }>;
       };
-      const ajv = new Ajv({ allErrors: true, strict: true });
+      const ajv = createContractAjv();
       for (const operation of manifest.operations) {
         expect(
           () => ajv.compile(operation.inputSchema),
@@ -80,7 +91,7 @@ describe('fixed runtime bindings', () => {
         calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
         workflows: Array<{ id: string; steps: string[] }>;
       };
-      const ajv = new Ajv({ allErrors: true, strict: true });
+      const ajv = createContractAjv();
       const validators = new Map(
         manifest.operations.map(
           (operation) =>
@@ -117,7 +128,10 @@ describe('fixed runtime bindings', () => {
         }
       }
       for (const workflow of recipes.workflows) {
-        expect(workflow.steps.every((id) => ids.has(id)), workflow.id).toBe(true);
+        expect(
+          workflow.steps.every((id) => ids.has(id)),
+          workflow.id,
+        ).toBe(true);
       }
       const invalid: Array<[string, Record<string, unknown>]> = [
         ['add_items', { actor_uuid: 'Actor.a', items: [{ item_uuid: 'Item.a', quantity: 0 }] }],
@@ -177,50 +191,56 @@ describe('fixed runtime bindings', () => {
     ).rejects.toThrow('requires the dnd5e system');
   });
 
-  it.each(itemPilesDirectories)('uses the %s public API and returns plain item summaries', async (directory) => {
-    const actor = { documentName: 'Actor' };
-    const item = {
-      id: '2',
-      uuid: 'Actor.1.Item.2',
-      name: 'Potion',
-      type: 'consumable',
-      parent: actor,
-    };
-    const calls: unknown[] = [];
-    const result = await runBinding(`${directory}/get_items.js`, {
-      game: {
-        ready: true,
-        user: { id: 'gm', isGM: true },
-        modules: new Map([['item-piles', { active: true }]]),
-        itempiles: {
-          API: {
-            getActorItems: (target: unknown) => {
-              calls.push(target);
-              return [item];
-            },
-            getItemQuantity: (target: unknown) => {
-              expect(target).toBe(item);
-              return 3;
+  it.each(itemPilesDirectories)(
+    'uses the %s public API and returns plain item summaries',
+    async (directory) => {
+      const actor = { documentName: 'Actor' };
+      const item = {
+        id: '2',
+        uuid: 'Actor.1.Item.2',
+        name: 'Potion',
+        type: 'consumable',
+        parent: actor,
+      };
+      const calls: unknown[] = [];
+      const result = await runBinding(`${directory}/get_items.js`, {
+        game: {
+          ready: true,
+          user: { id: 'gm', isGM: true },
+          modules: new Map([['item-piles', { active: true }]]),
+          itempiles: {
+            API: {
+              getActorItems: (target: unknown) => {
+                calls.push(target);
+                return [item];
+              },
+              getItemQuantity: (target: unknown) => {
+                expect(target).toBe(item);
+                return 3;
+              },
             },
           },
         },
-      },
-      args: { actor_uuid: 'Actor.1' },
-      fromUuid: async () => actor,
-    });
-    expect(calls).toEqual([actor]);
-    expect(result).toEqual([
-      { id: '2', uuid: 'Actor.1.Item.2', name: 'Potion', type: 'consumable', quantity: 3 },
-    ]);
-    expect(JSON.stringify(result)).not.toContain('parent');
-  });
+        args: { actor_uuid: 'Actor.1' },
+        fromUuid: async () => actor,
+      });
+      expect(calls).toEqual([actor]);
+      expect(result).toEqual([
+        { id: '2', uuid: 'Actor.1.Item.2', name: 'Potion', type: 'consumable', quantity: 3 },
+      ]);
+      expect(JSON.stringify(result)).not.toContain('parent');
+    },
+  );
 
-  it.each(itemPilesDirectories)('does not equate an active %s module with a ready public API', async (directory) => {
-    expect(
-      await runBinding(`${directory}/probe.js`, {
-        game: { ready: true, modules: new Map([['item-piles', { active: true }]]) },
-        fromUuid: async () => null,
-      }),
-    ).toMatchObject({ ready: false });
-  });
+  it.each(itemPilesDirectories)(
+    'does not equate an active %s module with a ready public API',
+    async (directory) => {
+      expect(
+        await runBinding(`${directory}/probe.js`, {
+          game: { ready: true, modules: new Map([['item-piles', { active: true }]]) },
+          fromUuid: async () => null,
+        }),
+      ).toMatchObject({ ready: false });
+    },
+  );
 });

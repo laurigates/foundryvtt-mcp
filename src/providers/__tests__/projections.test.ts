@@ -25,7 +25,9 @@ afterEach(async () => {
 
 describe('system-owned source derivation', () => {
   const source: WorldActor = {
-    _id: 'aaaaaaaaaaaaaaaa', name: 'Paladin', type: 'character',
+    _id: 'aaaaaaaaaaaaaaaa',
+    name: 'Paladin',
+    type: 'character',
     system: {
       details: { level: null },
       abilities: { str: { value: 18 }, dex: { value: 11 } },
@@ -57,19 +59,53 @@ describe('system-owned source derivation', () => {
     expect(projectActor(flat, 'dnd5e', version).derivedUnavailable).toBeUndefined();
   });
 
-  it.each([['another-system', '14.369'], ['dnd5e', '15.400']])(
-    'keeps raw data for unsupported system/generation %s %s',
-    (system, version) => {
-      const actor = projectActor(source, system, version);
-      expect(actor).toEqual({
-        _id: source._id,
-        name: source.name,
-        type: source.type,
-        data: source.system,
-      });
-      expect(supportsPreparedActorProjection(system, version)).toBe(false);
+  it.each([
+    ['another-system', '14.369'],
+    ['dnd5e', '15.400'],
+  ])('keeps raw data for unsupported system/generation %s %s', (system, version) => {
+    const actor = projectActor(source, system, version);
+    expect(actor).toEqual({
+      _id: source._id,
+      name: source.name,
+      type: source.type,
+      data: source.system,
+    });
+    expect(supportsPreparedActorProjection(system, version)).toBe(false);
+  });
+
+  // PF2e has no derived display fields of its own; the projection restores the HP
+  // and AC values the pre-projection client mapped generically from system.attributes.
+  it.each(['13.348', '14.369'])(
+    'projects PF2e HP and AC from source attributes for %s',
+    (version) => {
+      const pf2e: WorldActor = {
+        _id: 'bbbbbbbbbbbbbbbb',
+        name: 'Goblin',
+        type: 'npc',
+        system: {
+          details: { level: { value: 5 } },
+          attributes: { hp: { value: 12, max: 18, temp: 2 }, ac: { value: 17 } },
+        },
+      };
+      const actor = projectActor(pf2e, 'pf2e', version);
+      expect(actor.hp).toEqual({ value: 12, max: 18, temp: 2 });
+      expect(actor.ac).toEqual({ value: 17 });
+      expect(actor.level).toBeUndefined();
+      expect(actor.derivedUnavailable).toBeUndefined();
     },
   );
+
+  it('reports PF2e HP as unavailable instead of defaulting a missing maximum to zero', () => {
+    const pf2e: WorldActor = {
+      _id: 'cccccccccccccccc',
+      name: 'Goblin',
+      type: 'npc',
+      system: { attributes: { hp: { value: 12 } } },
+    };
+    const actor = projectActor(pf2e, 'pf2e', '14.369');
+    expect(actor.hp).toEqual({ value: 12 });
+    expect(actor.derivedUnavailable).toEqual(['hpMax']);
+  });
 });
 
 async function fixtureRoot(): Promise<string> {
@@ -95,15 +131,17 @@ function manifest(
     status: 'experimental',
     upstream: { repository: null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: { foundryVersions: [], integrationVersions: [], tested: [], ...compatibility },
-    operations: [{
-      id: 'read',
-      description: 'Read fixture data',
-      inputSchema: { type: 'object', additionalProperties: false },
-      outputSchema: { type: 'object', additionalProperties: true },
-      binding: 'binding.js',
-      probe: 'probe.js',
-      readOnly: true,
-    }],
+    operations: [
+      {
+        id: 'read',
+        description: 'Read fixture data',
+        inputSchema: { type: 'object', additionalProperties: false },
+        outputSchema: { type: 'object', additionalProperties: true },
+        binding: 'binding.js',
+        probe: 'probe.js',
+        readOnly: true,
+      },
+    ],
   };
 }
 
@@ -150,7 +188,10 @@ async function fixture(
 
 function actor(): WorldActor {
   return {
-    _id: 'hero', name: 'Hero', type: 'character', img: 'hero.webp',
+    _id: 'hero',
+    name: 'Hero',
+    type: 'character',
+    img: 'hero.webp',
     system: {
       old: { hp: 13, max: 26 },
       current: { hp: 14, max: 28 },
@@ -161,7 +202,9 @@ function actor(): WorldActor {
 
 function item(): WorldItem {
   return {
-    _id: 'item', name: 'Item', type: 'equipment',
+    _id: 'item',
+    name: 'Item',
+    type: 'equipment',
     system: {
       old: { description: 'Generation 13', rarity: 'common' },
       current: { description: 'Generation 14', rarity: 'rare' },
@@ -190,11 +233,18 @@ function validate(
 function expectRaw(root: string, version: string | undefined, systemVersion?: string): void {
   const raw = actor();
   expect(projectActor(raw, systemId, version, root, systemVersion)).toEqual({
-    _id: raw._id, name: raw.name, type: raw.type, img: raw.img, data: raw.system,
+    _id: raw._id,
+    name: raw.name,
+    type: raw.type,
+    img: raw.img,
+    data: raw.system,
   });
   const rawItem = item();
   expect(projectItem(rawItem, systemId, version, root, systemVersion)).toEqual({
-    _id: rawItem._id, name: rawItem.name, type: rawItem.type, data: rawItem.system,
+    _id: rawItem._id,
+    name: rawItem.name,
+    type: rawItem.type,
+    data: rawItem.system,
   });
   expect(() => validate(root, version, 999, systemVersion)).not.toThrow();
   expect(() => validate(root, version, Number.NaN, systemVersion)).toThrow(/finite scalar/);
@@ -203,7 +253,9 @@ function expectRaw(root: string, version: string | undefined, systemVersion?: st
 describe('generation-specific Actor and Item projections', () => {
   it('shares exact compatibility filters with runtime adapter selection', () => {
     const compatible = {
-      systems: [systemId], foundryVersions: ['14.370'], integrationVersions: ['1.0'],
+      systems: [systemId],
+      foundryVersions: ['14.370'],
+      integrationVersions: ['1.0'],
     };
     const observed = { systemId, foundryVersion: '14.370', integrationVersion: '1.0' };
     expect(matchesIntegrationCompatibility(compatible, observed)).toBe(true);
@@ -265,13 +317,17 @@ describe('generation-specific Actor and Item projections', () => {
     await fixture(root, 14, { compatibility: { integrationVersions: ['1.0'] } });
     vi.spyOn(manifests, 'defaultPackageRoot').mockReturnValue(root);
     const provider = new SocketIOProvider({
-      kind: 'socketio', baseUrl: 'https://foundry.example', writeEnabled: true,
+      kind: 'socketio',
+      baseUrl: 'https://foundry.example',
+      writeEnabled: true,
     });
     const raw = { ...actor(), _id: 'aaaaaaaaaaaaaaaa' };
     const worldData = {
       world: { id: 'world', title: 'World' },
       release: { version: '14.370' },
-      system: { id: systemId, version: '1.0' }, actors: [raw], items: [item()],
+      system: { id: systemId, version: '1.0' },
+      actors: [raw],
+      items: [item()],
     };
     Reflect.set(provider, 'worldData', worldData);
     Reflect.set(provider, 'socket', { connected: true });
@@ -282,8 +338,9 @@ describe('generation-specific Actor and Item projections', () => {
     expect((await provider.getActor(raw._id)).hp?.value).toBe(14);
     expect((await provider.searchActors({})).actors[0]?.hp?.value).toBe(14);
     expect((await provider.searchItems({})).items[0]?.rarity).toBe('rare');
-    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }))
-      .rejects.toThrow(/between 0 and 10/);
+    await expect(
+      provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }),
+    ).rejects.toThrow(/between 0 and 10/);
     expect(dispatch).not.toHaveBeenCalled();
 
     worldData.system.version = '2.0';
@@ -295,15 +352,18 @@ describe('generation-specific Actor and Item projections', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledWith('Actor', 'update', {
       updates: [{ _id: raw._id, 'system.attributes.resource': 11 }],
-      diff: true, recursive: true,
+      diff: true,
+      recursive: true,
     });
-    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': Number.NaN }))
-      .rejects.toThrow(/finite scalar/);
+    await expect(
+      provider.updateActorAttribute(raw._id, { 'attributes.resource': Number.NaN }),
+    ).rejects.toThrow(/finite scalar/);
     expect(dispatch).toHaveBeenCalledTimes(1);
 
     worldData.system.version = '1.0';
-    await expect(provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }))
-      .rejects.toThrow(/between 0 and 10/);
+    await expect(
+      provider.updateActorAttribute(raw._id, { 'attributes.resource': 11 }),
+    ).rejects.toThrow(/between 0 and 10/);
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
@@ -314,13 +374,15 @@ describe('generation-specific Actor and Item projections', () => {
 
     expect(projectActor(actor(), systemId, '13.350', root).hp).toEqual({ value: 13, max: 26 });
     expect(projectItem(item(), systemId, '13.350', root)).toMatchObject({
-      description: 'Generation 13', rarity: 'common',
+      description: 'Generation 13',
+      rarity: 'common',
     });
     expect(() => validate(root, '13.350', 8)).toThrow(/between 0 and 6/);
 
     expect(projectActor(actor(), systemId, '14.370', root).hp).toEqual({ value: 14, max: 28 });
     expect(projectItem(item(), systemId, '14.370', root)).toMatchObject({
-      description: 'Generation 14', rarity: 'rare',
+      description: 'Generation 14',
+      rarity: 'rare',
     });
     expect(() => validate(root, '14.370', 8)).not.toThrow();
     expect(() => validate(root, '14.370', 11)).toThrow(/between 0 and 10/);
@@ -331,7 +393,8 @@ describe('generation-specific Actor and Item projections', () => {
   });
 
   it.each(['12.331', '15.400', 'unknown', undefined])(
-    'retains raw data without borrowing a descriptor for Foundry %s', async (version) => {
+    'retains raw data without borrowing a descriptor for Foundry %s',
+    async (version) => {
       const root = await fixtureRoot();
       await fixture(root, 13);
       await fixture(root, 14);
@@ -378,7 +441,10 @@ describe('generation-specific Actor and Item projections', () => {
     expect(() => validate(root, '14.370', 50)).toThrow(/between 0 and 6/);
 
     // Different content length makes the cache-stamp change independent of clock resolution.
-    await writeFile(join(directory, 'actor-projection.json'), JSON.stringify(descriptor('current', 1234)));
+    await writeFile(
+      join(directory, 'actor-projection.json'),
+      JSON.stringify(descriptor('current', 1234)),
+    );
     expect(projectActor(actor(), systemId, '14.370', root).hp?.value).toBe(14);
     expect(projectItem(item(), systemId, '14.370', root).rarity).toBe('rare');
     expect(() => validate(root, '14.370', 50)).not.toThrow();
@@ -428,32 +494,41 @@ describe('generation-specific Actor and Item projections', () => {
     const moved = join(root, 'saved-systems');
     await rename(original, moved);
     await symlink(moved, original, 'dir');
-    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(/Invalid actor projection/);
+    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(
+      /Invalid actor projection/,
+    );
   });
 
   it('rejects an identity directory aliased to another system', async () => {
     const root = await fixtureRoot();
     await fixture(root, 14, { id: 'original' });
     await symlink(join(root, 'systems/original'), join(root, 'systems', systemId), 'dir');
-    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(/Invalid actor projection/);
+    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(
+      /Invalid actor projection/,
+    );
   });
 
   it('rejects a generation directory aliased to its sibling', async () => {
     const root = await fixtureRoot();
     const earlier = await fixture(root, 13);
     await symlink(earlier, join(root, 'systems', systemId, '14'), 'dir');
-    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(/Invalid actor projection/);
+    expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(
+      /Invalid actor projection/,
+    );
     expect(projectActor(actor(), systemId, '13.350', root).hp?.value).toBe(13);
   });
 
   it.each(['actor-projection.json', 'manifest.json'])(
-    'rejects %s borrowed through a sibling-generation symlink', async (name) => {
+    'rejects %s borrowed through a sibling-generation symlink',
+    async (name) => {
       const root = await fixtureRoot();
       const earlier = await fixture(root, 13);
       const current = await fixture(root, 14);
       await rm(join(current, name));
       await symlink(join(earlier, name), join(current, name), 'file');
-      expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(/Invalid actor projection/);
+      expect(() => projectActor(actor(), systemId, '14.370', root)).toThrow(
+        /Invalid actor projection/,
+      );
     },
   );
 

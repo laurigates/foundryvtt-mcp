@@ -44,6 +44,15 @@ For an isolated copy, run `node build.mjs --check`,
 `node --test tests/*.test.mjs` and
 `python3 -B -m unittest discover -s tests -v` from this directory.
 
+## Core display projection
+
+`actor-projection.json` declares the PF2e source paths the shared core uses to
+display HP and AC (`system.attributes.hp` and `system.attributes.ac`). It carries
+no validation bounds, so the core attribute write path applies no PF2e-specific
+limits, matching the behaviour before the projection existed. The file restores
+the HP and AC fields the pre-projection client mapped generically; it is a display
+projection, not a live compatibility claim.
+
 ## Install and connect
 
 Install PF2e **8.7.1** from its [official release](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-8.7.1)

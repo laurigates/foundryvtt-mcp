@@ -89,7 +89,11 @@ function descriptor(
       const suffix = relative(root, path);
       return suffix !== '..' && !suffix.startsWith(`..${sep}`) && !isAbsolute(suffix);
     };
-    if (family !== resolve(familyPath) || systemRoot !== systemPath || !inside(family, systemRoot)) {
+    if (
+      family !== resolve(familyPath) ||
+      systemRoot !== systemPath ||
+      !inside(family, systemRoot)
+    ) {
       throw new Error('System projection directory escapes the systems directory');
     }
     const entries = readdirSync(systemRoot, { withFileTypes: true });
@@ -238,6 +242,7 @@ export function projectActor(
     actor.ac = { value: ac };
   }
   let level = value('level');
+  let derivedLevel = false;
   const levelRule = config.derived?.level;
   if (typeof level !== 'number' && levelRule && raw.type === levelRule.actorType) {
     const levels = (raw.items ?? [])
@@ -246,21 +251,26 @@ export function projectActor(
       .filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry));
     if (levels.length > 0) {
       level = levels.reduce((total, entry) => total + entry, 0);
+      derivedLevel = true;
     }
   }
   if (typeof level === 'number') {
     actor.level = level;
   }
   const proficiencyRule = config.derived?.proficiency;
-  if (proficiencyRule && raw.type === levelRule?.actorType && typeof level === 'number') {
+  if (proficiencyRule && raw.type === levelRule?.actorType) {
     const prepared = readPath(raw.system, proficiencyRule.path);
-    actor.attributes = {
-      prof:
-        typeof prepared === 'number'
-          ? prepared
-          : Math.floor((level - proficiencyRule.levelOffset) / proficiencyRule.step) +
-            proficiencyRule.base,
-    };
+    // A source-provided level is not evidence that the system left proficiency
+    // unset, so only a level reconstructed from class items licenses the derivation.
+    if (typeof prepared === 'number') {
+      actor.attributes = { prof: prepared };
+    } else if (derivedLevel && typeof level === 'number') {
+      actor.attributes = {
+        prof:
+          Math.floor((level - proficiencyRule.levelOffset) / proficiencyRule.step) +
+          proficiencyRule.base,
+      };
+    }
   }
   const bio = value('biography');
   if (typeof bio === 'string') {
@@ -388,12 +398,18 @@ export function validateSystemPatch(
         maximum = limit;
       }
       const addPath = expand(rule.addPath);
-      const add =
+      const addSource =
         (addPath ? patch[addPath] : undefined) ??
         readPath(rawSystem, addPath) ??
-        readPath(actor, rule.fallbackAdd) ??
-        0;
-      if (maximum !== undefined && typeof add === 'number') {
+        readPath(actor, rule.fallbackAdd);
+      const add = typeof addSource === 'number' ? addSource : 0;
+      // Keep the additive component so a rejection explains the cap instead of
+      // printing only the total, e.g. "max + temp (20 + 3 = 23)".
+      let capDetail =
+        typeof limit === 'number' && typeof addSource === 'number'
+          ? `${limit} + ${addSource} = ${limit + addSource}`
+          : undefined;
+      if (maximum !== undefined) {
         maximum += add;
       }
       for (const override of rule.overrides) {
@@ -403,6 +419,8 @@ export function validateSystemPatch(
           )
         ) {
           maximum = override.maximum;
+          // An override replaces the whole cap, so the additive breakdown no longer applies.
+          capDetail = undefined;
         }
       }
       if (
@@ -415,7 +433,7 @@ export function validateSystemPatch(
           );
         }
         throw new Error(
-          `Invalid ${rule.label} ${value}: exceeds ${rule.maximumLabel} (${maximum})`,
+          `Invalid ${rule.label} ${value}: exceeds ${rule.maximumLabel} (${capDetail ?? maximum})`,
         );
       }
     }

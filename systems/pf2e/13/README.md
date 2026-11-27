@@ -71,6 +71,15 @@ behavior has not been replaced with a different contract.
 [Manual examples](examples/workflows.md) and [JSON recipe](examples/workflows.json)
 cover the only operation. This variant makes no promise about Foundry-14 APIs.
 
+## Core display projection
+
+`actor-projection.json` declares the PF2e source paths the shared core uses to
+display HP and AC (`system.attributes.hp` and `system.attributes.ac`). It carries
+no validation bounds, so the core attribute write path applies no PF2e-specific
+limits, matching the behaviour before the projection existed. The file restores
+the HP and AC fields the pre-projection client mapped generically; it is a display
+projection, not a live compatibility claim.
+
 ## Validate this folder independently
 
 From this directory, with no sibling generation present:

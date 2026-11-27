@@ -118,7 +118,12 @@ export const operations = [
     readOnly: true, requiredMethods: ['calculateCurrencies'],
     inputSchema: {
       ...object({ currencies: currencyAmounts(nonnegative), other_currencies: currencyAmounts(nonnegative), multiplier: nonnegative, subtract: boolean }, ['currencies']),
-      oneOf: [{ required: ['other_currencies'], not: { required: ['multiplier'] } }, { required: ['multiplier'], not: { required: ['other_currencies'] } }],
+      // Ajv strictRequired rejects `required` inside a subschema that does not declare
+      // the property, so each branch declares the key it requires and forbids the other.
+      oneOf: [
+        { properties: { other_currencies: currencyAmounts(nonnegative), multiplier: false }, required: ['other_currencies'] },
+        { properties: { multiplier: nonnegative, other_currencies: false }, required: ['multiplier'] },
+      ],
     },
     outputSchema: object({ currencies: text }),
     handler: async function (args, runtime) {

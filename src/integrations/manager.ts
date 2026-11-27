@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import Ajv, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { z } from 'zod';
 import {
   assertOperationCurrent,
@@ -7,6 +7,7 @@ import {
   type ProviderOperationContext,
   withOperationContext,
 } from '../providers/operation-context.js';
+import { createContractAjv } from './ajv.js';
 import {
   defaultPackageRoot,
   type IntegrationLoadFailure,
@@ -89,7 +90,7 @@ const CONFIRMED_NO_WRITE_ERRORS = new Set([
 
 /** Session-owned integration instances; package definitions never contain connection credentials. */
 export class IntegrationManager {
-  private readonly ajv = new Ajv({ allErrors: true, strict: true });
+  private readonly ajv = createContractAjv();
   private readonly packageRoot: string;
   private worker: PythonWorker | undefined;
   private operations = new Map<string, RegisteredOperation>();
@@ -591,9 +592,10 @@ export class IntegrationManager {
       ...details,
       state: 'incompatible',
       operations: [],
-      reason: generation === undefined
-        ? `Cannot select an integration variant from unknown Foundry version ${JSON.stringify(environment.foundryVersion)}`
-        : `No integration variant for Foundry generation ${generation}; available generations: ${availableGenerations.join(', ') || 'none'}`,
+      reason:
+        generation === undefined
+          ? `Cannot select an integration variant from unknown Foundry version ${JSON.stringify(environment.foundryVersion)}`
+          : `No integration variant for Foundry generation ${generation}; available generations: ${availableGenerations.join(', ') || 'none'}`,
     };
     if (!installed) {
       status.state = 'absent';
