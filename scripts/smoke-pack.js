@@ -207,13 +207,20 @@ function installInConsumer(tarball) {
     fail(`server entrypoint missing in installed package: ${serverPath}`);
   }
   verifyLegacyClientImport(installedRoot, consumer);
-  const integrationSmoke = spawnSync(process.execPath, [join(repoRoot, 'scripts', 'smoke-integrations.js'), installedRoot], {
-    cwd: consumer,
-    encoding: 'utf8',
-    timeout: 20000,
-  });
+  const integrationSmoke = spawnSync(
+    process.execPath,
+    [join(repoRoot, 'scripts', 'smoke-integrations.js'), installedRoot],
+    {
+      cwd: consumer,
+      encoding: 'utf8',
+      timeout: 20000,
+    },
+  );
   if (integrationSmoke.status !== 0) {
-    fail('Installed Python integration smoke failed', integrationSmoke.stderr || integrationSmoke.stdout);
+    fail(
+      'Installed Python integration smoke failed',
+      integrationSmoke.stderr || integrationSmoke.stdout,
+    );
   }
   process.stdout.write(integrationSmoke.stdout);
   console.log(`📥 Installed at: ${installedRoot}`);
@@ -248,7 +255,9 @@ function verifyLegacyClientImport(installedRoot, consumer) {
       }
       const world = await probeRestModule(async (url) => {
         assert.equal(url, '/api/world');
-        return { data: { id: 'legacy-import-smoke' } };
+        // The probe validates the module's { success: true, data } envelope, so a
+        // bare { data } body is rejected as an incompatible server (#330).
+        return { data: { success: true, data: { id: 'legacy-import-smoke' } } };
       });
       assert.equal(world.id, 'legacy-import-smoke');
     } finally {
@@ -266,7 +275,10 @@ function verifyLegacyClientImport(installedRoot, consumer) {
     timeout: 10000,
   });
   if (result.status !== 0) {
-    fail('Installed legacy client import smoke failed', result.stderr || result.error?.message || result.stdout);
+    fail(
+      'Installed legacy client import smoke failed',
+      result.stderr || result.error?.message || result.stdout,
+    );
   }
   process.stdout.write(result.stdout);
 }
