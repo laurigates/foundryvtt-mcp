@@ -65,6 +65,10 @@ The REST-only mode is kept so existing configurations behave as before, and depr
 - Writes, combat, chat, users, journals and the other snapshot reads: Socket.IO only.
 - Dice: Foundry's roller via the bridge, then the local roller.
 
+### Bridge identity verification
+
+In dual mode the bridge is a second view of the same world, so a bridge answer is never trusted on its own. `verifyRestIdentity` probes `GET /api/world` before and after each bridge call and compares the world id, the system id and, when the bridge reports it, the Foundry origin with the native session. A difference discards the bridge answer and leaves the Socket.IO result in place; a native world change during the request surfaces as `session_changed`. This probe is why a dual-mode cell in the capability matrix lists `/api/world` next to the route the capability actually needs.
+
 ### Fallback
 
 In dual mode a bridge call that fails, times out or returns an unexpected shape yields the Socket.IO answer, or the existing "unavailable" label when there is none. Each capability's failure is logged once until a call succeeds again. Failures that would cost the same wait on the next call start a 30-second pause (`REST_RETRY_AFTER_MS`):

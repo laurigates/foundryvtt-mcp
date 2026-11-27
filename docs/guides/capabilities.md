@@ -36,7 +36,7 @@ Configure an independent `socketio` target for separately available native acces
 
 ### Optional historical bridge on a Socket.IO target
 
-`restUrl` and `restApiKey` add the historical `/api/*` bridge to one native target. This corresponds to upstream's dual transport mode and is independent of the ThreeHats relay used for integration bindings. The legacy environment selects this native-plus-bridge combination when `FOUNDRY_API_KEY`, `FOUNDRY_REST_URL` and native credentials are present. Explicit targets use only their own provider configuration.
+`restUrl` and `restApiKey` add the historical `/api/*` bridge to one native target. This corresponds to upstream's dual transport mode and is independent of the ThreeHats relay used for integration bindings. The legacy environment selects this native-plus-bridge combination when `FOUNDRY_API_KEY`, `FOUNDRY_REST_URL` and native credentials are present. Explicit targets use only their own provider configuration. In this mode every bridge call is bracketed by an identity probe (`GET /api/world`), so the bridge cannot answer for a different world, system or origin; see [ADR-0011](../adrs/0011-dual-mode-transport.md).
 
 Socket.IO continues to serve the world cache, combat, journals and native writes. The optional bridge supplies prepared actor values, Foundry's dice engine, compendium search and REST diagnostics. Failed reads fall back where a native/local answer exists. A bridge transport failure pauses bridge requests, while a server error pauses that capability, for 30 seconds. Neither mechanism changes target or retries an uncertain write. Native reads remain available when the optional bridge is unavailable; this differs from the two required connections of a `composite` provider.
 
