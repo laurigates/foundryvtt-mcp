@@ -1,5 +1,5 @@
-import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
+import { createContractAjv } from '../../integrations/ajv.js';
 import type { FoundrySession, FoundrySessionManager } from '../../sessions/index.js';
 import { ToolCatalog } from '../catalog.js';
 
@@ -55,7 +55,7 @@ describe('integration output schema resources', () => {
       .list()
       .find((tool) => tool.name === 'module_schema_read');
     expect(definition?.outputSchema).toBeDefined();
-    const validate = new Ajv({ strict: false }).compile(definition?.outputSchema ?? {});
+    const validate = createContractAjv().compile(definition?.outputSchema ?? {});
     expect(validate(wrapped({ value: 4 }))).toBe(true);
     expect(validate(wrapped({ value: 'wrong' }))).toBe(false);
     expect(JSON.stringify(original)).toBe(before);
@@ -74,7 +74,7 @@ describe('integration output schema resources', () => {
     const definition = catalogFor([recursive])
       .list()
       .find((tool) => tool.name === 'module_schema_read');
-    const validate = new Ajv({ strict: false }).compile(definition?.outputSchema ?? {});
+    const validate = createContractAjv().compile(definition?.outputSchema ?? {});
     expect(validate(wrapped({ value: 1, next: { value: 2, next: null } }))).toBe(true);
     expect(validate(wrapped({ value: 1, next: { value: 'wrong', next: null } }))).toBe(false);
   });
@@ -100,7 +100,7 @@ describe('integration output schema resources', () => {
     const definition = catalogFor([nested])
       .list()
       .find((tool) => tool.name === 'module_schema_read');
-    const validate = new Ajv({ strict: false }).compile(definition?.outputSchema ?? {});
+    const validate = createContractAjv().compile(definition?.outputSchema ?? {});
     expect(validate(wrapped({ child: { label: 'valid' } }))).toBe(true);
     expect(validate(wrapped({ child: { label: 7 } }))).toBe(false);
   });

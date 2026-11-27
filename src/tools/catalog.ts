@@ -91,13 +91,18 @@ function integrationOutputSchema(
   // Embedding an anonymous schema changes the root of "#" and "#/$defs/...".
   // Give result its own resource identity instead of rewriting references, so
   // nested $id scopes and recursive references retain their original meaning.
-  const digest = createHash('sha256').update(canonical([name, resultSchema])).digest('hex');
+  const digest = createHash('sha256')
+    .update(canonical([name, resultSchema]))
+    .digest('hex');
   const base = `https://schemas.foundryvtt-mcp.invalid/tools/${digest}/`;
   const declaredId = resultSchema.$id;
+  // A fragment-only $id is an anchor inside the containing resource, not a new
+  // resource identity: keeping the fragment in the generated id would make a
+  // "#/$defs/..." reference resolve against a URI that already carries one.
   const resultId =
     typeof declaredId === 'string' && declaredId && !declaredId.startsWith('#')
       ? declaredId
-      : new URL(typeof declaredId === 'string' ? declaredId : '', `${base}result`).href;
+      : `${base}result`;
   return {
     $id: `${base}response`,
     type: 'object',
