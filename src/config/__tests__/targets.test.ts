@@ -27,6 +27,7 @@ describe('target configuration', () => {
       FOUNDRY_TARGETS_JSON: JSON.stringify([
         {
           id: 'a',
+          expectedWorldId: 'world-a',
           writeEnabled: true,
           provider: {
             kind: 'socketio',
@@ -37,7 +38,11 @@ describe('target configuration', () => {
             restApiKeyEnv: 'BRIDGE_KEY',
           },
         },
-        { id: 'b', provider: { kind: 'socketio', baseUrl: 'https://b.test' } },
+        {
+          id: 'b',
+          expectedWorldId: 'world-b',
+          provider: { kind: 'socketio', baseUrl: 'https://b.test' },
+        },
       ]),
     });
     const first = targets?.[0];
@@ -59,6 +64,68 @@ describe('target configuration', () => {
       restUrl: 'https://bridge-a.test',
       apiKey: 'bridge-a',
     });
+  });
+
+  it('requires a configured world identity when more than one target is declared', () => {
+    expect(() =>
+      loadTargetConfiguration({
+        FOUNDRY_TARGETS_JSON: JSON.stringify([
+          {
+            id: 'a',
+            expectedWorldId: 'world-a',
+            provider: { kind: 'socketio', baseUrl: 'https://a.test' },
+          },
+          { id: 'b', provider: { kind: 'socketio', baseUrl: 'https://b.test' } },
+        ]),
+      }),
+    ).toThrow(/expectedWorldId/);
+    const targets = loadTargetConfiguration({
+      FOUNDRY_TARGETS_JSON: JSON.stringify([
+        {
+          id: 'a',
+          expectedWorldId: 'world-a',
+          provider: { kind: 'socketio', baseUrl: 'https://a.test' },
+        },
+        {
+          id: 'b',
+          expectedWorldId: 'world-b',
+          provider: { kind: 'socketio', baseUrl: 'https://b.test' },
+        },
+      ]),
+    });
+    expect(targets?.map((target) => target.expectedWorldId)).toEqual(['world-a', 'world-b']);
+  });
+
+  it('accepts a relay provider world identity in place of the target setting', () => {
+    const targets = loadTargetConfiguration({
+      FOUNDRY_TARGETS_JSON: JSON.stringify([
+        {
+          id: 'a',
+          expectedWorldId: 'world-a',
+          provider: { kind: 'socketio', baseUrl: 'https://a.test' },
+        },
+        {
+          id: 'b',
+          provider: {
+            kind: 'rest-api',
+            relayUrl: 'https://relay.test',
+            apiKey: 'relay-key',
+            clientId: 'client-b',
+            expectedWorldId: 'world-b',
+          },
+        },
+      ]),
+    });
+    expect(targets?.[1]?.provider).toMatchObject({ kind: 'rest-api', expectedWorldId: 'world-b' });
+  });
+
+  it('keeps a single target without expectedWorldId on its historical behaviour', () => {
+    const targets = loadTargetConfiguration({
+      FOUNDRY_TARGETS_JSON: JSON.stringify([
+        { id: 'only', provider: { kind: 'socketio', baseUrl: 'https://only.test' } },
+      ]),
+    });
+    expect(targets?.[0]?.expectedWorldId).toBeUndefined();
   });
 
   it('rejects incomplete bridge configuration rather than silently changing transport', () => {
@@ -209,6 +276,7 @@ describe('target configuration', () => {
         targets: [
           {
             id: 'campaign-a',
+            expectedWorldId: 'world-a',
             writeEnabled: true,
             provider: {
               kind: 'socketio',
@@ -219,6 +287,7 @@ describe('target configuration', () => {
           },
           {
             id: 'campaign-b',
+            expectedWorldId: 'world-b',
             provider: {
               kind: 'rest-api',
               relayUrl: 'https://relay.test',
@@ -239,7 +308,11 @@ describe('target configuration', () => {
   });
 
   it('rejects duplicate targets and ambiguous configuration sources', () => {
-    const target = { id: 'same', provider: { kind: 'socketio', baseUrl: 'http://foundry.test' } };
+    const target = {
+      id: 'same',
+      expectedWorldId: 'world-same',
+      provider: { kind: 'socketio', baseUrl: 'http://foundry.test' },
+    };
     expect(() =>
       loadTargetConfiguration({ FOUNDRY_TARGETS_JSON: JSON.stringify([target, target]) }),
     ).toThrow(/Duplicate target/);

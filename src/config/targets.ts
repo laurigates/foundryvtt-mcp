@@ -144,9 +144,39 @@ const TargetSchema = z
     }
   });
 
+/** A relay target may declare its world on the provider instead of on the target. */
+function providerWorldId(provider: z.infer<typeof ProviderConfigSchema>): string | undefined {
+  if (provider.kind === 'rest-api') {
+    return provider.expectedWorldId;
+  }
+  if (provider.kind === 'composite') {
+    return provider.execution.expectedWorldId;
+  }
+  return undefined;
+}
+
 const TargetsFileSchema = z
   .object({ version: z.literal(1).default(1), targets: z.array(TargetSchema).min(1) })
-  .strict();
+  .strict()
+  .superRefine((file, ctx) => {
+    // A single target keeps the historical behaviour of pinning the world seen on
+    // its first connection. With several targets an inferred identity could route
+    // a write to the wrong world, so the configuration has to declare it.
+    if (file.targets.length <= 1) {
+      return;
+    }
+    file.targets.forEach((target, index) => {
+      if (target.expectedWorldId || providerWorldId(target.provider)) {
+        return;
+      }
+      ctx.addIssue({
+        code: 'custom',
+        path: ['targets', index, 'expectedWorldId'],
+        message:
+          'Every target in a multi-target configuration must declare expectedWorldId; world identity comes from configuration, not from the first world observed',
+      });
+    });
+  });
 
 export interface TargetConfig {
   id: string;

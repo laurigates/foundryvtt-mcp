@@ -51,9 +51,14 @@ describe('Config', () => {
         FOUNDRY_TARGETS_JSON: JSON.stringify({
           version: 1,
           targets: [
-            { id: 'a', provider: { kind: 'socketio', baseUrl: 'http://a.test' } },
+            {
+              id: 'a',
+              expectedWorldId: 'world-a',
+              provider: { kind: 'socketio', baseUrl: 'http://a.test' },
+            },
             {
               id: 'b',
+              expectedWorldId: 'world-b',
               provider: {
                 kind: 'rest-api',
                 relayUrl: 'http://relay.test',

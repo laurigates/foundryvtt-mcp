@@ -34,8 +34,10 @@ export function runtime(world, options = {}) {
   return runInNewContext(`(${createRuntime.toString()})(${JSON.stringify(options)})`, { game: world.game, fromUuid: world.fromUuid });
 }
 
-export function execute(operation, args, world) {
+// Handlers are self-contained by construction: build.mjs embeds their source in
+// standalone bindings that receive only `args` and `runtime`. Calling the handler
+// directly keeps that contract under test without constructing code at runtime.
+export async function execute(operation, args, world) {
   const options = { readOnly: operation.readOnly, requiredMethods: operation.requiredMethods, legacy: operation.id === 'get_items' };
-  return runInNewContext(`(async () => { const runtime = (${createRuntime.toString()})(${JSON.stringify(options)}); return await (${operation.handler.toString()})(args, runtime); })()`,
-    { game: world.game, fromUuid: world.fromUuid, args: structuredClone(args) });
+  return operation.handler(structuredClone(args), runtime(world, options));
 }

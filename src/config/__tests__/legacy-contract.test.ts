@@ -107,8 +107,16 @@ describe('legacy environment contract', () => {
       FOUNDRY_PASSWORD: 'unused-password',
       FOUNDRY_WRITE_ENABLED: 'true',
       FOUNDRY_TARGETS_JSON: JSON.stringify([
-        { id: 'a', provider: { kind: 'socketio', baseUrl: 'https://a.test' } },
-        { id: 'b', provider: { kind: 'socketio', baseUrl: 'https://b.test' } },
+        {
+          id: 'a',
+          expectedWorldId: 'world-a',
+          provider: { kind: 'socketio', baseUrl: 'https://a.test' },
+        },
+        {
+          id: 'b',
+          expectedWorldId: 'world-b',
+          provider: { kind: 'socketio', baseUrl: 'https://b.test' },
+        },
       ]),
     });
     expect(config.targets.map((target) => target.writeEnabled)).toEqual([false, false]);

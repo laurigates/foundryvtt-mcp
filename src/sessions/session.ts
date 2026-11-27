@@ -463,6 +463,9 @@ export class FoundrySession {
   }
 
   private assertIdentity(environment: FoundryEnvironment): void {
+    // Multi-target configurations must declare expectedWorldId (see config/targets.ts).
+    // The fallback keeps the historical single-target behaviour of pinning the world
+    // observed on the first successful connection.
     const expectedWorld = this.config.expectedWorldId ?? this.boundWorldId;
     if (typeof environment.world.id !== 'string' || !environment.world.id.trim()) {
       throw new SessionError(
