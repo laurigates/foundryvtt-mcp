@@ -178,4 +178,30 @@ describe('handleGetJournal', () => {
       expect(text).not.toContain('a'.repeat(600));
     });
   });
+
+  describe('markup sanitization', () => {
+    it('leaves no angle bracket when markup is split across tags', async () => {
+      const journal: MockJournal = {
+        _id: 'jrnl-nested',
+        name: 'Nested',
+        pages: [
+          {
+            _id: 'p-nested',
+            name: 'Page',
+            type: 'text',
+            text: { content: '<scr<script>ipt>alert(1)</script>', format: 1 },
+          },
+        ],
+      };
+      const client = {
+        getJournal: vi.fn(() => journal),
+      } as unknown as FoundryClient;
+
+      const text = getText(await handleGetJournal({ journalId: 'jrnl-nested' }, client));
+
+      // A single-pass tag regex would rebuild "<script>" from this input.
+      expect(text).not.toContain('<');
+      expect(text).toContain('alert(1)');
+    });
+  });
 });

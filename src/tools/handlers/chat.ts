@@ -2,6 +2,7 @@
  * Chat message tool handler
  */
 
+import { stripMarkup } from '../../foundry/world-search.js';
 import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
@@ -24,10 +25,7 @@ export async function handleGetChatMessages(args: { limit?: number }, provider: 
       .map((m) => {
         const speaker = m.speaker?.alias || userMap.get(m.user) || 'Unknown';
         const time = new Date(m.timestamp).toLocaleTimeString();
-        const content = m.content
-          .replace(/<[^>]+>/g, '')
-          .trim()
-          .slice(0, 200);
+        const content = stripMarkup(m.content).trim().slice(0, 200);
         return `[${time}] **${speaker}**: ${content}`;
       })
       .join('\n');

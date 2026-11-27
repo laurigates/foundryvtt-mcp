@@ -3,6 +3,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { stripMarkup } from '../../foundry/world-search.js';
 import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
@@ -56,8 +57,7 @@ export async function handleGetJournal(args: { journalId: string }, provider: Fo
       journal.pages
         ?.map((p) => {
           const content =
-            p.text?.content
-              ?.replace(/<[^>]+>/g, '')
+            stripMarkup(p.text?.content ?? '')
               .trim()
               .slice(0, 500) || '';
           return `### ${p.name}\n${content}${content.length >= 500 ? '...' : ''}`;

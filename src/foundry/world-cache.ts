@@ -178,7 +178,10 @@ function sanitize(doc: Record<string, unknown>): Record<string, unknown> {
  */
 function mergePatch(target: Record<string, unknown>, patch: Record<string, unknown>): void {
   for (const [key, value] of Object.entries(patch)) {
-    if (FORBIDDEN_KEYS.has(key)) {
+    // Literal comparisons rather than FORBIDDEN_KEYS.has: static analysis only
+    // follows a guard it can see, and without one this assignment is reported
+    // as a prototype-polluting sink.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
       continue;
     }
     if (value === null) {
@@ -303,10 +306,7 @@ function resolveParent(
  * Reports changes separately from unhandled data so partial batches preserve
  * the historical boolean API without concealing a freshness gap.
  */
-function applyBroadcast(
-  worldData: WorldData,
-  broadcast: DocumentBroadcast,
-): BroadcastApplication {
+function applyBroadcast(worldData: WorldData, broadcast: DocumentBroadcast): BroadcastApplication {
   const { type, action, result, parentUuid } = broadcast;
   if (result.length === 0) {
     return { changed: false, unhandled: false };

@@ -1,6 +1,7 @@
 # Review response: projection, catalog and integration-contract hardening
 
-Status: working tree only, not committed. The operator owns commit and push.
+Status: P1–P5 are committed (`228368f` and earlier); the CodeQL fixes (P6) are in
+the working tree. The operator owns commit and push.
 
 ## Evidence policy
 
@@ -10,8 +11,8 @@ allowed scope, so nothing below quotes or paraphrases them. Every claim is
 derived from local evidence: git history, source, tests and the commands listed
 in the verification log.
 
-Code-scanning alerts cannot be triaged from here. Paste the alert titles as text
-(`js/rule-name src/file.ts:line`) to map them onto this work.
+The code-scanning alert titles were supplied as text in the conversation, not
+read from the repository, and are addressed in P6.
 
 ## Workstreams
 
@@ -20,9 +21,10 @@ Code-scanning alerts cannot be triaged from here. Paste the alert titles as text
 | P1 | Projection display defects | `src/providers/projections.ts`, `src/providers/__tests__/projections.test.ts`, `systems/pf2e/{13,14}/actor-projection.json`, both PF2e `README.md` | `bf0bdfc` (test file still local) |
 | P2 | Fragment-only `$id` in the catalog | `src/tools/catalog.ts`, `src/tools/__tests__/catalog-schema.test.ts` | `1ea0c5f` |
 | P3 | Dual-mode capability matrix | `src/tools/__tests__/capability-matrix.test.ts`, `docs/adrs/0011-dual-mode-transport.md`, `docs/guides/capabilities.md` | `bd7e78b` |
-| P4 | Integration contracts and the capability source of truth | `src/integrations/{types,manifest}.ts`, `src/tools/catalog.ts`, six `src/registry.mjs`, six `manifest.json`, `scripts/create-integration.mjs`, `docs/guides/writing-integrations.md`, three test files | local |
+| P4 | Integration contracts and the capability source of truth | `src/integrations/{types,manifest}.ts`, `src/tools/catalog.ts`, six `src/registry.mjs`, six `manifest.json`, `scripts/create-integration.mjs`, `docs/guides/writing-integrations.md`, three test files | `228368f` |
 | P5 | Python interpreter resolution | `python-worker.ts` callers in four integration test files, `src/foundry/__tests__/legacy-client.test.ts` | `c3d1b89` |
-| — | Load-dependent test timeouts | `src/integrations/__tests__/lifecycle.test.ts` | local |
+| — | Load-dependent test timeouts | `src/integrations/__tests__/lifecycle.test.ts` | `228368f` |
+| P6 | CodeQL alerts (2 high, 1 medium) | `src/tools/handlers/{chat,journals}.ts`, `src/foundry/{world-cache,world-search}.ts`, two handler tests | local |
 
 ### P1 — projection is display-only again
 
@@ -85,6 +87,32 @@ parallel workers the start sometimes consumed the timeout, so the assertion saw 
 different error code. Timeouts are now 2500 ms and the adapter sleep is 5 s, which
 keeps the same assertions but makes the ordering deterministic.
 
+### P6 — CodeQL alerts
+
+Three alerts were reported on code touched by this work.
+
+**Incomplete multi-character sanitization** (`src/tools/handlers/chat.ts`,
+`src/tools/handlers/journals.ts`). Both stripped markup with
+`replace(/<[^>]+>/g, '')`, which rebuilds a tag from split input:
+`<scr<script>ipt>alert(1)</script>` becomes `<script>alert(1)</script>`. The
+handlers now call `stripMarkup`, the linear scanner that already existed in
+`src/foundry/world-search.ts` and is now exported. It removes comments,
+script/style elements and tags in one pass, keeps an unmatched `<` as literal
+text, and never runs a multi-character regex. Reuse beats a second copy, and the
+scanner is already covered by 37 tests.
+
+**Prototype-polluting assignment** (`src/foundry/world-cache.ts`). `mergePatch`
+already skipped dangerous keys, but through `FORBIDDEN_KEYS.has(key)`, which
+static analysis cannot follow, so the assignment below it was reported as a sink.
+The guard is now the literal comparison the query documents
+(`key === '__proto__' || key === 'constructor' || key === 'prototype'`). The
+`FORBIDDEN_KEYS` set stays for `sanitize`, and the existing prototype-pollution
+tests cover both paths.
+
+Two regression tests assert the sanitization fix: a chat message and a journal
+page built from `<scr<script>ipt>alert(1)</script>` must leave no `<` in the
+output.
+
 ## What is gained
 
 1. **PF2e actors display HP and AC again** and the HP cap error is actionable.
@@ -102,6 +130,9 @@ keeps the same assertions but makes the ordering deterministic.
 8. **Documentation matches behaviour** again (matrix, ADR-0011, integration guide).
 9. **The suite is deterministic**: five consecutive full runs are green, and the
    Python integration tests actually execute on Windows.
+10. **Tool text output is tag-free by construction.** The handlers no longer rely
+    on a regex that can rebuild the tag it removed, and the scanner they share is
+    linear on hostile input.
 
 ## What is lost or accepted as risk
 
@@ -128,7 +159,7 @@ keeps the same assertions but makes the ordering deterministic.
 
 ## Deferred and open items
 
-- **Code-scanning alerts**: need the titles pasted as text.
+- **Re-run CodeQL** on the branch to confirm the three alerts close.
 - **`.gitattributes`** (`* text=auto eol=lf`) or `core.autocrlf=false`: an
   operator decision, because it changes checkout behaviour for everyone.
 - **Commit and push**: operator-only.
@@ -139,13 +170,13 @@ keeps the same assertions but makes the ordering deterministic.
 | Command | Result |
 |---|---|
 | `node node_modules/typescript/bin/tsc --noEmit` | exit 0 |
-| `npx vitest run` (five consecutive runs) | 65 files, 1205 tests, all green |
+| `npx vitest run` (five consecutive runs) | 65 files, 1207 tests, all green |
 | `node scripts/integrations.mjs check` | 6 packages checked |
 | `node scripts/integrations.mjs test` | 646 tests, 0 failures |
 | `node --test scripts/tests/integration-tooling.test.mjs` | 7 tests, 0 failures |
 | `node_modules/.bin/biome.exe check <touched files>` | no findings (only the pre-existing deprecated-config warning) |
 
-Test count moved from 1171 to 1205 across this work.
+Test count moved from 1171 to 1207 across this work.
 
 ## Note on `git status`
 
