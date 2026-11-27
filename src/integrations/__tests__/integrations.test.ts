@@ -4,16 +4,18 @@ import { IntegrationManager } from '../manager.js';
 import { loadIntegrations, toolName } from '../manifest.js';
 
 const packageRoot = fileURLToPath(new URL('../../../', import.meta.url));
+// `python3` is not installed on every platform, so the interpreter is resolved
+// once here and honours the same override the server configuration accepts.
+const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
+const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 
 describe('integration packages', () => {
   it('preserves upstream IDs and loads both families', async () => {
     expect(toolName('module', 'item-piles', 'get_items')).toBe('module_item-piles_get_items');
     const packages = await loadIntegrations(packageRoot);
-    expect([...new Set(packages.map((entry) => `${entry.manifest.kind}:${entry.manifest.id}`))].sort()).toEqual([
-      'module:item-piles',
-      'system:dnd5e',
-      'system:pf2e',
-    ]);
+    expect(
+      [...new Set(packages.map((entry) => `${entry.manifest.kind}:${entry.manifest.id}`))].sort(),
+    ).toEqual(['module:item-piles', 'system:dnd5e', 'system:pf2e']);
   });
 });
 
@@ -23,6 +25,7 @@ describe('session integration isolation', () => {
       new IntegrationManager({
         targetId,
         packageRoot,
+        pythonExecutable: python,
         execute: async () => ({ ready: true }),
       });
     const a = create('one');
@@ -56,6 +59,7 @@ describe('session integration isolation', () => {
       new IntegrationManager({
         targetId: target,
         packageRoot,
+        pythonExecutable: python,
         execute: async (script, args) => {
           calls.push({ target, script, args });
           if (script.includes('INTEGRATION_PROBE')) {
@@ -104,6 +108,7 @@ describe('session integration isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'custom',
       packageRoot,
+      pythonExecutable: python,
       execute: async (script) => (script.includes('INTEGRATION_PROBE') ? { ready: true } : []),
     });
     try {
@@ -144,7 +149,11 @@ describe('session integration isolation', () => {
       execute: async () => ({ ready: true }),
     });
     try {
-      const env = { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] };
+      const env = {
+        foundryVersion: '14.370',
+        system: { id: 'dnd5e', version: 'test' },
+        modules: [],
+      };
       await manager.reconcile({ ...env, runtimeAvailable: false }, 1);
       expect(manager.getTools()).toEqual([]);
       expect(manager.list().find((entry) => entry.id === 'dnd5e')?.state).toBe('unsupported');
@@ -163,6 +172,7 @@ describe('session integration isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'changed',
       packageRoot,
+      pythonExecutable: python,
       execute: async () => ({ ready, reason: ready ? undefined : 'API removed' }),
     });
     try {
@@ -192,6 +202,7 @@ describe('session integration isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'errors',
       packageRoot,
+      pythonExecutable: python,
       execute: async (script) => {
         if (script.includes('INTEGRATION_PROBE')) {
           return { ready: true };

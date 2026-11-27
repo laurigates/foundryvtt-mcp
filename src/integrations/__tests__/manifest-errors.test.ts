@@ -8,6 +8,10 @@ import { type IntegrationLoadFailure, loadIntegrations } from '../manifest.js';
 
 const roots: string[] = [];
 const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+// `python3` is not installed on every platform, so the interpreter is resolved
+// once here and honours the same override the server configuration accepts.
+const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
+const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -126,6 +130,7 @@ describe('integration package failure isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'activation',
       packageRoot: root,
+      pythonExecutable: python,
       execute: async (script) => (script.includes('ready') ? { ready: true } : { ok: true }),
     });
     try {
@@ -156,6 +161,7 @@ describe('integration package failure isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'world',
       packageRoot: root,
+      pythonExecutable: python,
       execute: async (script) => (script.includes('ready') ? { ready: true } : { ok: true }),
     });
     try {

@@ -74,6 +74,9 @@ void useExistingApi;
     const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, process.cwd());
     const program = ts.createProgram([source], {
       ...parsed.options,
+      // This ad-hoc program does not inherit the project's automatic `@types`
+      // inclusion, so the Node globals the public API relies on must be named.
+      types: ['node'],
       rootDir: process.cwd(),
       noEmit: true,
       incremental: false,

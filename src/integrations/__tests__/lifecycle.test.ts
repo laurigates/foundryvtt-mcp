@@ -15,6 +15,10 @@ import { FoundrySession } from '../../sessions/session.js';
 import { IntegrationManager } from '../manager.js';
 
 const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+// `python3` is not installed on every platform, so the interpreter is resolved
+// once here and honours the same override the server configuration accepts.
+const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
+const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 const roots: string[] = [];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -92,6 +96,7 @@ describe('Python integration lifecycle boundaries', () => {
     const manager = new IntegrationManager({
       targetId: 'dead-worker',
       packageRoot: root,
+      pythonExecutable: python,
       timeoutMs: 2000,
       execute: async () => {
         probeStarted = true;
@@ -129,6 +134,7 @@ describe('Python integration lifecycle boundaries', () => {
     const manager = new IntegrationManager({
       targetId: 'context',
       packageRoot: root,
+      pythonExecutable: python,
       execute: async (script) => {
         if (script.includes('PROBE')) {
           return { ready: true };
@@ -155,6 +161,7 @@ describe('Python integration lifecycle boundaries', () => {
     const manager = new IntegrationManager({
       targetId: 'write-timeout',
       packageRoot: root,
+      pythonExecutable: python,
       writesEnabled: true,
       timeoutMs: 250,
       execute: async (script) => {
@@ -198,6 +205,7 @@ describe('Python integration lifecycle boundaries', () => {
     const manager = new IntegrationManager({
       targetId: 'before-dispatch',
       packageRoot: root,
+      pythonExecutable: python,
       writesEnabled: true,
       timeoutMs: 250,
       execute: async (script) => {
@@ -274,7 +282,7 @@ describe('Python integration lifecycle boundaries', () => {
         },
         writeEnabled: true,
         integrationsEnabled: true,
-        pythonExecutable: 'python3',
+        pythonExecutable: python,
         integrationTimeoutMs: 250,
       },
       provider,
@@ -309,6 +317,7 @@ describe('Python integration lifecycle boundaries', () => {
     const manager = new IntegrationManager({
       targetId: 'expired-context',
       packageRoot: root,
+      pythonExecutable: python,
       writesEnabled: true,
       execute: async (script) => {
         if (script.includes('PROBE')) {
@@ -337,6 +346,7 @@ describe('Python integration lifecycle boundaries', () => {
       const manager = new IntegrationManager({
         targetId: 'confirmed-no-write',
         packageRoot: root,
+        pythonExecutable: python,
         writesEnabled: true,
         execute: async (script) => {
           if (script.includes('PROBE')) {
@@ -371,6 +381,7 @@ describe('Python integration lifecycle boundaries', () => {
       const manager = new IntegrationManager({
         targetId: failure,
         packageRoot: root,
+        pythonExecutable: python,
         writesEnabled: true,
         timeoutMs: 1000,
         execute: async (script) => {
