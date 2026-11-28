@@ -2,7 +2,7 @@
 
 ## Before You Start
 
-- **Read the architecture boundaries** in [CLAUDE.md](CLAUDE.md) and the ADRs
+- **Read the architecture boundaries** in [AGENTS.md](AGENTS.md) and the ADRs
   they link ([`docs/adrs/`](docs/adrs/README.md)). They apply to human and
   AI-assisted contributions alike. In short: Socket.IO is the primary
   transport and carries every write; the companion bridge

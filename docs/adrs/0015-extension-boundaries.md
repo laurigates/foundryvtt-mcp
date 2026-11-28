@@ -77,6 +77,6 @@ extension work, by a contributor or an agent, starts from them.
 - Tool count must be watched: one MCP tool per operation grows a dnd5e +
   Item Piles world from about 33 tools to 100–120. A per-target operation
   index is an open option.
-- Agent-facing docs (`CLAUDE.md` § Architecture boundaries, `AGENTS.md`,
+- Agent-facing docs (`AGENTS.md` § Architecture boundaries,
   `CONTRIBUTING.md`) link here; a change to any point above starts as a new
   ADR that supersedes this one.
