@@ -76,9 +76,11 @@ describe('legacy tool contexts', () => {
     await expect(new RollDiceTool().execute({ formula: '1d20' }, context)).rejects.toBeInstanceOf(
       McpError,
     );
-    await expect(registry.execute('roll_dice', { formula: '1d20' }, context)).rejects.toMatchObject({
-      code: ErrorCode.InvalidParams,
-    });
+    await expect(registry.execute('roll_dice', { formula: '1d20' }, context)).rejects.toMatchObject(
+      {
+        code: ErrorCode.InvalidParams,
+      },
+    );
     expect(provider.rollDice).not.toHaveBeenCalled();
     expect(other.rollDice).not.toHaveBeenCalled();
   });

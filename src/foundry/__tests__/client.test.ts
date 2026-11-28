@@ -85,7 +85,8 @@ describe('FoundryClient', () => {
     it('checks a connected REST client without replacing its session generation', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockResolvedValue({
-        status: 200, data: { success: true, data: { id: 'world-1' } },
+        status: 200,
+        data: { success: true, data: { id: 'world-1' } },
       });
       await client.connect();
       const generation = client.getGeneration();

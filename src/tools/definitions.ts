@@ -13,7 +13,7 @@
  * Foundry itself enforces the GM/owner permission (ADR-010 and ADR-011).
  */
 const WRITE_GATE =
-  'WRITE: mutates the selected target world. Requires that target\'s writeEnabled=true (default false), core.write capability and a connected provider; Foundry additionally enforces GM/owner permission on the document. In environment-only single-target configuration, the opt-in is FOUNDRY_WRITE_ENABLED=true. Socketio/composite use native document writes; rest-api uses the paired runtime; legacy-rest does not provide core writes. An interrupted write can return outcome_unknown: inspect the world before retrying.';
+  "WRITE: mutates the selected target world. Requires that target's writeEnabled=true (default false), core.write capability and a connected provider; Foundry additionally enforces GM/owner permission on the document. In environment-only single-target configuration, the opt-in is FOUNDRY_WRITE_ENABLED=true. Socketio/composite use native document writes; rest-api uses the paired runtime; legacy-rest does not provide core writes. An interrupted write can return outcome_unknown: inspect the world before retrying.";
 
 /**
  * Extra clause for destructive tools (data removal that this server cannot undo).
@@ -301,7 +301,7 @@ export const itemMutationTools = [
   {
     name: 'delete_actor_item',
     description:
-      "Permanently remove an item owned by an actor. Use when: the user explicitly asks to delete or discard a specific owned item and you have its exact actorId and itemId. An available module_item-piles_get_items integration can return owned-item IDs; otherwise obtain them from the user. Never guess an ID. For data changes use update_actor_item. In a replacement or migration flow, run create_actor_item first and this second: the calls are not atomic, and failing after the delete loses the item. Confirm the actorId, itemId and selected target with the user before calling. " +
+      'Permanently remove an item owned by an actor. Use when: the user explicitly asks to delete or discard a specific owned item and you have its exact actorId and itemId. An available module_item-piles_get_items integration can return owned-item IDs; otherwise obtain them from the user. Never guess an ID. For data changes use update_actor_item. In a replacement or migration flow, run create_actor_item first and this second: the calls are not atomic, and failing after the delete loses the item. Confirm the actorId, itemId and selected target with the user before calling. ' +
       CONFIRM_FIRST +
       ' ' +
       WRITE_GATE,
@@ -833,7 +833,7 @@ export const worldTools = [
   {
     name: 'refresh_world_data',
     description:
-      'Re-fetch the selected target\'s world snapshot and rebuild its session/integration context. Explicit refresh invalidates pending work from the previous session generation. Socketio/composite follow supported native broadcasts; rest-api needs explicit refresh for changes made elsewhere in Foundry. Use after changes not represented by the cache, including synthetic token actors, or to recheck runtime/integration availability. Routine refresh of a known stale cache already occurs before core calls without replacing the session. This operation does not mutate the remote world.',
+      "Re-fetch the selected target's world snapshot and rebuild its session/integration context. Explicit refresh invalidates pending work from the previous session generation. Socketio/composite follow supported native broadcasts; rest-api needs explicit refresh for changes made elsewhere in Foundry. Use after changes not represented by the cache, including synthetic token actors, or to recheck runtime/integration availability. Routine refresh of a known stale cache already occurs before core calls without replacing the session. This operation does not mutate the remote world.",
     inputSchema: {
       type: 'object',
       properties: {},

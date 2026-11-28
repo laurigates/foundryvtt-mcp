@@ -45,10 +45,9 @@ async function nativeSession() {
     pythonExecutable: 'python3',
     integrationTimeoutMs: 1000,
   };
-  const provider = new SocketIOProvider(config.provider as Extract<
-    TargetConfig['provider'],
-    { kind: 'socketio' }
-  >);
+  const provider = new SocketIOProvider(
+    config.provider as Extract<TargetConfig['provider'], { kind: 'socketio' }>,
+  );
   const socket = { connected: true, emit: vi.fn(), off: vi.fn(), disconnect: vi.fn() };
   vi.spyOn(provider, 'connect').mockImplementation(async () => {
     Reflect.set(provider, 'generation', provider.getGeneration() + 1);

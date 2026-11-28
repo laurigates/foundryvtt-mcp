@@ -71,7 +71,10 @@ export class RestApiProvider extends DocumentProvider {
       await this.readSnapshot();
       assertOperationCurrent();
       if (epoch !== this.generation) {
-        throw new ProviderError('session_changed', 'The connection changed while loading the world');
+        throw new ProviderError(
+          'session_changed',
+          'The connection changed while loading the world',
+        );
       }
       this._isConnected = true;
     } catch (error) {

@@ -68,10 +68,7 @@ describe('applyDocumentBroadcastWithStatus', () => {
     );
     expect(applyDocumentBroadcastWithStatus(world, broadcast({ result: [] }))).toBe('irrelevant');
     expect(
-      applyDocumentBroadcastWithStatus(
-        world,
-        broadcast({ action: 'delete', result: ['missing'] }),
-      ),
+      applyDocumentBroadcastWithStatus(world, broadcast({ action: 'delete', result: ['missing'] })),
     ).toBe('irrelevant');
     expect(
       applyDocumentBroadcastWithStatus(

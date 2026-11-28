@@ -143,9 +143,7 @@ describe('DiagnosticsClient', () => {
 
       const result = await diagnosticsClient.searchLogs({ pattern: 'TypeError' });
 
-      expect(mockProvider.get).toHaveBeenCalledWith(
-        '/api/diagnostics/search?pattern=TypeError',
-      );
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/search?pattern=TypeError');
       expect(result.matches).toBe(1);
       expect(result.logs[0].message).toContain('TypeError');
     });
@@ -273,9 +271,7 @@ describe('DiagnosticsClient', () => {
 
       const result = await diagnosticsClient.diagnoseErrors(3600);
 
-      expect(mockProvider.get).toHaveBeenCalledWith(
-        '/api/diagnostics/errors?timeframe=3600',
-      );
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
       expect(result.healthScore).toBe(75);
       expect(result.summary.totalErrors).toBe(5);
       expect(result.suggestions).toHaveLength(1);
@@ -295,9 +291,7 @@ describe('DiagnosticsClient', () => {
 
       await diagnosticsClient.diagnoseErrors();
 
-      expect(mockProvider.get).toHaveBeenCalledWith(
-        '/api/diagnostics/errors?timeframe=3600',
-      );
+      expect(mockProvider.get).toHaveBeenCalledWith('/api/diagnostics/errors?timeframe=3600');
     });
   });
 

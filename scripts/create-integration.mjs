@@ -52,9 +52,11 @@ class Adapter:
         return await context.invoke(operation, arguments)
 `;
 
-const bindingSource = '// Scaffold only: implement a specific upstream contract before making its probe ready.\n' +
+const bindingSource =
+  '// Scaffold only: implement a specific upstream contract before making its probe ready.\n' +
   'throw Object.assign(new Error("Integration skeleton is not implemented"), { code: "integration_not_ready" });\n';
-const probeSource = '// INTEGRATION_PROBE: no capability is advertised by an unfinished scaffold.\n' +
+const probeSource =
+  '// INTEGRATION_PROBE: no capability is advertised by an unfinished scaffold.\n' +
   'return { ready: false, reason: "Integration skeleton is not implemented" };\n';
 
 const testSource = String.raw`import assert from 'node:assert/strict';
@@ -69,44 +71,87 @@ test('unfinished scaffold is unavailable and cannot report an operation as compl
 `;
 
 async function exists(path) {
-  try { await access(path); return true; }
-  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function safeParent(path) {
   await mkdir(path, { recursive: true });
-  if (await realpath(path) !== path) throw new Error(`Scaffold directory may not alias another path: ${path}`);
+  if ((await realpath(path)) !== path) {
+    throw new Error(`Scaffold directory may not alias another path: ${path}`);
+  }
 }
 
-export async function createIntegration({ kind, id, foundry, upstream, packageRoot = checkoutRoot }) {
-  if (!['system', 'module'].includes(kind)) throw new Error('--kind must be system or module');
-  if (typeof id !== 'string' || !INTEGRATION_ID.test(id) || id.length > 100) throw new Error('--id must be a safe integration identifier of at most 100 characters');
+export async function createIntegration({
+  kind,
+  id,
+  foundry,
+  upstream,
+  packageRoot = checkoutRoot,
+}) {
+  if (!['system', 'module'].includes(kind)) {
+    throw new Error('--kind must be system or module');
+  }
+  if (typeof id !== 'string' || !INTEGRATION_ID.test(id) || id.length > 100) {
+    throw new Error('--id must be a safe integration identifier of at most 100 characters');
+  }
   const foundryGeneration = parseGeneration(foundry);
   if (upstream !== undefined) {
     let url;
-    try { url = new URL(upstream); } catch { throw new Error('--upstream must be an HTTPS repository URL'); }
-    if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.search) throw new Error('--upstream must be an HTTPS repository URL without credentials, query, or fragment');
+    try {
+      url = new URL(upstream);
+    } catch {
+      throw new Error('--upstream must be an HTTPS repository URL');
+    }
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.search) {
+      throw new Error(
+        '--upstream must be an HTTPS repository URL without credentials, query, or fragment',
+      );
+    }
   }
   const base = await realpath(packageRoot);
   const family = join(base, kind === 'system' ? 'systems' : 'modules');
   await safeParent(family);
   const identity = join(family, id);
   await safeParent(identity);
-  if (await exists(join(identity, 'manifest.json'))) throw new Error('Cannot add a generation beneath a legacy flat package');
+  if (await exists(join(identity, 'manifest.json'))) {
+    throw new Error('Cannot add a generation beneath a legacy flat package');
+  }
   const root = join(identity, String(foundryGeneration));
   // Exclusive creation prevents accidental overwrites, including empty folders.
   await mkdir(root);
   const operation = {
     id: 'get_status',
-    description: 'Unimplemented scaffold; unavailable until its fixed binding and probe are completed.',
+    description:
+      'Unimplemented scaffold; unavailable until its fixed binding and probe are completed.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
-    outputSchema: { type: 'object', additionalProperties: false, properties: { status: { type: 'string', enum: ['not-implemented'] } }, required: ['status'] },
-    binding: 'bindings/get_status.js', probe: 'probes/get_status.js', readOnly: true,
+    outputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { status: { type: 'string', enum: ['not-implemented'] } },
+      required: ['status'],
+    },
+    binding: 'bindings/get_status.js',
+    probe: 'probes/get_status.js',
+    readOnly: true,
   };
   const manifest = {
-    schemaVersion: 1, protocolVersion: 1, kind, id, foundryGeneration,
-    adapterVersion: '0.1.0', updatedAt: new Date().toISOString().slice(0, 10),
-    entrypoint: 'adapter.py', status: 'experimental',
+    schemaVersion: 1,
+    protocolVersion: 1,
+    kind,
+    id,
+    foundryGeneration,
+    adapterVersion: '0.1.0',
+    updatedAt: new Date().toISOString().slice(0, 10),
+    entrypoint: 'adapter.py',
+    status: 'experimental',
     upstream: { repository: upstream ?? null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: {
       foundryVersions: [String(foundryGeneration)],
@@ -118,7 +163,13 @@ export async function createIntegration({ kind, id, foundry, upstream, packageRo
   const targetId = 'replace-with-your-target-id';
   const recipes = {
     target_id: targetId,
-    calls: [{ id: 'unavailable-scaffold', name: `${kind}_${id}_get_status`, arguments: { target_id: targetId } }],
+    calls: [
+      {
+        id: 'unavailable-scaffold',
+        name: `${kind}_${id}_get_status`,
+        arguments: { target_id: targetId },
+      },
+    ],
     workflows: [{ id: 'implementation-required', steps: ['unavailable-scaffold'] }],
   };
   const readme = `# ${id} — Foundry ${foundryGeneration} integration scaffold
@@ -142,14 +193,27 @@ From this folder, run \`node build.mjs --write\`, \`node build.mjs --check\`, an
 Copy this complete folder to \`${kind === 'system' ? 'systems' : 'modules'}/${id}/${foundryGeneration}/\` under the host package root. Keep every variant self-contained. There is no central adapter registry to edit. Restart the host or refresh the affected target after copying; the manager selects the installed runtime's generation and does not fall back to a sibling generation. Do not copy this unfinished scaffold into a live installation expecting an available tool.
 `;
   const files = new Map([
-    ['README.md', readme], ['adapter.py', adapterSource], ['build.mjs', buildSource],
-    ['src/registry.mjs', '// Authored scaffold source. No runtime capability is ready yet.\n' +
-      'export const manifest = ' + JSON.stringify(manifest, null, 2) + ';\n' +
-      'export const binding = ' + JSON.stringify(bindingSource) + ';\n' +
-      'export const probe = ' + JSON.stringify(probeSource) + ';\n'],
-    ['manifest.json', JSON.stringify(manifest, null, 2) + '\n'],
-    ['bindings/get_status.js', bindingSource], ['probes/get_status.js', probeSource],
-    ['tests/runtime.test.mjs', testSource], ['examples/workflows.json', JSON.stringify(recipes, null, 2) + '\n'],
+    ['README.md', readme],
+    ['adapter.py', adapterSource],
+    ['build.mjs', buildSource],
+    [
+      'src/registry.mjs',
+      '// Authored scaffold source. No runtime capability is ready yet.\n' +
+        'export const manifest = ' +
+        JSON.stringify(manifest, null, 2) +
+        ';\n' +
+        'export const binding = ' +
+        JSON.stringify(bindingSource) +
+        ';\n' +
+        'export const probe = ' +
+        JSON.stringify(probeSource) +
+        ';\n',
+    ],
+    ['manifest.json', `${JSON.stringify(manifest, null, 2)}\n`],
+    ['bindings/get_status.js', bindingSource],
+    ['probes/get_status.js', probeSource],
+    ['tests/runtime.test.mjs', testSource],
+    ['examples/workflows.json', `${JSON.stringify(recipes, null, 2)}\n`],
   ]);
   try {
     for (const [name, contents] of files) {
@@ -169,9 +233,13 @@ export function parseArguments(argv) {
   for (let index = 0; index < argv.length; index += 2) {
     const option = argv[index];
     const value = argv[index + 1];
-    if (!['--kind', '--id', '--foundry', '--upstream'].includes(option) || !value) throw new Error(`Invalid option: ${option ?? ''}`);
+    if (!['--kind', '--id', '--foundry', '--upstream'].includes(option) || !value) {
+      throw new Error(`Invalid option: ${option ?? ''}`);
+    }
     const key = option.slice(2);
-    if (key in options) throw new Error(`Duplicate option: ${option}`);
+    if (key in options) {
+      throw new Error(`Duplicate option: ${option}`);
+    }
     options[key] = value;
   }
   return options;
@@ -180,7 +248,9 @@ export function parseArguments(argv) {
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   try {
     const result = await createIntegration(parseArguments(process.argv.slice(2)));
-    console.log(`Created ${result.root}. The scaffold remains unavailable until implemented and tested.`);
+    console.log(
+      `Created ${result.root}. The scaffold remains unavailable until implemented and tested.`,
+    );
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

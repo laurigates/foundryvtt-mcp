@@ -146,25 +146,22 @@ describe('native provider trust boundaries', () => {
     { result: 'invalid' },
     { result: [42] },
     { result: [{ _id: ITEM_ID }] },
-  ])(
-    'does not confirm a delete from malformed acknowledgement %j',
-    async (response) => {
-      const { client, socket } = await connect();
-      socket.emit.mockClear();
-      socket.emit.mockImplementation((_event: string, ...args: unknown[]) => {
-        const acknowledge = args[1];
-        if (typeof acknowledge === 'function') {
-          acknowledge(response);
-        }
-        return socket;
-      });
-      await expect(client.deleteActorItem(ACTOR_ID, ITEM_ID)).rejects.toMatchObject({
-        code: 'outcome_unknown',
-      });
-      expect(client.isWorldDataStale()).toBe(true);
-      expect(socket.emit).toHaveBeenCalledOnce();
-    },
-  );
+  ])('does not confirm a delete from malformed acknowledgement %j', async (response) => {
+    const { client, socket } = await connect();
+    socket.emit.mockClear();
+    socket.emit.mockImplementation((_event: string, ...args: unknown[]) => {
+      const acknowledge = args[1];
+      if (typeof acknowledge === 'function') {
+        acknowledge(response);
+      }
+      return socket;
+    });
+    await expect(client.deleteActorItem(ACTOR_ID, ITEM_ID)).rejects.toMatchObject({
+      code: 'outcome_unknown',
+    });
+    expect(client.isWorldDataStale()).toBe(true);
+    expect(socket.emit).toHaveBeenCalledOnce();
+  });
 
   it.each([{ result: [] }, { result: [{}] }, { result: [{ _id: 42 }] }])(
     'does not confirm an update without a returned document: $result',

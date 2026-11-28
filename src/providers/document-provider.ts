@@ -915,10 +915,7 @@ export class DocumentProvider implements FoundryProvider {
    * attempt, honours the pause after a transport failure, and throws a
    * message naming the bridge; Socket.IO-only mode throws without any I/O.
    */
-  async restGet<T = unknown>(
-    url: string,
-    config?: AxiosRequestConfig,
-  ): Promise<AxiosResponse<T>> {
+  async restGet<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     const rest = this.rest;
     if (!rest) {
       throw new Error(

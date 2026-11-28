@@ -35,7 +35,9 @@ export async function testConnection(): Promise<void> {
           }
         } catch (error) {
           failures++;
-          console.log(`Actor read failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(
+            `Actor read failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
         }
       }
       // The historical REST transport must roll on the authenticated server.
@@ -49,7 +51,9 @@ export async function testConnection(): Promise<void> {
           }
         } catch (error) {
           failures++;
-          console.log(`REST dice roll failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(
+            `REST dice roll failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
         }
       }
       console.log(`Integration status: ${JSON.stringify(status.integrations)}`);
@@ -61,7 +65,9 @@ export async function testConnection(): Promise<void> {
   } finally {
     await sessions.close();
   }
-  console.log(`Checked ${config.targets.length} target(s); ${failures} connection/read failure(s).`);
+  console.log(
+    `Checked ${config.targets.length} target(s); ${failures} connection/read failure(s).`,
+  );
   process.exitCode = failures > 0 ? 1 : 0;
 }
 

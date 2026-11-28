@@ -57,7 +57,11 @@ describe('Relay operation context', () => {
   it('rejects an expired automatic refresh before it can overwrite the newer snapshot', async () => {
     const instance = provider();
     const response = deferred<unknown>();
-    Reflect.set(instance, 'request', vi.fn(() => response.promise));
+    Reflect.set(
+      instance,
+      'request',
+      vi.fn(() => response.promise),
+    );
     const context = new ProviderOperationContext(() => {});
     const pending = withOperationContext(context, () => instance.refreshWorldData());
     const rejected = expect(pending).rejects.toMatchObject({ code: 'session_changed' });
@@ -121,7 +125,8 @@ describe('Relay operation context', () => {
     Reflect.set(
       instance,
       'readSnapshot',
-      vi.fn()
+      vi
+        .fn()
         .mockImplementationOnce(async () => {
           await firstSnapshot.promise;
           throw new ProviderError('session_changed', 'Old connection');

@@ -6,7 +6,6 @@ export {
   DocumentProvider as FoundryClient,
   overlayDerivedValues,
 } from '../providers/document-provider.js';
-export { worldActorToFoundry, worldItemToFoundry, worldInfoToFoundry } from './native-mappers.js';
 export type {
   AttributePatch,
   CompendiumSearchParams,
@@ -17,4 +16,5 @@ export type {
   SearchActorsParams,
   SearchItemsParams,
 } from '../providers/types.js';
+export { worldActorToFoundry, worldInfoToFoundry, worldItemToFoundry } from './native-mappers.js';
 export { probeRestModule } from './rest-probe.js';

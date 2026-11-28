@@ -234,8 +234,11 @@ describe('FoundryClient dual transport', () => {
 
     it('keeps an explicit native provider native when a historical apiKey is present', async () => {
       const config = {
-        kind: 'socketio' as const, baseUrl: FOUNDRY_URL, apiKey: 'stale-key',
-        username: 'gm', password: 'secret',
+        kind: 'socketio' as const,
+        baseUrl: FOUNDRY_URL,
+        apiKey: 'stale-key',
+        username: 'gm',
+        password: 'secret',
       };
       const provider = new SocketIOProvider(config);
       expect(provider.kind).toBe('socketio');
@@ -249,8 +252,13 @@ describe('FoundryClient dual transport', () => {
 
     it('enables the explicit native bridge without changing the core provider', () => {
       const provider = new SocketIOProvider({
-        kind: 'socketio', baseUrl: FOUNDRY_URL, username: 'gm', password: 'secret',
-        restUrl: BRIDGE_URL, restApiKey: 'bridge-key', writeEnabled: true,
+        kind: 'socketio',
+        baseUrl: FOUNDRY_URL,
+        username: 'gm',
+        password: 'secret',
+        restUrl: BRIDGE_URL,
+        restApiKey: 'bridge-key',
+        writeEnabled: true,
       });
       expect(provider.kind).toBe('socketio');
       expect(provider.getTransportMode()).toBe('dual');
@@ -262,8 +270,13 @@ describe('FoundryClient dual transport', () => {
 
     it('keeps explicit legacy-rest read-only even with native credentials and a bridge URL', () => {
       const provider = new LegacyRestProvider({
-        kind: 'legacy-rest', baseUrl: FOUNDRY_URL, apiKey: 'bridge-key',
-        restUrl: BRIDGE_URL, username: 'gm', password: 'secret', writeEnabled: true,
+        kind: 'legacy-rest',
+        baseUrl: FOUNDRY_URL,
+        apiKey: 'bridge-key',
+        restUrl: BRIDGE_URL,
+        username: 'gm',
+        password: 'secret',
+        writeEnabled: true,
       });
       expect(provider.kind).toBe('legacy-rest');
       expect(provider.getTransportMode()).toBe('rest');

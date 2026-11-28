@@ -420,32 +420,41 @@ describe('Provider execution boundary', () => {
     ['unknown', '14.370', true],
     ['14.370', 'unknown', true],
     ['unknown', 'unknown', true],
-  ])('checks composite generation identity for core %s and relay %s', async (coreVersion, runtimeVersion, compatible) => {
-    const identity = {
-      world: { id: 'world-a', title: 'A' },
-      system: { id: 'dnd5e', version: 'test' },
-      modules: [], ready: true, origin: 'https://foundry.example',
-    };
-    vi.spyOn(SocketIOProvider.prototype, 'inspect').mockResolvedValue({
-      ...identity, foundryVersion: coreVersion,
-    });
-    vi.spyOn(RestApiProvider.prototype, 'inspect').mockResolvedValue({
-      ...identity, foundryVersion: runtimeVersion,
-    });
-    const provider = new CompositeProvider({
-      kind: 'composite',
-      core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
-      execution: {
-        kind: 'rest-api', relayUrl: 'http://localhost:30001',
-        apiKey: 'test-key', clientId: 'paired-a',
-      },
-    });
-    if (compatible) {
-      await expect(provider.inspect()).resolves.toMatchObject({ foundryVersion: runtimeVersion });
-    } else {
-      await expect(provider.inspect()).rejects.toMatchObject({ code: 'identity_mismatch' });
-    }
-  });
+  ])(
+    'checks composite generation identity for core %s and relay %s',
+    async (coreVersion, runtimeVersion, compatible) => {
+      const identity = {
+        world: { id: 'world-a', title: 'A' },
+        system: { id: 'dnd5e', version: 'test' },
+        modules: [],
+        ready: true,
+        origin: 'https://foundry.example',
+      };
+      vi.spyOn(SocketIOProvider.prototype, 'inspect').mockResolvedValue({
+        ...identity,
+        foundryVersion: coreVersion,
+      });
+      vi.spyOn(RestApiProvider.prototype, 'inspect').mockResolvedValue({
+        ...identity,
+        foundryVersion: runtimeVersion,
+      });
+      const provider = new CompositeProvider({
+        kind: 'composite',
+        core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
+        execution: {
+          kind: 'rest-api',
+          relayUrl: 'http://localhost:30001',
+          apiKey: 'test-key',
+          clientId: 'paired-a',
+        },
+      });
+      if (compatible) {
+        await expect(provider.inspect()).resolves.toMatchObject({ foundryVersion: runtimeVersion });
+      } else {
+        await expect(provider.inspect()).rejects.toMatchObject({ code: 'identity_mismatch' });
+      }
+    },
+  );
 
   it('discards a native snapshot that arrives after disconnect', async () => {
     const provider = new SocketIOProvider({ kind: 'socketio', baseUrl: 'http://localhost:30000' });
@@ -608,22 +617,25 @@ describe('Provider execution boundary', () => {
     [{ version: 'unknown', generation: 14 }, 'unknown', false],
     [{ generation: 15 }, '15', false],
     [{ generation: Number.NaN }, 'unknown', false],
-  ])('uses the same release identity for discovery and projections: %j', async (release, expected, projected) => {
-    const provider = new SocketIOProvider({
-      kind: 'socketio',
-      baseUrl: 'https://foundry.example',
-    });
-    const actor = {
-      _id: 'aaaaaaaaaaaaaaaa',
-      name: 'Hero',
-      type: 'character',
-      system: { attributes: { hp: { value: 10, max: 20 } } },
-    };
-    Reflect.set(provider, 'worldData', { ...snapshot(), release, actors: [actor] });
-    vi.spyOn(provider, 'isConnected').mockReturnValue(true);
-    expect((await provider.getWorldInfo()).coreVersion).toBe(expected);
-    expect((await provider.inspect()).foundryVersion).toBe(expected);
-    const result = await provider.getActor(actor._id);
-    expect(result.hp).toEqual(projected ? { value: 10, max: 20 } : undefined);
-  });
+  ])(
+    'uses the same release identity for discovery and projections: %j',
+    async (release, expected, projected) => {
+      const provider = new SocketIOProvider({
+        kind: 'socketio',
+        baseUrl: 'https://foundry.example',
+      });
+      const actor = {
+        _id: 'aaaaaaaaaaaaaaaa',
+        name: 'Hero',
+        type: 'character',
+        system: { attributes: { hp: { value: 10, max: 20 } } },
+      };
+      Reflect.set(provider, 'worldData', { ...snapshot(), release, actors: [actor] });
+      vi.spyOn(provider, 'isConnected').mockReturnValue(true);
+      expect((await provider.getWorldInfo()).coreVersion).toBe(expected);
+      expect((await provider.inspect()).foundryVersion).toBe(expected);
+      const result = await provider.getActor(actor._id);
+      expect(result.hp).toEqual(projected ? { value: 10, max: 20 } : undefined);
+    },
+  );
 });

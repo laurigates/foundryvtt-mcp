@@ -1,6 +1,6 @@
 # Review response: projection, catalog and integration-contract hardening
 
-Status: P1–P5 are committed (`228368f` and earlier); the CodeQL fixes (P6) are in
+Status: P1–P6 are committed (`228368f`, `c3c1096`, `4280650`); the lint repair (P7) is in
 the working tree. The operator owns commit and push.
 
 ## Evidence policy
@@ -24,7 +24,8 @@ read from the repository, and are addressed in P6.
 | P4 | Integration contracts and the capability source of truth | `src/integrations/{types,manifest}.ts`, `src/tools/catalog.ts`, six `src/registry.mjs`, six `manifest.json`, `scripts/create-integration.mjs`, `docs/guides/writing-integrations.md`, three test files | `228368f` |
 | P5 | Python interpreter resolution | `python-worker.ts` callers in four integration test files, `src/foundry/__tests__/legacy-client.test.ts` | `c3d1b89` |
 | — | Load-dependent test timeouts | `src/integrations/__tests__/lifecycle.test.ts` | `228368f` |
-| P6 | CodeQL alerts (2 high, 1 medium) | `src/tools/handlers/{chat,journals}.ts`, `src/foundry/{world-cache,world-search}.ts`, two handler tests | local |
+| P6 | CodeQL alerts (2 high, 1 medium) | `src/tools/handlers/{chat,journals}.ts`, `src/foundry/{world-cache,world-search}.ts`, two handler tests | `c3c1096` |
+| P7 | Lint scope widened by `66342fd` | 19 files: four `scripts/` files, `src/foundry/client.ts`, 14 test and source files | local |
 
 ### P1 — projection is display-only again
 
@@ -113,6 +114,27 @@ Two regression tests assert the sanitization fix: a chat message and a journal
 page built from `<scr<script>ipt>alert(1)</script>` must leave no `<` in the
 output.
 
+### P7 — the widened lint scope is green again
+
+`66342fd style(lint): run Biome over scripts/ and tests/, not only src/` widened
+`files.includes` to `scripts/**`, `tests/**` and `*.config.ts`, but the files it
+newly covered still carried 51 errors: 30 `useBlockStatements`, 3
+`organizeImports` and 18 files the formatter had never seen. `bun run lint` is
+`biome check`, so the job failed on the branch while `main` stayed green.
+
+The repair stays inside what the linter reported. `biome check --write` applied
+the safe fixes (format and import order) to 19 files, and `--write --unsafe`
+wrapped the 30 brace-less statements in the four `scripts/` files. No assertion,
+behaviour or test count changed: `src/foundry/client.ts` only reorders a
+re-export, and the script diffs are reflows and blocks.
+
+**Windows pitfall, worth remembering.** With `core.autocrlf=true` the working
+tree is CRLF while the repository stores LF, so `biome check` in the checkout
+reports 174 errors, 141 of them format-only false positives the Linux runner
+never sees. The real figure comes from the LF blobs: export the index with
+`git -c core.autocrlf=false checkout-index -a -f --prefix=<tmp>` and run Biome
+there. That is how the 51 errors were separated from the noise.
+
 ## What is gained
 
 1. **PF2e actors display HP and AC again** and the HP cap error is actionable.
@@ -133,6 +155,8 @@ output.
 10. **Tool text output is tag-free by construction.** The handlers no longer rely
     on a regex that can rebuild the tag it removed, and the scanner they share is
     linear on hostile input.
+11. **The lint scope and the code agree.** `scripts/` and `tests/` are both linted
+    and clean now, so the widened `files.includes` no longer hides a failing gate.
 
 ## What is lost or accepted as risk
 
@@ -164,6 +188,8 @@ output.
   operator decision, because it changes checkout behaviour for everyone.
 - **Commit and push**: operator-only.
 - **Live verification** of PF2e HP/AC display and the dual-mode probe.
+- **Local lint on Windows** still needs the LF-blob export above (or
+  `.gitattributes` with `eol=lf`) before it agrees with CI.
 
 ## Verification log
 
@@ -175,6 +201,8 @@ output.
 | `node scripts/integrations.mjs test` | 646 tests, 0 failures |
 | `node --test scripts/tests/integration-tooling.test.mjs` | 7 tests, 0 failures |
 | `node_modules/.bin/biome.exe check <touched files>` | no findings (only the pre-existing deprecated-config warning) |
+| `node_modules/.bin/biome.exe check` (LF blobs, whole repo) | exit 0, 60 warnings, 3 infos |
+| `node_modules/.bin/biome.exe check` (CRLF working tree) | 174 errors, 141 of them CRLF format noise |
 
 Test count moved from 1171 to 1207 across this work.
 
