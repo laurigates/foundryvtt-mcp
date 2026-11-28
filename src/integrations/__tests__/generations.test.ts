@@ -403,12 +403,16 @@ describe('target generation selection', () => {
         targetId: `target-${generation}`,
         packageRoot: root,
         writesEnabled,
-        execute: async (script, args, readOnly) => {
+        execute: async (script, args, options) => {
           expect(script).toContain(`VARIANT_${generation}`);
           if (script.includes('PROBE')) {
             return { ready: true };
           }
-          calls.push({ target: `target-${generation}`, write: !readOnly, actor: args.actor_uuid });
+          calls.push({
+            target: `target-${generation}`,
+            write: !options.readOnly,
+            actor: args.actor_uuid,
+          });
           return { target: `target-${generation}`, actor_uuid: args.actor_uuid };
         },
       });

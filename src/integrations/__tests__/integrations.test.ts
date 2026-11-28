@@ -54,13 +54,25 @@ describe('session integration isolation', () => {
   });
 
   it('selects one system and only active modules; executes the packaged binding', async () => {
-    const calls: Array<{ target: string; script: string; args: Record<string, unknown> }> = [];
+    const calls: Array<{
+      target: string;
+      script: string;
+      args: Record<string, unknown>;
+      operation: string;
+      readOnly: boolean;
+    }> = [];
     const make = (target: string) =>
       new IntegrationManager({
         targetId: target,
         packageRoot,
-        execute: async (script, args) => {
-          calls.push({ target, script, args });
+        execute: async (script, args, options) => {
+          calls.push({
+            target,
+            script,
+            args,
+            operation: options.operation,
+            readOnly: options.readOnly,
+          });
           if (script.includes('INTEGRATION_PROBE')) {
             return { ready: true };
           }
@@ -99,6 +111,20 @@ describe('session integration isolation', () => {
       expect(ar).toMatchObject({ target: 'a' });
       expect(br).toMatchObject({ target: 'b' });
       expect(calls.filter((call) => !call.script.includes('INTEGRATION_PROBE'))).toHaveLength(2);
+      // The relay receives a package-owned identity, never a caller-supplied name.
+      expect(calls.map((call) => call.operation)).toEqual(
+        expect.arrayContaining([
+          'system.dnd5e.14.get_actor_data#probe',
+          'system.dnd5e.14.get_actor_data',
+          'system.pf2e.14.get_actor_data#probe',
+          'system.pf2e.14.get_actor_data',
+        ]),
+      );
+      expect(
+        calls
+          .filter((call) => call.operation === 'system.dnd5e.14.get_actor_data')
+          .every((call) => call.readOnly),
+      ).toBe(true);
       await expect(a.call('system_dnd5e_get_actor_data', { actor_uuid: '' })).rejects.toThrow();
     } finally {
       await Promise.all([a.close(), b.close()]);

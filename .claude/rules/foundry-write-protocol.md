@@ -19,7 +19,7 @@ Read this before changing document reads, writes, providers, integration binding
 |---|---|---|
 | `socketio` | Direct authenticated Foundry world; cache with native document broadcasts; opt-in core writes through `modifyDocument`; optional historical REST read augmentation | No generic runtime binding executor |
 | `legacy-rest` | Historical `/api/*` bridge; different capabilities, no native Socket.IO write path | No paired relay execution |
-| `rest-api` | Paired runtime/relay snapshot and opt-in document writes using Foundry's runtime document APIs | Fixed package-owned JS bindings over `execute-js` |
+| `rest-api` | Paired runtime/relay snapshot and opt-in document writes using Foundry's runtime document APIs | Named package-owned operations by default, fixed bindings over `execute-js` as an opt-in |
 | `composite` | Socket.IO for core operations and write protocol | Paired relay for packaged integration bindings on the same identity-verified world |
 
 In legacy environment configuration, `FOUNDRY_API_KEY` with `FOUNDRY_REST_URL` and native credentials augments the Socket.IO target with the historical bridge. A key without that complete combination retains **`legacy-rest`**. An explicit native target uses `restUrl` and `restApiKey` (or `restApiKeyEnv`) for the same augmentation. The ThreeHats relay uses separate `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` settings. Explicit target lists do not inherit global credentials or the global write flag. Verify remote world/origin and permissions before enabling writes.

@@ -17,7 +17,11 @@ export class CompositeProvider extends SocketIOProvider {
     return 'composite';
   }
   override get capabilities(): ReadonlySet<string> {
-    return new Set([...super.capabilities, 'runtime.execute']);
+    return new Set([
+      ...super.capabilities,
+      'runtime.execute',
+      ...(this.execution.capabilities.has('runtime.named') ? ['runtime.named'] : []),
+    ]);
   }
   override getGeneration(): number {
     return super.getGeneration() + this.execution.getGeneration();
@@ -89,7 +93,7 @@ export class CompositeProvider extends SocketIOProvider {
   override async execute(
     script: string,
     args: Record<string, unknown>,
-    options: { readOnly: boolean },
+    options: { readOnly: boolean; operation?: string },
   ): Promise<unknown> {
     if (!this.isConnected()) {
       throw new ProviderError('target_offline', 'The composed target is disconnected');

@@ -102,7 +102,7 @@ specified together. Explicit targets do not inherit `FOUNDRY_WRITE_ENABLED`.
 |---|---|---|
 | `socketio` | `baseUrl`, world user credentials, optional socket/timeouts and paired `restUrl` / `restApiKey` | Native documents and world cache, optionally augmented by historical bridge reads |
 | `legacy-rest` | `baseUrl`, `apiKey` | Historical `/api/*` bridge; capability-limited |
-| `rest-api` | `relayUrl`, `apiKey`, `clientId`, optional `executeJsPath` | Paired runtime through the relay |
+| `rest-api` | `relayUrl`, `apiKey`, `clientId`, optional `runtimeMode` / `runtimePath` / `executeJsPath` | Paired runtime through the relay; named operations by default |
 | `composite` | `core` socket configuration and `execution` relay configuration | Deterministic core/runtime composition |
 
 ### Historical bridge read augmentation
@@ -122,15 +122,28 @@ bindings or replace the composite's `execution` provider.
 
 ### Paired runtime relay
 
-The REST provider currently uses `POST /execute-js`, with the configured client
-ID in the query and body, and expects a JSON `{ "success": true, "result": ... }`
-envelope. `executeJsPath` (or `FOUNDRY_REST_EXECUTE_JS_PATH` for environment
-configuration) changes the route on the same relay. No redirects are followed.
-The paired Foundry runtime must permit this operation. Credentials and runtime
-permissions are configured upstream; this server does not enable those settings.
+The REST provider sends **named operations** by default: `POST /mcp/operation`
+with `{ clientId, operation, args, write }`, answered by the JSON
+`{ "success": true, "result": ... }` envelope. The relay resolves the identifier,
+so no script source crosses the wire. `runtimePath` changes the route. Core work
+uses `core.snapshot`, `core.modify_document` and `core.roll_dice`; packages use
+`<kind>.<id>.<generation>.<operation>`, with `#probe` for the readiness check.
+An optional `identity` echo in the envelope re-verifies the bound world and
+origin on every call.
+
+The historical `execute-js` transport stays available as an explicit opt-in:
+`runtimeMode: 'execute-js'` (or `FOUNDRY_REST_RUNTIME_MODE=execute-js`) posts the
+package-owned binding source to `/execute-js`, and `executeJsPath` (or
+`FOUNDRY_REST_EXECUTE_JS_PATH`) changes that route. A target cannot mix the two:
+`executeJsPath` requires `execute-js`, `runtimePath` requires `named`. An
+`execute-js` relay must permit the operation explicitly. No redirects are
+followed in either mode. Credentials and runtime permissions are configured
+upstream; this server does not enable those settings.
 
 The relay backend obtains a world snapshot and executes fixed package-owned
-bindings. It does not expose arbitrary JavaScript as an MCP tool. Protocol tests
+bindings. It does not expose arbitrary JavaScript as an MCP tool. Named mode
+requires a relay that implements the operation contract above; an upstream relay
+that only offers `execute-js` keeps working through the opt-in. Protocol tests
 use a local fake relay; verify the chosen upstream relay version and a real
 Foundry runtime before relying on live compatibility.
 

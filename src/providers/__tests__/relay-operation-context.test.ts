@@ -43,6 +43,7 @@ function deferred<T>() {
 function provider() {
   const instance = new RestApiProvider({
     kind: 'rest-api',
+    runtimeMode: 'execute-js',
     relayUrl: 'http://relay.test',
     apiKey: 'test-key',
     clientId: 'test-client',
@@ -59,7 +60,7 @@ describe('Relay operation context', () => {
     const response = deferred<unknown>();
     Reflect.set(
       instance,
-      'request',
+      'requestScript',
       vi.fn(() => response.promise),
     );
     const context = new ProviderOperationContext(() => {});

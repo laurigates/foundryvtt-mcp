@@ -13,6 +13,7 @@ import {
   type IntegrationOperation,
   type IntegrationPackage,
   loadIntegrations,
+  operationName,
   toolName,
 } from './manifest.js';
 import {
@@ -30,7 +31,11 @@ export interface IntegrationManagerOptions {
   targetId: string;
   packageRoot?: string;
   writesEnabled?: boolean;
-  execute: (script: string, args: Record<string, unknown>, readOnly: boolean) => Promise<unknown>;
+  execute: (
+    script: string,
+    args: Record<string, unknown>,
+    options: { readOnly: boolean; operation: string },
+  ) => Promise<unknown>;
   onChange?: () => void;
 }
 
@@ -41,6 +46,9 @@ interface RegisteredOperation {
   output: ValidateFunction;
   script: string;
   probe: string;
+  /** Relay identity of the binding, and of its readiness probe. */
+  runtime: string;
+  runtimeProbe: string;
 }
 
 interface PackageVariants {
@@ -149,6 +157,12 @@ export class IntegrationManager {
             if (!binding) {
               throw new IntegrationError('invalid_manifest', `Missing binding for ${name}`);
             }
+            const runtime = operationName(
+              entry.manifest.kind,
+              entry.manifest.id,
+              entry.manifest.foundryGeneration,
+              definition.id,
+            );
             const operation: RegisteredOperation = {
               package: entry,
               definition,
@@ -156,6 +170,8 @@ export class IntegrationManager {
               output: this.ajv.compile(definition.outputSchema),
               script: binding.script,
               probe: binding.probe,
+              runtime,
+              runtimeProbe: `${runtime}#probe`,
             };
             const available = status.operations.find((candidate) => candidate.name === name);
             if (!available) {
@@ -301,7 +317,10 @@ export class IntegrationManager {
           call.possibleWrites += 1;
         }
         try {
-          return await this.options.execute(operation.script, args, operation.definition.readOnly);
+          return await this.options.execute(operation.script, args, {
+            readOnly: operation.definition.readOnly,
+            operation: operation.runtime,
+          });
         } catch (error) {
           if (
             !operation.definition.readOnly &&
@@ -358,7 +377,16 @@ export class IntegrationManager {
   }
 
   private async probe(operation: RegisteredOperation): Promise<void> {
-    const response = ProbeResult.parse(await this.options.execute(operation.probe, {}, true));
+    const response = ProbeResult.parse(
+      await this.options.execute(
+        operation.probe,
+        {},
+        {
+          readOnly: true,
+          operation: operation.runtimeProbe,
+        },
+      ),
+    );
     if (!response.ready) {
       throw new IntegrationError(
         'integration_not_ready',

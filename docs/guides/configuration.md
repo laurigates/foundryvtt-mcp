@@ -32,7 +32,9 @@ With no `FOUNDRY_API_KEY` or explicit `FOUNDRY_PROVIDER`, this uses authenticate
 | `FOUNDRY_REST_URL` | Historical bridge URL; a key without this URL or native credentials retains the `legacy-rest` provider |
 | `FOUNDRY_PROVIDER` | Optional explicit `socketio`, `legacy-rest`, `rest-api` or `composite` |
 | `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY`, `FOUNDRY_REST_CLIENT_ID` | Paired runtime relay configuration (separate from `FOUNDRY_API_KEY`) |
-| `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional relay execution endpoint path |
+| `FOUNDRY_REST_RUNTIME_MODE` | Relay transport: `named` (default) or `execute-js` |
+| `FOUNDRY_REST_RUNTIME_PATH` | Optional named-operation endpoint path; requires `named` |
+| `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional historical execution endpoint path; selects `execute-js` |
 | `FOUNDRY_EXPECTED_WORLD_ID`, `FOUNDRY_EXPECTED_ORIGIN` | Optional destination-identity pins; world ID required for composite targets |
 | `FOUNDRY_WRITE_ENABLED` | Single-target write opt-in, default `false` |
 | `FOUNDRY_TIMEOUT`, `FOUNDRY_RETRY_ATTEMPTS`, `FOUNDRY_RETRY_DELAY` | Native/legacy transport timeouts and read retry settings |

@@ -110,6 +110,24 @@ export function toolName(kind: IntegrationKind, id: string, operation: string): 
   return name;
 }
 
+/**
+ * Stable relay identity for a package operation. The generation keeps two
+ * variants of the same package distinct, because a relay holds the bindings of
+ * every installed generation. A probe is the same operation with its own suffix.
+ */
+export function operationName(
+  kind: IntegrationKind,
+  id: string,
+  generation: number | undefined,
+  operation: string,
+): string {
+  const name = `${kind}.${id}.${generation === undefined ? '' : `${generation}.`}${operation}`;
+  if (!/^[A-Za-z0-9_.-]+$/.test(name) || name.length > 128) {
+    throw new IntegrationError('invalid_tool_name', `Invalid integration operation name: ${name}`);
+  }
+  return name;
+}
+
 async function containedFile(root: string, path: string): Promise<string> {
   const base = await realpath(root);
   const file = await realpath(resolve(root, path));

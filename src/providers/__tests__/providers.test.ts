@@ -80,6 +80,7 @@ describe('Provider execution boundary', () => {
     );
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -98,6 +99,7 @@ describe('Provider execution boundary', () => {
     );
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -114,6 +116,7 @@ describe('Provider execution boundary', () => {
     );
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -132,6 +135,7 @@ describe('Provider execution boundary', () => {
     );
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -152,6 +156,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -176,6 +181,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -208,6 +214,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -247,6 +254,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -271,6 +279,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -305,6 +314,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -343,6 +353,7 @@ describe('Provider execution boundary', () => {
     });
     const provider = new RestApiProvider({
       kind: 'rest-api',
+      runtimeMode: 'execute-js',
       relayUrl: endpoint.url,
       clientId: 'paired-a',
       apiKey: 'test-key',
@@ -402,6 +413,7 @@ describe('Provider execution boundary', () => {
       core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
       execution: {
         kind: 'rest-api',
+        runtimeMode: 'execute-js',
         relayUrl: endpoint.url,
         apiKey: 'test-key',
         clientId: 'paired-a',
@@ -443,6 +455,7 @@ describe('Provider execution boundary', () => {
         core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
         execution: {
           kind: 'rest-api',
+          runtimeMode: 'execute-js',
           relayUrl: 'http://localhost:30001',
           apiKey: 'test-key',
           clientId: 'paired-a',
@@ -523,6 +536,7 @@ describe('Provider execution boundary', () => {
       core: { kind: 'socketio', baseUrl: 'https://foundry.example' },
       execution: {
         kind: 'rest-api',
+        runtimeMode: 'execute-js',
         relayUrl: 'http://localhost:30001',
         apiKey: 'test-key',
         clientId: 'paired-a',
@@ -638,4 +652,110 @@ describe('Provider execution boundary', () => {
       expect(result.hp).toEqual(projected ? { value: 10, max: 20 } : undefined);
     },
   );
+});
+
+describe('Named relay operations', () => {
+  const named = (endpoint: { url: string }, extra: Record<string, unknown> = {}) =>
+    new RestApiProvider({
+      kind: 'rest-api',
+      relayUrl: endpoint.url,
+      clientId: 'paired-a',
+      apiKey: 'test-key',
+      ...extra,
+    });
+
+  it('sends an operation identifier and never script source', async () => {
+    const endpoint = await relay((body, respond) => {
+      if (body.operation === 'core.snapshot') {
+        respond({ success: true, result: envelope() });
+        return;
+      }
+      respond({ success: true, result: body.args ?? null });
+    });
+    const provider = named(endpoint);
+    await provider.connect();
+    const result = await provider.execute(
+      'const ignored = true;',
+      { pile: 'Pile.1' },
+      {
+        readOnly: true,
+        operation: 'module.item-piles.13.get_pile',
+      },
+    );
+    expect(result).toEqual({ pile: 'Pile.1' });
+    expect(endpoint.requests[0]?.operation).toBe('core.snapshot');
+    expect(endpoint.requests[0]).not.toHaveProperty('script');
+    const call = endpoint.requests[1];
+    expect(call?.operation).toBe('module.item-piles.13.get_pile');
+    expect(call?.args).toEqual({ pile: 'Pile.1' });
+    expect(call?.write).toBe(false);
+    expect(call).not.toHaveProperty('script');
+    expect(provider.capabilities.has('runtime.named')).toBe(true);
+    await provider.disconnect();
+  });
+
+  it('routes a core write through a named operation', async () => {
+    const endpoint = await relay((body, respond) => {
+      if (body.operation === 'core.snapshot') {
+        respond({ success: true, result: envelope() });
+        return;
+      }
+      respond({ success: true, result: [] });
+    });
+    const provider = named(endpoint, { writeEnabled: true });
+    await provider.connect();
+    await provider.deleteActorItem('actor00000000001', 'item000000000001');
+    const call = endpoint.requests[1];
+    expect(call?.operation).toBe('core.modify_document');
+    expect(call?.write).toBe(true);
+    expect(call).not.toHaveProperty('script');
+    await provider.disconnect();
+  });
+
+  it('refuses a binding without a named operation', async () => {
+    const endpoint = await relay((_body, respond) =>
+      respond({ success: true, result: envelope() }),
+    );
+    const provider = named(endpoint);
+    await provider.connect();
+    await expect(provider.execute('return 1;', {}, { readOnly: true })).rejects.toMatchObject({
+      code: 'unsupported_operation',
+    });
+    await provider.disconnect();
+  });
+
+  it('rejects a transport path that belongs to the other mode', () => {
+    expect(() => named({ url: 'http://relay.test' }, { executeJsPath: '/execute-js' })).toThrow(
+      /executeJsPath requires runtimeMode 'execute-js'/,
+    );
+    expect(() =>
+      named(
+        { url: 'http://relay.test' },
+        { runtimeMode: 'execute-js', runtimePath: '/mcp/operation' },
+      ),
+    ).toThrow(/runtimePath requires runtimeMode 'named'/);
+  });
+
+  it('rejects a relay that reports another world for the same client', async () => {
+    let calls = 0;
+    const endpoint = await relay((_body, respond) => {
+      calls += 1;
+      if (calls === 1) {
+        respond({ success: true, result: envelope() });
+        return;
+      }
+      respond({
+        success: true,
+        result: {},
+        identity: { worldId: 'other-world', origin: 'https://foundry.example' },
+      });
+    });
+    const provider = named(endpoint);
+    await provider.connect();
+    await expect(
+      provider.execute('', {}, { readOnly: true, operation: 'core.roll_dice' }),
+    ).rejects.toMatchObject({ code: 'identity_mismatch' });
+    expect(provider.isConnected()).toBe(false);
+    await provider.disconnect();
+  });
 });

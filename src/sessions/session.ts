@@ -272,20 +272,20 @@ export class FoundrySession {
     const options: IntegrationManagerOptions = {
       targetId: this.config.id,
       writesEnabled: this.config.writeEnabled,
-      execute: async (script, args, readOnly) => {
+      execute: async (script, args, options) => {
         if (generation !== this.generation || this.closed || !this.provider.isConnected()) {
           throw new SessionError(
             'session_changed',
             `The execution context for target ${this.config.id} is no longer current`,
           );
         }
-        if (!readOnly && !this.config.writeEnabled) {
+        if (!options.readOnly && !this.config.writeEnabled) {
           throw new SessionError(
             'writes_disabled',
             `Writes are disabled for target ${this.config.id}`,
           );
         }
-        if (!readOnly) {
+        if (!options.readOnly) {
           this.requireReady();
         }
         const providerGeneration = this.provider.getGeneration();
@@ -298,11 +298,11 @@ export class FoundrySession {
         return this.scoped(
           () => {
             assertOperationCurrent();
-            return trackOperation(this.provider.execute(script, args, { readOnly }));
+            return trackOperation(this.provider.execute(script, args, options));
           },
           generation,
           providerGeneration,
-          !readOnly,
+          !options.readOnly,
         );
       },
       ...(this.options.packageRoot !== undefined ? { packageRoot: this.options.packageRoot } : {}),

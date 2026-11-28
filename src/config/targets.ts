@@ -42,6 +42,8 @@ const RestApiProviderSchema = z
     relayUrl: HttpUrl,
     apiKey: z.string().min(1),
     clientId: z.string().min(1),
+    runtimeMode: z.enum(['named', 'execute-js']).optional(),
+    runtimePath: z.string().startsWith('/').optional(),
     executeJsPath: z.string().startsWith('/').optional(),
     timeout: z.number().int().positive().default(10000),
     expectedWorldId: z.string().min(1).optional(),
@@ -139,6 +141,26 @@ const TargetSchema = z
         path: ['expectedOrigin'],
         message: 'Target and provider expectedOrigin values must agree',
       });
+    }
+    if (execution) {
+      // An explicit JS path is the opt-in for the historical transport. Without
+      // one, the relay receives named operations and never script source.
+      const mode =
+        execution.runtimeMode ?? (execution.executeJsPath === undefined ? 'named' : 'execute-js');
+      if (mode === 'named' && execution.executeJsPath !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['provider'],
+          message: "executeJsPath requires runtimeMode 'execute-js'",
+        });
+      }
+      if (mode === 'execute-js' && execution.runtimePath !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['provider'],
+          message: "runtimePath requires runtimeMode 'named'",
+        });
+      }
     }
   });
 
@@ -263,13 +285,19 @@ function relayConfig(
 ): RestApiProviderConfig {
   const worldId = target.expectedWorldId ?? input.expectedWorldId;
   const origin = target.expectedOrigin ?? input.expectedOrigin;
+  // An explicit JS path is the opt-in for the historical transport; otherwise the
+  // relay receives named operations and no script source.
+  const runtimeMode =
+    input.runtimeMode ?? (input.executeJsPath === undefined ? 'named' : 'execute-js');
   return {
     kind: 'rest-api',
     relayUrl: input.relayUrl,
     apiKey: input.apiKey,
     clientId: input.clientId,
+    runtimeMode,
     timeout: input.timeout,
     writeEnabled: target.writeEnabled,
+    ...(input.runtimePath !== undefined ? { runtimePath: input.runtimePath } : {}),
     ...(input.executeJsPath !== undefined ? { executeJsPath: input.executeJsPath } : {}),
     ...(worldId !== undefined ? { expectedWorldId: worldId } : {}),
     ...(origin !== undefined ? { expectedOrigin: origin } : {}),
@@ -372,6 +400,8 @@ export function normalizeLegacyTarget(
     apiKey: env.FOUNDRY_REST_API_KEY,
     clientId: env.FOUNDRY_REST_CLIENT_ID,
     timeout: foundry.timeout,
+    ...(env.FOUNDRY_REST_RUNTIME_MODE ? { runtimeMode: env.FOUNDRY_REST_RUNTIME_MODE } : {}),
+    ...(env.FOUNDRY_REST_RUNTIME_PATH ? { runtimePath: env.FOUNDRY_REST_RUNTIME_PATH } : {}),
     ...(env.FOUNDRY_REST_EXECUTE_JS_PATH
       ? { executeJsPath: env.FOUNDRY_REST_EXECUTE_JS_PATH }
       : {}),

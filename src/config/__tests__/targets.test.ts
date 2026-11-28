@@ -421,4 +421,78 @@ describe('target configuration', () => {
     expect(target.provider).toMatchObject({ kind: 'rest-api', apiKey: 'relay-key' });
     expect(target.provider).not.toHaveProperty('baseUrl');
   });
+
+  it('selects the relay runtime mode from the environment', () => {
+    const foundry = {
+      url: 'http://foundry.test',
+      apiKey: 'old-key',
+      socketPath: '/socket.io/',
+      timeout: 10000,
+      retryAttempts: 3,
+      retryDelay: 1000,
+      writeEnabled: false,
+    };
+    const named = normalizeLegacyTarget(foundry, {
+      FOUNDRY_PROVIDER: 'rest-api',
+      FOUNDRY_REST_RELAY_URL: 'http://relay.test',
+      FOUNDRY_REST_API_KEY: 'relay-key',
+      FOUNDRY_REST_CLIENT_ID: 'client-a',
+    });
+    expect(named.provider).toMatchObject({ runtimeMode: 'named' });
+    const script = normalizeLegacyTarget(foundry, {
+      FOUNDRY_PROVIDER: 'rest-api',
+      FOUNDRY_REST_RELAY_URL: 'http://relay.test',
+      FOUNDRY_REST_API_KEY: 'relay-key',
+      FOUNDRY_REST_CLIENT_ID: 'client-a',
+      FOUNDRY_REST_EXECUTE_JS_PATH: '/execute-js',
+    });
+    expect(script.provider).toMatchObject({
+      runtimeMode: 'execute-js',
+      executeJsPath: '/execute-js',
+    });
+  });
+});
+
+describe('relay runtime mode', () => {
+  const load = (provider: Record<string, unknown>) =>
+    loadTargetConfiguration({
+      FOUNDRY_TARGETS_JSON: JSON.stringify([
+        {
+          id: 'relay',
+          expectedWorldId: 'world-a',
+          provider: {
+            kind: 'rest-api',
+            relayUrl: 'https://relay.test',
+            apiKey: 'relay-key',
+            clientId: 'client-a',
+            ...provider,
+          },
+        },
+      ]),
+    })?.[0]?.provider;
+
+  it('defaults to named operations', () => {
+    expect(load({})).toMatchObject({ runtimeMode: 'named' });
+    expect(load({})).not.toHaveProperty('executeJsPath');
+  });
+
+  it('treats an explicit JS path as the opt-in for the historical transport', () => {
+    expect(load({ executeJsPath: '/execute-js' })).toMatchObject({ runtimeMode: 'execute-js' });
+  });
+
+  it('keeps a configured named runtime path', () => {
+    expect(load({ runtimePath: '/mcp/operation' })).toMatchObject({
+      runtimeMode: 'named',
+      runtimePath: '/mcp/operation',
+    });
+  });
+
+  it('rejects a transport path that belongs to the other mode', () => {
+    expect(() => load({ runtimeMode: 'named', executeJsPath: '/execute-js' })).toThrow(
+      /executeJsPath requires runtimeMode 'execute-js'/,
+    );
+    expect(() => load({ runtimeMode: 'execute-js', runtimePath: '/mcp/operation' })).toThrow(
+      /runtimePath requires runtimeMode 'named'/,
+    );
+  });
 });

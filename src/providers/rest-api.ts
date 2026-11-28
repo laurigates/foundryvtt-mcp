@@ -6,18 +6,45 @@ import { DocumentProvider } from './document-provider.js';
 import { ProviderError } from './errors.js';
 import { assertOperationCurrent, trackOperation } from './operation-context.js';
 import { parseSnapshot, SNAPSHOT_SCRIPT } from './snapshot.js';
-import type { FoundryEnvironment, ProviderKind, RestApiProviderConfig } from './types.js';
+import type {
+  FoundryEnvironment,
+  ProviderKind,
+  RestApiProviderConfig,
+  RestRuntimeMode,
+} from './types.js';
 
 const EnvelopeSchema = z.object({
   success: z.boolean(),
   result: z.unknown().optional(),
   error: z.unknown().optional(),
+  /** Optional echo of the runtime identity; a mismatch invalidates the binding. */
+  identity: z.object({ worldId: z.string(), origin: z.string() }).optional(),
 });
 
-/** ThreeHats relay backend. The remote client must explicitly allow execute-js. */
+/** Core operations every named-operation relay must provide; never caller-supplied code. */
+const SNAPSHOT_OPERATION = 'core.snapshot';
+const MODIFY_DOCUMENT_OPERATION = 'core.modify_document';
+const ROLL_DICE_OPERATION = 'core.roll_dice';
+const DEFAULT_RUNTIME_PATH = '/mcp/operation';
+const DEFAULT_EXECUTE_JS_PATH = '/execute-js';
+
+function relayPath(value: string, field: string): string {
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('://')) {
+    throw new Error(`${field} must be a relative absolute path on the configured relay`);
+  }
+  return value;
+}
+
+/**
+ * ThreeHats relay backend. Named operations are the default transport; the
+ * historical `execute-js` route stays available as an explicit opt-in.
+ */
 export class RestApiProvider extends DocumentProvider {
   private readonly relay: AxiosInstance;
   private readonly relayConfig: RestApiProviderConfig;
+  private readonly runtimeMode: RestRuntimeMode;
+  private readonly runtimePath: string;
+  private readonly executeJsPath: string;
   private readonly pending = new Set<AbortController>();
   private boundIdentity: { worldId: string; origin: string } | undefined;
   private runtimeReady = false;
@@ -31,10 +58,18 @@ export class RestApiProvider extends DocumentProvider {
     if (!config.apiKey || !config.clientId) {
       throw new Error('REST API provider requires apiKey and clientId');
     }
-    const path = config.executeJsPath ?? '/execute-js';
-    if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
-      throw new Error('executeJsPath must be a relative absolute path on the configured relay');
+    this.runtimeMode = config.runtimeMode ?? 'named';
+    if (this.runtimeMode === 'named' && config.executeJsPath !== undefined) {
+      throw new Error("executeJsPath requires runtimeMode 'execute-js'");
     }
+    if (this.runtimeMode === 'execute-js' && config.runtimePath !== undefined) {
+      throw new Error("runtimePath requires runtimeMode 'named'");
+    }
+    this.runtimePath = relayPath(config.runtimePath ?? DEFAULT_RUNTIME_PATH, 'runtimePath');
+    this.executeJsPath = relayPath(
+      config.executeJsPath ?? DEFAULT_EXECUTE_JS_PATH,
+      'executeJsPath',
+    );
     this.relayConfig = config;
     this.relay = axios.create({
       baseURL: config.relayUrl,
@@ -54,6 +89,7 @@ export class RestApiProvider extends DocumentProvider {
       'core.read',
       'core.cache',
       'runtime.execute',
+      ...(this.runtimeMode === 'named' ? ['runtime.named'] : []),
       ...(this.config.writeEnabled ? ['core.write'] : []),
     ]);
   }
@@ -98,7 +134,10 @@ export class RestApiProvider extends DocumentProvider {
 
   private async readSnapshot(): Promise<void> {
     const epoch = this.generation;
-    const result = await this.request(SNAPSHOT_SCRIPT, {}, true);
+    const result =
+      this.runtimeMode === 'execute-js'
+        ? await this.requestScript(SNAPSHOT_SCRIPT, {}, true)
+        : await this.requestOperation(SNAPSHOT_OPERATION, {}, true);
     // Session refresh can replace the snapshot without changing the transport
     // epoch. An earlier automatic refresh must not overwrite that new snapshot.
     assertOperationCurrent();
@@ -162,7 +201,7 @@ export class RestApiProvider extends DocumentProvider {
   override async execute(
     script: string,
     args: Record<string, unknown>,
-    options: { readOnly: boolean },
+    options: { readOnly: boolean; operation?: string },
   ): Promise<unknown> {
     assertOperationCurrent();
     if (!this.isConnected()) {
@@ -176,7 +215,16 @@ export class RestApiProvider extends DocumentProvider {
     }
     const epoch = this.generation;
     try {
-      return await this.request(script, args, options.readOnly);
+      if (this.runtimeMode === 'execute-js') {
+        return await this.requestScript(script, args, options.readOnly);
+      }
+      if (options.operation === undefined) {
+        throw new ProviderError(
+          'unsupported_operation',
+          'This target executes named operations and requires an operation identifier',
+        );
+      }
+      return await this.requestOperation(options.operation, args, options.readOnly);
     } finally {
       // A refresh may finish while the remote write is still running. Its
       // snapshot cannot establish the final state of that write. An expired
@@ -196,15 +244,12 @@ export class RestApiProvider extends DocumentProvider {
     }
   }
 
-  private async request(
+  /** Package-owned binding source for relays that only implement `execute-js`. */
+  private async requestScript(
     script: string,
     args: Record<string, unknown>,
     readOnly: boolean,
   ): Promise<unknown> {
-    // This check is outside the transport catch: a cancelled operation has not
-    // sent anything and must not be misreported as a new network failure.
-    assertOperationCurrent();
-    const epoch = this.generation;
     const identity = this.boundIdentity;
     const guard = identity
       ? `
@@ -213,16 +258,64 @@ if (typeof game === 'undefined' || !game.ready || game.world.id !== ${JSON.strin
 }`
       : '';
     // JSON encoding preserves argument boundaries, including quotes and line breaks.
-    const body = {
-      clientId: this.relayConfig.clientId,
-      script: `const args = ${JSON.stringify(args)};\n${guard}\nreturn await (async () => {\n${script}\n})();`,
-    };
+    return this.send(
+      this.executeJsPath,
+      {
+        clientId: this.relayConfig.clientId,
+        script: `const args = ${JSON.stringify(args)};\n${guard}\nreturn await (async () => {\n${script}\n})();`,
+      },
+      readOnly,
+    );
+  }
+
+  /** Named operation: the relay resolves the identifier and no code crosses the wire. */
+  private async requestOperation(
+    operation: string,
+    args: Record<string, unknown>,
+    readOnly: boolean,
+  ): Promise<unknown> {
+    return this.send(
+      this.runtimePath,
+      {
+        clientId: this.relayConfig.clientId,
+        operation,
+        args,
+        write: !readOnly,
+      },
+      readOnly,
+    );
+  }
+
+  /** A confirmed identity change invalidates the entire bound connection. */
+  private dropBoundIdentity(controller: AbortController): void {
+    // Keep it offline until an explicit reconnect binds a fresh snapshot.
+    this.generation++;
+    this._isConnected = false;
+    this.runtimeReady = false;
+    this.worldDataStale = this.worldData !== null;
+    for (const pending of this.pending) {
+      if (pending !== controller) {
+        pending.abort();
+      }
+    }
+  }
+
+  /** Envelope, epoch, identity and error mapping shared by both transports. */
+  private async send(
+    path: string,
+    body: Record<string, unknown>,
+    readOnly: boolean,
+  ): Promise<unknown> {
+    // This check is outside the transport catch: a cancelled operation has not
+    // sent anything and must not be misreported as a new network failure.
+    assertOperationCurrent();
+    const epoch = this.generation;
     const controller = new AbortController();
     assertOperationCurrent();
     this.pending.add(controller);
     try {
       const response = await trackOperation(
-        this.relay.post(this.relayConfig.executeJsPath ?? '/execute-js', body, {
+        this.relay.post(path, body, {
           params: { clientId: this.relayConfig.clientId },
           signal: controller.signal,
         }),
@@ -246,22 +339,25 @@ if (typeof game === 'undefined' || !game.ready || game.world.id !== ${JSON.strin
         throw new ProviderError(readOnly ? 'execution_rejected' : 'outcome_unknown', detail);
       }
       const result = parsed.data.result;
+      const reported = parsed.data.identity;
+      if (
+        reported !== undefined &&
+        this.boundIdentity !== undefined &&
+        (reported.worldId !== this.boundIdentity.worldId ||
+          reported.origin !== this.boundIdentity.origin)
+      ) {
+        this.dropBoundIdentity(controller);
+        throw new ProviderError(
+          'identity_mismatch',
+          'The paired client changed world or origin; reconnect the target explicitly',
+        );
+      }
       if (
         typeof result === 'object' &&
         result !== null &&
         Reflect.get(result, '__foundryMcpError') === 'identity_mismatch'
       ) {
-        // A confirmed identity change invalidates the entire bound connection.
-        // Keep it offline until an explicit reconnect binds a fresh snapshot.
-        this.generation++;
-        this._isConnected = false;
-        this.runtimeReady = false;
-        this.worldDataStale = this.worldData !== null;
-        for (const pending of this.pending) {
-          if (pending !== controller) {
-            pending.abort();
-          }
-        }
+        this.dropBoundIdentity(controller);
         throw new ProviderError(
           'identity_mismatch',
           'The paired client changed world or origin; reconnect the target explicitly',
@@ -328,7 +424,7 @@ if (parent) {
 return Array.from(documents).map(document => args.action === 'delete' ? document.id : document.toObject(false));
 `,
       { type, action, operation },
-      { readOnly: false },
+      { readOnly: false, operation: MODIFY_DOCUMENT_OPERATION },
     );
     try {
       assertOperationCurrent();
@@ -365,7 +461,7 @@ return Array.from(documents).map(document => args.action === 'delete' ? document
     const result = await this.execute(
       'const roll = await new Roll(args.formula).evaluate(); return { total: roll.total, breakdown: roll.result };',
       { formula },
-      { readOnly: true },
+      { readOnly: true, operation: ROLL_DICE_OPERATION },
     );
     const roll = z.object({ total: z.number(), breakdown: z.string() }).parse(result);
     return {

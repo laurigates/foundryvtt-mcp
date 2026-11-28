@@ -184,11 +184,15 @@ export interface FoundryProvider extends FoundryCore {
   readonly kind: ProviderKind;
   readonly capabilities: ReadonlySet<string>;
   inspect(): Promise<FoundryEnvironment>;
-  /** Execute a repository-owned binding. This is never exposed as a free-form MCP tool. */
+  /**
+   * Execute a repository-owned binding. This is never exposed as a free-form MCP tool.
+   * `operation` is the stable package-owned identifier that a named-operation relay
+   * resolves; `script` is sent only to `execute-js` relays.
+   */
   execute(
     script: string,
     args: Record<string, unknown>,
-    options: { readOnly: boolean },
+    options: { readOnly: boolean; operation?: string },
   ): Promise<unknown>;
   /** Changes whenever a connection is replaced or its transport disconnects/reconnects. */
   getGeneration(): number;
@@ -202,11 +206,18 @@ export interface LegacyRestProviderConfig extends FoundryClientConfig {
   kind: 'legacy-rest';
   apiKey: string;
 }
+/** How a paired relay executes package-owned work. */
+export type RestRuntimeMode = 'named' | 'execute-js';
 export interface RestApiProviderConfig {
   kind: 'rest-api';
   relayUrl: string;
   apiKey: string;
   clientId: string;
+  /** Defaults to `named`: the relay receives operation names, never script source. */
+  runtimeMode?: RestRuntimeMode;
+  /** Named-operation endpoint on the relay; only valid with `runtimeMode: 'named'`. */
+  runtimePath?: string;
+  /** Historical `/execute-js` endpoint; only valid with `runtimeMode: 'execute-js'`. */
   executeJsPath?: string;
   timeout?: number;
   writeEnabled?: boolean;
