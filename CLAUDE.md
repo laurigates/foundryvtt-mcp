@@ -65,7 +65,8 @@ from configuration alone (empty values count as unset); the design is
   shipped in its v2.1.0; dual mode was checked by hand against a live world
   on 2026-11-26 (see `docs/guides/capabilities.md`).
 - **`rest`** (deprecated: the key without Socket.IO credentials, or without
-  `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
+  `FOUNDRY_REST_URL`): the old REST-only *mode* (the bridge itself is current;
+  only using it as the sole transport is deprecated) against `FOUNDRY_URL`, with a
   startup warning. It probes the bridge's authenticated `/api/world`
   (`probeRestModule()` in `src/foundry/rest-probe.ts`); `/api/status` is served
   unauthenticated by Foundry core, so it proves neither the module nor the key.
@@ -83,6 +84,46 @@ through to the router's "Unknown tool" error. The per-mode result is recorded in
 `docs/guides/capabilities.md` and pinned by
 `src/tools/__tests__/capability-matrix.test.ts`; field differences between the
 transports are `KNOWN_GAPS` in `src/foundry/parity.ts`.
+
+## Architecture boundaries (read before proposing a design change)
+
+Decisions, not gaps. Each links the ADR that owns it; a change to one starts
+as a new ADR, discussed in an issue, before code.
+
+- **Two canonical transports.** Socket.IO to Foundry is primary and carries
+  every write; [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api)
+  is the augment in dual mode. The bridge is **not** legacy: only the
+  REST-only *mode* is deprecated. Third-party relays are not a supported
+  transport. [ADR-011](docs/adrs/0011-dual-mode-transport.md).
+- **Writes only over Socket.IO `modifyDocument`**, behind
+  `FOUNDRY_WRITE_ENABLED=true`. Never over REST.
+  [ADR-011](docs/adrs/0011-dual-mode-transport.md),
+  [ADR-010](docs/adrs/0010-mutation-api-conventions.md),
+  `.claude/rules/foundry-write-protocol.md`.
+- **No arbitrary JavaScript.** Code that must run inside Foundry is a named
+  operation in a companion Foundry module, answered under the bridge's
+  response contract
+  ([bridge ADR-0003](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/adrs/0003-response-contract.md),
+  [ADR-0006](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/adrs/0006-named-operations-only.md)).
+  No `/execute-js`-style route, not even as an opt-in.
+  [ADR-015](docs/adrs/0015-extension-boundaries.md).
+- **One capability table.** New tools and extension operations are entries in
+  `CAPABILITY_SOURCES` / `TOOL_CAPABILITIES` (`src/foundry/capabilities.ts`);
+  availability and the parity tripwires derive from it. No parallel provider
+  or availability layer. [ADR-015](docs/adrs/0015-extension-boundaries.md).
+- **Node only.** TypeScript on Node, bun as package manager; no Python or
+  other runtime dependency. [ADR-015](docs/adrs/0015-extension-boundaries.md).
+- **Extension packages**: allowlisted in configuration (no directory
+  auto-discovery), Foundry-style `minimum`/`verified`/`maximum` ranges for the
+  Foundry generation and the upstream package, `verified` only for a build
+  actually run, no silent fallback to another generation, one shared strict
+  schema validator. [ADR-015](docs/adrs/0015-extension-boundaries.md).
+- **Foundry v13 and v14 both supported** by accepting both wire shapes.
+  [ADR-014](docs/adrs/0014-foundry-v13-v14-wire-shapes.md).
+- **dnd5e derived values**: compute only what is exact from source data; the
+  bridge supplies prepared values. [ADR-012](docs/adrs/0012-derived-values-from-source-data.md).
+- **Small PRs, one concern each**, against current `main`; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Environment Variables
 
@@ -105,6 +146,11 @@ See `.claude/rules/` for detailed guidelines:
 - `testing.md` — Test tiers (unit, integration, E2E) and requirements
 - `foundry-write-protocol.md` — transports (Socket.IO primary, REST bridge augment) and the `modifyDocument` write protocol
 - `document-management.md` — Document detection and organization
+- `release-pipeline.md` — release-please and npm publishing
+- `esm-entrypoint-env-loading.md`, `scripts-typecheck-gap.md` — known build traps
+
+Architecture decisions: [`docs/adrs/`](docs/adrs/README.md) (ADR-001..006 in
+`docs/blueprint/adrs/`).
 
 ## Reference
 
