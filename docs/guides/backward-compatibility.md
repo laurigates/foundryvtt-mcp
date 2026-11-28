@@ -39,6 +39,22 @@ may be added. Clients should select tools/resources by their names and URIs,
 rather than assuming fixed catalog sizes. The nine base resource definitions
 remain unchanged; single-target discovery also includes their qualified aliases.
 
+## Node-only integration runtime
+
+Integration packages no longer ship a Python entrypoint. The host evaluates each
+declared binding and probe directly, so these declarations are removed:
+
+| Removed | Replacement |
+|---|---|
+| `entrypoint` in `manifest.json` | Nothing; the manifest lists only `binding` and `probe` |
+| `pythonExecutable` per target and `FOUNDRY_PYTHON_EXECUTABLE` | Nothing; no external interpreter is launched |
+| `integrationTimeoutMs` per target | The selected provider's own `timeout` |
+| `adapter.py`, `python/foundry_mcp_modules/worker.py`, `npm run test:python` | Package-local `tests/*.test.mjs` and `npm run test:bindings` |
+
+A manifest that still declares `entrypoint` is rejected as invalid, so an older
+package must drop the field before it loads. Configuration objects that still
+contain the removed target fields are rejected by the strict target schema.
+
 ### Single target
 
 An existing MCP call remains valid:
@@ -153,9 +169,9 @@ implementing them. The adapter does not manufacture unsupported transport APIs.
   execution and response construction discards stale reads; an interrupted write
   can return `outcome_unknown`. Its result is never relabeled as a newer session.
 - **Delayed operations cannot send new steps after invalidation.** The original
-  operation context reaches provider dispatches and Python callbacks. Ordinary
-  work remains queued while tracked local provider requests settle, even if a
-  worker already failed. This does not roll back remote mutations or guarantee
+  operation context reaches provider dispatches and binding execution. Ordinary
+  work remains queued while tracked local provider requests settle, even after a
+  public error. This does not roll back remote mutations or guarantee
   their cancellation after a timeout.
 - **Legacy REST identity is rechecked.** Session operations inspect the world
   immediately before dispatch and after successful completion. A mismatch
@@ -181,10 +197,12 @@ The repository regression tests cover the legacy environment mapping, a typed
 pre-overhaul consumer, old/custom tool contexts, unchanged result content,
 resource aliases, typed errors, refresh output, late reconnects and REST world
 changes. The package smoke check now imports the legacy client from a freshly
-installed consumer and checks the declaration files as well as the Python assets.
+installed consumer and checks the declaration files as well as the packaged
+integration assets.
 
 The initial compatibility verification on 2026-11-22 used Node 24.22.3 and Python
-3.12.14. The subsequent provider-boundary pass is recorded separately in the
+3.12.14; the Python tier was removed afterwards, so the rows below are historical.
+The subsequent provider-boundary pass is recorded separately in the
 [implementation record](../prps/provider-session-integration-overhaul.md).
 Exact-source Node
 probes execute the changed TypeScript after stripping its types, with external

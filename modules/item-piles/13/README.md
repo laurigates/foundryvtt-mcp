@@ -3,7 +3,7 @@
 This package exposes **40 fixed MCP operations: 13 reads and 27 writes** for
 inventories, currencies, loot piles, containers, merchants, tables and vaults.
 It is a worked example of a substantial **module integration**: module-specific
-behavior lives here, while providers, target routing, Python transport and write
+behavior lives here, while providers, target routing, binding execution and write
 policy remain in the shared host. Its scope is these data-oriented workflows;
 it does not expose every upstream method, UI interaction or optional extension.
 See the [coverage boundaries](UPSTREAM.md#deliberately-separate-surfaces).
@@ -43,9 +43,9 @@ and their source/version records.
 ## Autonomous generation-13 package
 
 This entire directory is the installable `modules/item-piles/13/` unit. Keep
-its manifest, Python adapter, sources, generated bindings/probes, tests and
+its manifest, sources, generated bindings/probes, tests and
 examples together. It has no runtime or build imports from another generation
-or package. Shared provider transport and worker lifecycle remain host services.
+or package. Shared provider transport and operation lifecycle remain host services.
 The two variants intentionally contain independent source copies so either
 folder can be copied and maintained on its own.
 
@@ -79,10 +79,9 @@ node modules/item-piles/13/build.mjs --check
 npm run build
 ```
 
-Use Node.js 18+ and Python 3.10+. This branch includes the adapter; it does not
-publish a new npm release or install a Foundry world. The generated bindings,
-probes, manifest and Python adapter ship in the package. No additional Python
-dependencies are required by the adapter.
+Use Node.js 18+. This branch does not publish a new npm release or install a
+Foundry world. The generated bindings, probes and manifest ship in the package.
+No additional runtime is required.
 
 ### 3. Configure an execution-capable target
 
@@ -153,7 +152,7 @@ The operation result retains the original array contract:
 
 The host wraps it in structured MCP output with `target_id`, `world_id`,
 `session_generation` and `result`. `target_id` selects a configured connection and
-is removed before Python/binding validation. With multiple configured targets it
+is removed before input validation. With multiple configured targets it
 is mandatory. `target_uuid`, in contrast, identifies a destination inside that
 selected world.
 
@@ -250,7 +249,6 @@ sibling package:
 node build.mjs --write
 node build.mjs --check
 node --test tests/*.test.mjs
-python3 -B -m unittest discover -s tests -v
 ```
 
 For shared host/transport validation, run the project checks from the repository root:
@@ -259,7 +257,6 @@ For shared host/transport validation, run the project checks from the repository
 node modules/item-piles/13/build.mjs --write
 node modules/item-piles/13/build.mjs --check
 node --test modules/item-piles/13/tests/*.test.mjs
-npm run test:python
 npm test
 npm run build
 npm run smoke:integrations
@@ -268,10 +265,9 @@ npm run smoke:pack
 
 Package Node tests use `node:test` and isolated VM fixtures without extra test
 dependencies. They exercise real generated scripts, gates, API mapping, DTOs,
-failed/partial outcomes, target isolation and the legacy contract. Python tests
-exercise the actual worker and callback protocol. The installed smoke loads the
-adapter from another working directory and uses a local fake provider for
-representative reads/writes.
+failed/partial outcomes, target isolation and the legacy contract. The installed
+smoke loads the manifest from another working directory, compiles every contract
+and validates the recipes.
 
 Full project checks also require the declared development dependencies. Offline
 tests do not contact Foundry. For live verification, use dedicated test actors and
@@ -290,11 +286,10 @@ actually been done.
 | `build.mjs` | Generates standalone scripts/manifest; `--check` detects drift and orphans without writing |
 | `src/legacy.mjs`, `get_items.js`, `probe.js` | Legacy binding/probe bytes preserved; generation selection is host-owned |
 | `bindings/`, `probes/`, `manifest.json` | Checked-in runtime artifacts, no runtime bundler or user-selected API method |
-| `adapter.py` | Manifest allowlist and one authorized `context.invoke` callback |
 | `tests/`, `examples/`, `UPSTREAM.md` | Contracts, usage recipes and upstream evidence |
 
 Edit the source modules, generate, review the output and run the checks. Build and
-test verify generation rather than silently rewriting it. The adapter never
+test verify generation rather than silently rewriting it. Package code never
 receives credentials or chooses a provider. This pattern can be reused for another
 substantial module or system without adding module-specific provider branches.
 

@@ -17,7 +17,6 @@ export const metadata = Object.freeze({
   id: 'item-piles',
   adapterVersion: '0.2.1',
   updatedAt: '2026-11-22',
-  entrypoint: 'adapter.py',
   status: 'experimental',
   upstream: {
     repository: 'https://github.com/fantasycalendar/FoundryVTT-ItemPiles',

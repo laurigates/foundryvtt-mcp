@@ -72,8 +72,6 @@ function target(id: string, writeEnabled = false): TargetConfig {
     id,
     provider: { kind: 'socketio', baseUrl: `http://${id}.test`, writeEnabled },
     writeEnabled,
-    pythonExecutable: 'python3',
-    integrationTimeoutMs: 1000,
     integrationsEnabled: true,
   };
 }
@@ -285,14 +283,14 @@ describe('FoundrySessionManager', () => {
       integrationFactory: () => ({
         ...integrationStub(),
         reconcile: vi.fn(async () => {
-          throw new Error('Python executable missing');
+          throw new Error('Integration probe failed');
         }),
       }),
     });
     managers.push(manager);
     await manager.start();
     expect(manager.resolve().state).toBe('ready');
-    expect(manager.list()[0]?.integrationError).toBe('Python executable missing');
+    expect(manager.list()[0]?.integrationError).toBe('Integration probe failed');
     await expect(
       manager.resolve().run((provider) => provider.getActor('same')),
     ).resolves.toMatchObject({ name: 'a' });

@@ -6,7 +6,7 @@ Installation and API details belong in each package's README.
 
 Each module directory preserves the exact Foundry module ID. Its numeric children,
 such as `modules/<id>/13/` and `modules/<id>/14/`, are independent packages with
-their own manifest, Python adapter, README, fixed runtime bindings and tests.
+their own manifest, README, fixed runtime bindings, probes and tests.
 The manifest's `foundryGeneration` must match the directory. Tool names follow
 `module_{id}_{operation}` and do not change when a target upgrades Foundry.
 

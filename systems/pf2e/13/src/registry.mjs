@@ -6,7 +6,6 @@ export const metadata = Object.freeze({
   "id": "pf2e",
   "adapterVersion": "0.1.1",
   "updatedAt": "2026-11-22",
-  "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
     "repository": "https://github.com/foundryvtt/pf2e",

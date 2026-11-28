@@ -13,7 +13,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 ## Essential Commands
 
 ```bash
-just qa                # Lint, TypeScript (src + scripts), bindings, Vitest coverage and Python
+just qa                # Lint, TypeScript (src + scripts), bindings and Vitest coverage
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
@@ -32,8 +32,8 @@ bun run test-connection # Test MCP→FoundryVTT connection
 1. MCP discovery and calls use `src/tools/catalog.ts`.
 2. The catalog resolves `target_id` through `src/sessions/`.
 3. Core handlers consume the target's `FoundryCore` provider interface.
-4. System/module adapters run in the target's optional Python worker and invoke
-   fixed bindings through the same target's execution provider.
+4. System/module packages declare fixed bindings that the target's integration
+   manager evaluates through the same target's execution provider.
 5. Responses include target and session provenance.
 
 ### Key Modules
@@ -42,8 +42,8 @@ bun run test-connection # Test MCP→FoundryVTT connection
 |--------|------|---------|
 | Providers | `src/providers/` | Core port, per-instance cache, transport and execution backends |
 | Sessions | `src/sessions/` | Target routing, independent lifecycle, identity and generation checks |
-| Integrations | `src/integrations/` | Manifest loader, operation availability, Python bridge |
-| Systems/modules | `systems/`, `modules/` | Separate Python adapters, bindings, manifests and READMEs |
+| Integrations | `src/integrations/` | Manifest loader, operation availability, binding execution |
+| Systems/modules | `systems/`, `modules/` | Separate packages: bindings, probes, manifests and READMEs |
 | Auth | `src/foundry/auth.ts` | 4-step Socket.IO authentication |
 | Config | `src/config/index.ts`, `src/config/targets.ts` | Validated environment and target configuration |
 | Tools | `src/tools/definitions.ts` | MCP tool schemas |
@@ -112,7 +112,6 @@ See [capabilities](docs/guides/capabilities.md),
 | `LOG_LEVEL` | No | `debug` for verbose output |
 | `FOUNDRY_TIMEOUT` | No | Request timeout (ms, default 10000) |
 | `FOUNDRY_TARGETS_FILE` / `FOUNDRY_TARGETS_JSON` | No | Mutually exclusive explicit target configuration; `FOUNDRY_URL` is not required when used |
-| `FOUNDRY_PYTHON_EXECUTABLE` | No | Optional integration runtime, default `python3` |
 
 ## Rules
 

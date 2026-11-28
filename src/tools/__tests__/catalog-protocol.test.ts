@@ -24,8 +24,6 @@ function targetFixture(id: string) {
     provider: { kind: 'socketio', baseUrl: `http://${id}.test` },
     writeEnabled: false,
     integrationsEnabled: true,
-    pythonExecutable: 'python3',
-    integrationTimeoutMs: 1000,
   };
   const provider = {
     kind: 'socketio',

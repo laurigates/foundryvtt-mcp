@@ -6,6 +6,12 @@
 
 **Baseline:** `1b59ec4c710de9dff868e83b3474caa3d40f1632`
 
+> **Superseded in part:** the Python adapter runtime described below was removed
+> in the Node-only integration step. Manifests no longer declare an `entrypoint`,
+> and the host evaluates the fixed bindings directly. The provider, session and
+> target decisions in this ADR remain current; the Python transport sections are
+> historical.
+
 ## Context
 
 The MCP server needs extensible integrations for Foundry game systems and modules,

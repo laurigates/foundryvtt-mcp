@@ -1,7 +1,6 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IntegrationManager } from '../manager.js';
 import { type IntegrationLoadFailure, loadIntegrations } from '../manifest.js';
@@ -11,11 +10,6 @@ import {
   parseFoundryGeneration,
 } from '../types.js';
 
-const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
-// `python3` is not installed on every platform, so the interpreter is resolved
-// once here and honours the same override the server configuration accepts.
-const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
-const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 const roots: string[] = [];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -24,12 +18,6 @@ afterEach(async () => {
 async function fixtureRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'foundry-generations-'));
   roots.push(root);
-  const worker = join(root, 'python/foundry_mcp_modules');
-  await mkdir(worker, { recursive: true });
-  await copyFile(
-    join(sourceRoot, 'python/foundry_mcp_modules/worker.py'),
-    join(worker, 'worker.py'),
-  );
   return root;
 }
 
@@ -72,7 +60,6 @@ async function fixture(
     ...(generation === undefined ? {} : { foundryGeneration: generation }),
     adapterVersion: `fixture-${generation ?? 'legacy'}`,
     updatedAt: '2026-11-22',
-    entrypoint: 'adapter.py',
     status: 'experimental',
     upstream: { repository: null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
@@ -85,12 +72,6 @@ async function fixture(
     writeFile(
       join(directory, 'probe.js'),
       `// PROBE VARIANT_${generation ?? 'legacy'}\nreturn {ready: true};\n`,
-    ),
-    writeFile(
-      join(directory, 'adapter.py'),
-      'from pathlib import Path\nPath(__file__).with_name("imported").touch()\n' +
-        'class Adapter:\n    async def execute(self, operation, arguments, context):\n' +
-        '        return await context.invoke(operation, arguments)\n',
     ),
   ]);
   return directory;
@@ -225,7 +206,7 @@ describe('generation-specific integration discovery', () => {
     expect(failures.every((failure) => failure.error.code === 'duplicate_tool')).toBe(true);
   });
 
-  it.each(['manifest.json', 'binding.js', 'adapter.py'])(
+  it.each(['manifest.json', 'binding.js', 'probe.js'])(
     'rejects %s symlinked outside its selected variant',
     async (file) => {
       const root = await fixtureRoot();
@@ -272,46 +253,36 @@ describe('generation-specific integration discovery', () => {
 });
 
 describe('target generation selection', () => {
-  it.each([13, 14])(
-    'imports and probes only generation %s with the real Python worker',
-    async (generation) => {
-      const root = await fixtureRoot();
-      const paths = [await fixture(root, 'fixture', 13), await fixture(root, 'fixture', 14)];
-      const scripts: string[] = [];
-      const manager = new IntegrationManager({
-        targetId: `target-${generation}`,
-        packageRoot: root,
-        pythonExecutable: python,
-        execute: async (script, args) => {
-          scripts.push(script);
-          return script.includes('PROBE') ? { ready: true } : { generation, ...args };
-        },
+  it.each([13, 14])('loads and probes only generation %s', async (generation) => {
+    const root = await fixtureRoot();
+    await fixture(root, 'fixture', 13);
+    await fixture(root, 'fixture', 14);
+    const scripts: string[] = [];
+    const manager = new IntegrationManager({
+      targetId: `target-${generation}`,
+      packageRoot: root,
+      execute: async (script, args) => {
+        scripts.push(script);
+        return script.includes('PROBE') ? { ready: true } : { generation, ...args };
+      },
+    });
+    try {
+      await manager.reconcile(environment(`${generation}.370`));
+      expect(manager.list()).toHaveLength(1);
+      expect(manager.list()[0]).toMatchObject({
+        foundryGeneration: generation,
+        availableGenerations: [13, 14],
+        state: 'ready',
       });
-      try {
-        await manager.reconcile(environment(`${generation}.370`), 1);
-        expect(manager.list()).toHaveLength(1);
-        expect(manager.list()[0]).toMatchObject({
-          foundryGeneration: generation,
-          availableGenerations: [13, 14],
-          state: 'ready',
-        });
-        expect(manager.getTools().map((tool) => tool.name)).toEqual(['module_fixture_read']);
-        await expect(
-          manager.call('module_fixture_read', { actor_uuid: 'Actor.same' }),
-        ).resolves.toEqual({ generation, actor_uuid: 'Actor.same' });
-        expect(scripts.every((script) => script.includes(`VARIANT_${generation}`))).toBe(true);
-        for (const path of paths) {
-          if (path.endsWith(String(generation))) {
-            expect((await stat(join(path, 'imported'))).isFile()).toBe(true);
-          } else {
-            await expect(stat(join(path, 'imported'))).rejects.toMatchObject({ code: 'ENOENT' });
-          }
-        }
-      } finally {
-        await manager.close();
-      }
-    },
-  );
+      expect(manager.getTools().map((tool) => tool.name)).toEqual(['module_fixture_read']);
+      await expect(
+        manager.call('module_fixture_read', { actor_uuid: 'Actor.same' }),
+      ).resolves.toEqual({ generation, actor_uuid: 'Actor.same' });
+      expect(scripts.every((script) => script.includes(`VARIANT_${generation}`))).toBe(true);
+    } finally {
+      await manager.close();
+    }
+  });
 
   it.each([
     { version: '14.370', variants: [13] },
@@ -321,19 +292,18 @@ describe('target generation selection', () => {
     { version: '14broken', variants: [13, 14] },
   ])('does not fall back for Foundry $version', async ({ version, variants }) => {
     const root = await fixtureRoot();
-    const paths = await Promise.all(variants.map((value) => fixture(root, 'fixture', value)));
+    await Promise.all(variants.map((value) => fixture(root, 'fixture', value)));
     let probes = 0;
     const manager = new IntegrationManager({
       targetId: 'unsupported-generation',
       packageRoot: root,
-      pythonExecutable: '/missing/python',
       execute: async () => {
         probes += 1;
         return { ready: true };
       },
     });
     try {
-      await manager.reconcile(environment(version), 1);
+      await manager.reconcile(environment(version));
       expect(manager.getTools()).toEqual([]);
       expect(manager.list()).toHaveLength(1);
       expect(manager.list()[0]).toMatchObject({
@@ -343,9 +313,6 @@ describe('target generation selection', () => {
       });
       expect(manager.list()[0]?.reason).toMatch(/No integration variant|unknown Foundry version/);
       expect(probes).toBe(0);
-      for (const path of paths) {
-        await expect(stat(join(path, 'imported'))).rejects.toMatchObject({ code: 'ENOENT' });
-      }
     } finally {
       await manager.close();
     }
@@ -358,14 +325,13 @@ describe('target generation selection', () => {
     const manager = new IntegrationManager({
       targetId: 'future',
       packageRoot: root,
-      pythonExecutable: python,
       execute: async (script) => {
         scripts.push(script);
         return { ready: true };
       },
     });
     try {
-      await manager.reconcile(environment('15.400'), 1);
+      await manager.reconcile(environment('15.400'));
       expect(manager.list()[0]).toMatchObject({
         foundryGeneration: 15,
         availableGenerations: [15],
@@ -383,11 +349,10 @@ describe('target generation selection', () => {
     const manager = new IntegrationManager({
       targetId: 'legacy',
       packageRoot: root,
-      pythonExecutable: python,
       execute: async (script) => (script.includes('PROBE') ? { ready: true } : { legacy: true }),
     });
     try {
-      await manager.reconcile(environment('test'), 1);
+      await manager.reconcile(environment('test'));
       expect(manager.list()[0]).toMatchObject({ state: 'ready', availableGenerations: [] });
       expect(manager.list()[0]?.foundryGeneration).toBeUndefined();
       await expect(
@@ -406,14 +371,13 @@ describe('target generation selection', () => {
     const manager = new IntegrationManager({
       targetId: 'healthy',
       packageRoot: root,
-      pythonExecutable: python,
       execute: async (script) => {
         expect(script).toContain('VARIANT_14');
         return { ready: true };
       },
     });
     try {
-      await manager.reconcile(environment('14.370'), 1);
+      await manager.reconcile(environment('14.370'));
       expect(manager.list()).toHaveLength(1);
       expect(manager.list()[0]).toMatchObject({
         state: 'ready',
@@ -421,8 +385,7 @@ describe('target generation selection', () => {
         availableGenerations: [14],
         variantErrors: [{ foundryGeneration: 13 }],
       });
-      await expect(stat(join(broken, 'imported'))).rejects.toMatchObject({ code: 'ENOENT' });
-      await manager.reconcile(environment('13.350'), 2);
+      await manager.reconcile(environment('13.350'));
       expect(manager.getTools()).toEqual([]);
       expect(manager.list()[0]?.state).toBe('error');
     } finally {
@@ -440,7 +403,6 @@ describe('target generation selection', () => {
         targetId: `target-${generation}`,
         packageRoot: root,
         writesEnabled,
-        pythonExecutable: python,
         execute: async (script, args, readOnly) => {
           expect(script).toContain(`VARIANT_${generation}`);
           if (script.includes('PROBE')) {
@@ -454,8 +416,8 @@ describe('target generation selection', () => {
     const b = make(14, true);
     try {
       await Promise.all([
-        a.reconcile(environment('13.350', 'fixture', 'system'), 1),
-        b.reconcile(environment('14.370', 'fixture', 'system'), 1),
+        a.reconcile(environment('13.350', 'fixture', 'system')),
+        b.reconcile(environment('14.370', 'fixture', 'system')),
       ]);
       expect(a.has('system_fixture_write')).toBe(false);
       expect(b.has('system_fixture_write')).toBe(true);

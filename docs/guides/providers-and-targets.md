@@ -49,7 +49,6 @@ FOUNDRY_REST_API_KEY=your-relay-key
 FOUNDRY_REST_CLIENT_ID=your-paired-client-id
 FOUNDRY_EXPECTED_WORLD_ID=your-world-id
 FOUNDRY_EXPECTED_ORIGIN=https://foundry.example.invalid
-FOUNDRY_PYTHON_EXECUTABLE=python3
 FOUNDRY_WRITE_ENABLED=false
 ```
 
@@ -89,8 +88,6 @@ Each target has:
 | `expectedWorldId` | Optional identity pin; required for a composite target |
 | `expectedOrigin` | Optional expected Foundry origin |
 | `writeEnabled` | Target-local write opt-in, default `false` |
-| `pythonExecutable` | Python executable/path, default `python3` |
-| `integrationTimeoutMs` | Worker operation timeout, default `10000` |
 | `integrationsEnabled` | Whether to load system/module integrations, default `true` |
 
 Credentials can be supplied as `usernameEnv`, `passwordEnv`, `apiKeyEnv`, or
@@ -186,8 +183,8 @@ before invocation. See [Backward compatibility](backward-compatibility.md).
 
 ## Lifecycle, writes, and freshness
 
-Every target has its own connection generation, cache, diagnostics, integration
-instances, and optional Python worker. A failure does not redirect requests to
+Every target has its own connection generation, cache, diagnostics and integration
+instances. A failure does not redirect requests to
 another target. Reconnection and explicit refresh rebuild the affected runtime
 context. A changed remote world/origin is rejected until the configuration and
 connection are deliberately reconciled.
@@ -207,15 +204,15 @@ switch and return entirely between those probes cannot be detected.
 Operations on the same target are serialized; different targets remain
 independent and can run concurrently. Before a subsequent cache-backed core
 call, stale data is refreshed within that target's operation queue. This routine
-freshness check preserves the session generation and Python worker. An explicit
+freshness check preserves the session generation and integration state. An explicit
 `refresh_world_data` or reconnect deliberately rebuilds the runtime context.
 
 The operation context stays attached across asynchronous provider steps and
-Python callbacks. Before every provider dispatch it checks the original session
+binding execution. Before every provider dispatch it checks the original session
 and transport generation. After refresh, reconnect, close or operation
 completion, a delayed continuation cannot send a new step in the old operation.
 The ordinary target queue also waits for locally tracked provider requests to
-settle if a worker fails before its runtime callback completes. These guards stop
+settle after a public error. These guards stop
 future sends; they cannot undo a mutation already received by Foundry or prove
 that a remote request stopped executing after a local timeout.
 
@@ -238,14 +235,14 @@ A mutation timeout or lost connection can produce `outcome_unknown`. Inspect the
 world before deciding whether to retry. The server does not automatically replay
 such requests and does not provide distributed transactions or deduplication.
 
-## Python and installed packages
+## Installed packages
 
-Python 3.10 or later is required only for targets with executable Python
-integrations. One worker hosts the system and module adapters for its target.
-The initial adapters use the Python standard library. The worker is loaded from
-the installed package, independently of the current working directory.
+Integration packages are plain JavaScript, so no additional runtime is required
+beyond the Node.js host. The loader reads the installed package independently of
+the current working directory and evaluates each declared binding and probe as a
+script inside the selected operation context.
 
-A missing Python executable, invalid manifest, failed API probe, or incompatible
+An invalid manifest, failed API probe, or incompatible
 version is reported in integration status. The healthy core connection remains
 usable. System and module packages provide explicitly classified reads, rolls
 and mutations, each subject to the selected target's policy and runtime

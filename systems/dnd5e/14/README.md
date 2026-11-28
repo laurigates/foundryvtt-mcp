@@ -49,9 +49,8 @@ operation. Missing generation metadata or a missing exact-generation package
 never authorizes cross-generation fallback. The exact system version/minimum
 build checks below apply in addition to this package selection.
 
-For an isolated copy, run `node build.mjs --check`,
-`node --test tests/*.test.mjs` and
-`python3 -B -m unittest discover -s tests -v` from this directory.
+For an isolated copy, run `node build.mjs --check` and
+`node --test tests/*.test.mjs` from this directory.
 
 ## Install and connect
 
@@ -79,10 +78,9 @@ node systems/dnd5e/14/build.mjs --check
 npm run build
 ```
 
-Use Node.js 18+ and Python 3.10+. The branch includes the Python adapter, generated
-bindings, probes and manifest; no additional Python dependencies are needed by
-the adapter. These instructions do not install a Foundry world or publish a new
-npm release.
+Use Node.js 18+. The branch includes generated bindings, probes and the manifest;
+no additional runtime dependencies are needed. These instructions do not install
+a Foundry world or publish a new npm release.
 
 ### 3. Configure an execution-capable target
 
@@ -267,7 +265,6 @@ new bindings/probes. Regenerate deterministically after editing them:
 node systems/dnd5e/14/build.mjs --write
 node systems/dnd5e/14/build.mjs --check
 node --test systems/dnd5e/14/tests/*.test.mjs
-python3 -B -m unittest discover -s systems/dnd5e/14/tests -v
 ```
 
 Local tests execute the generated bindings with controlled fixtures and cover

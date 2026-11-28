@@ -14,13 +14,9 @@ const RelativeFile = z
     'Entrypoints and bindings must be relative paths within the integration directory',
   );
 /**
- * The worker imports the entrypoint as Python and evaluates bindings and probes
- * as scripts, so the manifest cannot point them at arbitrary package files.
+ * The host evaluates bindings and probes as JavaScript scripts, so the manifest
+ * cannot point them at arbitrary package files.
  */
-const PythonEntrypoint = RelativeFile.refine(
-  (value) => value.toLowerCase().endsWith('.py'),
-  'The entrypoint must be a .py file inside the integration directory',
-);
 const JavaScriptBinding = RelativeFile.refine(
   (value) => value.toLowerCase().endsWith('.js'),
   'Bindings and probes must be .js files inside the integration directory',
@@ -47,7 +43,6 @@ export const IntegrationManifestSchema = z
     foundryGeneration: z.number().int().min(13).max(Number.MAX_SAFE_INTEGER).optional(),
     adapterVersion: z.string().min(1),
     updatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    entrypoint: PythonEntrypoint,
     status: z.enum(['experimental', 'supported']),
     upstream: z
       .object({
@@ -130,7 +125,7 @@ async function containedFile(root: string, path: string): Promise<string> {
 
 async function containedDirectory(root: string, directory: string): Promise<void> {
   // Structural directory aliases can turn /14 into /13 or one identity into
-  // another. Keep the same canonical paths enforced by the Python worker.
+  // another. Keep the canonical paths the loader resolves for every variant.
   const expected = resolve(await realpath(root), basename(directory));
   if ((await realpath(directory)) !== expected) {
     throw new IntegrationError(
@@ -239,7 +234,6 @@ export async function loadIntegrations(
               `Folder and manifest identity/generation differ: ${root}`,
             );
           }
-          await containedFile(root, manifest.entrypoint);
           await containedFile(root, 'README.md');
           const bindings = new Map<string, { script: string; probe: string }>();
           for (const operation of manifest.operations) {

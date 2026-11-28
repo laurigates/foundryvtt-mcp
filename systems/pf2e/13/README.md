@@ -37,12 +37,12 @@ scope of inspection.
 ## Install and use
 
 Keep this entire directory together when copying it. It includes its manifest,
-Python adapter, original binding/probe, generator, tests and examples; it has no
+original binding/probe, generator, tests and examples; it has no
 runtime or build import from another generation or package. Install it as
 `systems/pf2e/13/` beneath an integration root. The shared host still owns
-provider transport, target routing and the Python worker.
+provider transport, target routing and the operation lifecycle.
 
-Use Python 3.10+ with an active execution-capable `rest-api` or `composite` target.
+Use Node.js 18+ with an active execution-capable `rest-api` or `composite` target.
 Standalone `socketio` and historical `legacy-rest` cannot execute this binding.
 Node.js 18+ is needed to regenerate or run the local binding tests.
 Copy [examples/targets.example.json](examples/targets.example.json), replace its
@@ -87,7 +87,6 @@ From this directory, with no sibling generation present:
 ```bash
 node build.mjs --check
 node --test tests/*.test.mjs
-python3 -B -m unittest discover -s tests -v
 ```
 
 `node build.mjs --write` regenerates the manifest and preserved scripts from

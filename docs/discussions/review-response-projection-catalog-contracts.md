@@ -1,7 +1,8 @@
 # Review response: projection, catalog and integration-contract hardening
 
-Status: P1–P6 are committed (`228368f`, `c3c1096`, `4280650`); the lint repair (P7) is in
-the working tree. The operator owns commit and push.
+Status: P1–P6 are committed (`228368f`, `c3c1096`, `4280650`); the lint repair (P7) and
+the Node-only integration runtime (P8) are in the working tree. The operator owns
+commit and push.
 
 ## Evidence policy
 
@@ -60,9 +61,9 @@ probe, and ADR-0011 gained a "Bridge identity verification" section.
   unconstrained, a full string is an exact pin, and a bare integer matches the
   generation (`"14"` covers `14.370`). `matchesIntegrationCompatibility` uses it
   for both `foundryVersions` and `integrationVersions`.
-- `src/integrations/manifest.ts` refines `entrypoint` to `.py` and
-  `binding`/`probe` to `.js`, so a manifest cannot point the worker at a file it
-  would misparse.
+- `src/integrations/manifest.ts` refines `binding`/`probe` to `.js`, so a manifest
+  cannot point the host at a file it would misparse. P8 later removed the Python
+  `entrypoint` this bullet originally described.
 - `src/tools/catalog.ts` deleted `WRITES`, `READS`, `CACHED`, `DIAGNOSTICS` and
   `requiredCapability()`. `TOOL_CAPABILITIES` in `src/foundry/capabilities.ts` is
   now the single source through `primaryCapability()`, `isWriteTool()`,
@@ -81,12 +82,21 @@ platform-aware and `FOUNDRY_PYTHON_EXECUTABLE` overrides it; the four integratio
 test files pass `pythonExecutable` explicitly. `legacy-client.test.ts` declares
 `types: ['node']` for its ad-hoc program.
 
+P8 removes the interpreter and both options, so this section is historical: it
+records why the branch was green before the runtime was deleted, not a current
+contract.
+
 ### Load-dependent test timeouts
 
 Three lifecycle tests used a 250 ms timeout against a real Python start. Under 65
 parallel workers the start sometimes consumed the timeout, so the assertion saw a
 different error code. Timeouts are now 2500 ms and the adapter sleep is 5 s, which
 keeps the same assertions but makes the ordering deterministic.
+
+P8 deletes those tests with the worker they measured. Their remaining coverage —
+operation-context fencing, confirmed no-write codes and uncertain writes — is kept
+in `src/integrations/__tests__/lifecycle.test.ts`, and the session-queue ordering
+assertion lives in `src/sessions/__tests__/operation-lifecycle.test.ts`.
 
 ### P6 — CodeQL alerts
 
@@ -135,6 +145,47 @@ never sees. The real figure comes from the LF blobs: export the index with
 `git -c core.autocrlf=false checkout-index -a -f --prefix=<tmp>` and run Biome
 there. That is how the 51 errors were separated from the noise.
 
+### P8 — the integration runtime is Node-only (step 2)
+
+The Python layer added no capability. Every `adapter.py` was the same wrapper:
+validate the operation name, then `await context.invoke(operation, arguments)`.
+`worker.py` only spoke JSONL on stdout and waited for Node to run the binding;
+Python never reached Foundry and never received credentials. Each call therefore
+crossed the process boundary four times to reach the same JavaScript.
+
+The manager now executes the registered binding directly:
+
+- `src/integrations/manager.ts` keeps the operation fence, the write
+  classification and the `outcome_unknown` rule, and drops `PythonWorker`,
+  `WorkerInvocation`, the per-target generation handshake and the worker timeout.
+  `reconcile(environment)` no longer takes a session generation.
+- `src/integrations/manifest.ts` removes `entrypoint` and `PythonEntrypoint`;
+  `bindings`/`probes` stay `.js` and remain contained by `containedFile`.
+- `src/config/targets.ts` and `src/sessions/session.ts` drop `pythonExecutable`
+  and `integrationTimeoutMs`; the strict target schema rejects both.
+- Deleted: `src/integrations/python-worker.ts`, `python/foundry_mcp_modules/`,
+  six `adapter.py`, six `test_*_adapter.py`, `npm run test:python`,
+  `just test-python`, the `python/` entry in `package.json#files`.
+- `scripts/smoke-integrations.js` now loads the packaged manifests, compiles every
+  contract, validates the recipes and asserts that no package still ships Python.
+- The scaffolder no longer writes `adapter.py`; `integration-packages.mjs` no
+  longer requires an entrypoint.
+
+Two behaviours changed with the deletion, both intentional:
+
+1. **`operation_pending` is gone.** It existed because a worker call could fail
+   while a previously dispatched binding was still running. With one binding per
+   call, the awaited execution is the only in-flight request, so the manager has
+   nothing to quarantine. The session queue still waits for tracked provider
+   requests (`src/sessions/__tests__/operation-lifecycle.test.ts`).
+2. **A provider error without a `code` is now `outcome_unknown` after a write.**
+   The worker used to relabel it `provider_error`; the manager treats an uncoded
+   failure as an unknown outcome, which is the safer reading.
+
+The door stays open: if a future adapter needs a Python-only library, it can be
+reintroduced as an opt-in per package, never as a mandatory entrypoint for every
+target.
+
 ## What is gained
 
 1. **PF2e actors display HP and AC again** and the HP cap error is actionable.
@@ -147,16 +198,19 @@ there. That is how the 51 errors were separated from the noise.
    touch Foundry.
 6. **Version filters express intent**: a package can say "generation 14" without
    pinning a patch build.
-7. **Manifest mistakes fail early** with a targeted message instead of a Python
+7. **Manifest mistakes fail early** with a targeted message instead of a runtime
    traceback.
 8. **Documentation matches behaviour** again (matrix, ADR-0011, integration guide).
-9. **The suite is deterministic**: five consecutive full runs are green, and the
-   Python integration tests actually execute on Windows.
+9. **The suite is deterministic and platform-independent**: five consecutive full
+   runs were green before P8, and the Node-only suite no longer needs an
+   interpreter to exercise the integration lifecycle.
 10. **Tool text output is tag-free by construction.** The handlers no longer rely
     on a regex that can rebuild the tag it removed, and the scanner they share is
     linear on hostile input.
 11. **The lint scope and the code agree.** `scripts/` and `tests/` are both linted
     and clean now, so the widened `files.includes` no longer hides a failing gate.
+12. **One fewer runtime.** Integrations need only Node: no interpreter to install,
+    no process to supervise, no duplicate wrapper per package.
 
 ## What is lost or accepted as risk
 
@@ -169,10 +223,10 @@ there. That is how the 51 errors were separated from the noise.
 3. **Bare-integer matching loosens a constraint.** `"14"` accepts every 14.x
    build, including untested patch releases; `compatibility.tested` remains the
    only record of live verification.
-4. **Three lifecycle tests are slower.** Timeouts moved from 250 ms to 2500 ms
-   (adapter sleep 2 s to 5 s) so the timeout lands after dispatch instead of
-   during a loaded Python start. Assertions are unchanged; the suite costs about
-   7 s more.
+4. **Removed configuration is rejected, not ignored.** A target that still sets
+   `pythonExecutable` or `integrationTimeoutMs`, or a manifest that still sets
+   `entrypoint`, fails validation. That is deliberate: silently ignoring them
+   would hide a package that cannot load.
 5. **Line endings are still a local trap.** `node <package>/build.mjs --check`
    compares bytes, so a checkout with `core.autocrlf=true` regenerates CRLF and
    the check fails. The generated files are LF now and the check passes, but a
@@ -190,21 +244,28 @@ there. That is how the 51 errors were separated from the noise.
 - **Live verification** of PF2e HP/AC display and the dual-mode probe.
 - **Local lint on Windows** still needs the LF-blob export above (or
   `.gitattributes` with `eol=lf`) before it agrees with CI.
+- **Maintainer reply**: the point 2 decision (Node-only) still needs to be posted;
+  point 1 (`/execute-js`) stays deferred to step 3, where the REST relay executor
+  is replaced by named operations.
+- **`smoke:pack`** was not run locally: it needs a published build, dependency
+  resolution and a POSIX `chmod`. The installed-package path is therefore verified
+  by `smoke:integrations` only.
 
 ## Verification log
 
 | Command | Result |
 |---|---|
 | `node node_modules/typescript/bin/tsc --noEmit` | exit 0 |
-| `npx vitest run` (five consecutive runs) | 65 files, 1207 tests, all green |
+| `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.scripts.json` | exit 0 |
+| `node node_modules/vitest/vitest.mjs run` | 65 files, 1204 tests, all green |
 | `node scripts/integrations.mjs check` | 6 packages checked |
 | `node scripts/integrations.mjs test` | 646 tests, 0 failures |
-| `node --test scripts/tests/integration-tooling.test.mjs` | 7 tests, 0 failures |
-| `node_modules/.bin/biome.exe check <touched files>` | no findings (only the pre-existing deprecated-config warning) |
-| `node_modules/.bin/biome.exe check` (LF blobs, whole repo) | exit 0, 60 warnings, 3 infos |
-| `node_modules/.bin/biome.exe check` (CRLF working tree) | 174 errors, 141 of them CRLF format noise |
+| `node scripts/smoke-integrations.js` | 6 packages, 258 strict schemas, 168 validated recipes |
+| `node_modules/.bin/biome.exe check <touched files>` | no errors (one pre-existing unsafe-fix info) |
+| `node_modules/.bin/biome.exe check` (CRLF working tree) | format noise only; the LF blobs are the reference |
 
-Test count moved from 1171 to 1207 across this work.
+Test count moved from 1171 to 1207 across P1–P7, then to 1204 with P8: three tests
+described the Python worker and one new test rejects a legacy `entrypoint`.
 
 ## Note on `git status`
 
@@ -219,8 +280,9 @@ change for them.
 
 ```
 node node_modules/typescript/bin/tsc --noEmit
-npx vitest run
+node node_modules/typescript/bin/tsc --noEmit -p tsconfig.scripts.json
+node node_modules/vitest/vitest.mjs run
 node scripts/integrations.mjs check
 node scripts/integrations.mjs test
-node --test scripts/tests/integration-tooling.test.mjs
+node scripts/smoke-integrations.js
 ```

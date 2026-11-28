@@ -7,8 +7,6 @@
       "expectedWorldId": "REPLACE_WITH_WORLD_ID",
       "expectedOrigin": "https://foundry.example.invalid",
       "writeEnabled": false,
-      "pythonExecutable": "python3",
-      "integrationTimeoutMs": 30000,
       "integrationsEnabled": true,
       "provider": {
         "kind": "composite",

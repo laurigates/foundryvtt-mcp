@@ -58,7 +58,7 @@ export interface SessionContext {
   readonly provider_generation: number;
 }
 
-/** A target owns its provider, caches, diagnostics and Python integration process. */
+/** A target owns its provider, caches, diagnostics and integration manager. */
 export class FoundrySession {
   readonly diagnosticsClient: DiagnosticsClient;
   readonly diagnosticSystem: DiagnosticSystem;
@@ -271,8 +271,6 @@ export class FoundrySession {
     const generation = this.generation;
     const options: IntegrationManagerOptions = {
       targetId: this.config.id,
-      pythonExecutable: this.config.pythonExecutable,
-      timeoutMs: this.config.integrationTimeoutMs,
       writesEnabled: this.config.writeEnabled,
       execute: async (script, args, readOnly) => {
         if (generation !== this.generation || this.closed || !this.provider.isConnected()) {
@@ -442,10 +440,10 @@ export class FoundrySession {
     this.environment = environment;
     if (changed && this.config.integrationsEnabled) {
       try {
-        await this.integrations.reconcile(
-          { ...environment, runtimeAvailable: this.provider.capabilities.has('runtime.execute') },
-          generation,
-        );
+        await this.integrations.reconcile({
+          ...environment,
+          runtimeAvailable: this.provider.capabilities.has('runtime.execute'),
+        });
         this.integrationError = undefined;
       } catch (error) {
         this.integrationError = this.publicError(error);
@@ -529,12 +527,12 @@ export class FoundrySession {
       this.integrations = this.createIntegrations();
       if (this.config.integrationsEnabled) {
         try {
-          await this.integrations.reconcile(
-            { ...environment, runtimeAvailable: this.provider.capabilities.has('runtime.execute') },
-            generation,
-          );
+          await this.integrations.reconcile({
+            ...environment,
+            runtimeAvailable: this.provider.capabilities.has('runtime.execute'),
+          });
         } catch (error) {
-          // Optional Python integrations must not take the core connection down.
+          // Optional integrations must not take the core connection down.
           this.integrationError = this.publicError(error);
           await this.integrations.close();
         }

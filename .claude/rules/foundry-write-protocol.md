@@ -66,7 +66,7 @@ Relay writes invalidate the snapshot before dispatch and again when settling. Th
 
 `composite` uses the Socket.IO core for ordinary documents and the relay specifically for packaged system/module bindings. The runtime user may be different from the core user; validate that identity and the necessary permissions for both. Integration manifests (`systems/` and `modules/`) declare whether bindings are read-only. A target write flag and provider/runtime permission are mandatory for mutating operations.
 
-There is no free-form JavaScript MCP tool. The Python worker is an optional per-target adapter runtime that invokes only packaged operations; credentials stay in Node. Validate arguments/results and run runtime probes before claiming a module or system operation is available.
+There is no free-form JavaScript MCP tool. The host evaluates only the fixed binding declared by a packaged operation; credentials stay in Node. Validate arguments/results and run runtime probes before claiming a module or system operation is available.
 
 ## Verify the native protocol against Foundry itself
 

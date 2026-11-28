@@ -4,8 +4,8 @@ The accompanying [workflows.json](workflows.json) contains manual MCP recipes fo
 every operation. It is not a batch to run. Replace every `REPLACE_*` document or
 activity ID, select the correct target, and inspect the prerequisites first.
 
-Use D&D5e **6.1.1** on Foundry **14.367 or later within generation 14**, an
-execution-capable `rest-api` or `composite` target, and Python 3.10+. A target has
+Use D&D5e **6.1.1** on Foundry **14.367 or later within generation 14** and an
+execution-capable `rest-api` or `composite` target. A target has
 one active world and one system; names remain `system_dnd5e_*` for that target.
 The sample [target configuration](targets.example.json) enables writes for a
 controlled test world and references environment variables for credentials.

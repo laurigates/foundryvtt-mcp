@@ -5,9 +5,9 @@
 ## Provider and integration overhaul
 
 This branch introduces target-scoped providers for all MCP access, independent
-connections to multiple Foundry worlds, and Python integrations in separate
+connections to multiple Foundry worlds, and JavaScript integrations in separate
 `systems/<id>/<foundry-generation>/` and `modules/<id>/<foundry-generation>/`
-directories. Each generation has a self-contained adapter package. Exact upstream IDs are preserved in tool
+directories. Each generation has a self-contained package. Exact upstream IDs are preserved in tool
 names: `system_{id}_{operation}` and `module_{id}_{operation}`. Existing environment
 configuration is converted into one target; explicit multi-target calls use `target_id`.
 
@@ -29,8 +29,9 @@ inclusive**; earlier generations are outside that scope. The loader selects the
 package matching the connected target's generation, then applies its upstream
 version and capability checks. A missing generation remains unavailable; the
 server does not borrow another generation's adapter. Individual package gates
-and actually tested combinations are documented separately. Python 3.10+ is
-optional for the core and required for active Python integrations.
+and actually tested combinations are documented separately. Integration packages
+are plain JavaScript, so the core and every integration share the same Node.js
+runtime.
 
 To add an external integration, copy its complete generation directory under
 the matching system or module ID. No central registration table is required.

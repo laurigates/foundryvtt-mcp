@@ -97,7 +97,7 @@ Destructive operations have no general undo. An interrupted write may return `ou
 
 Operation context checks stop unsent steps from continuing after a refresh,
 reconnect, shutdown or completed call. Ordinary same-target work waits for
-locally tracked provider requests even if a Python worker fails first. A local
+locally tracked provider requests even after a public error. A local
 timeout still cannot establish whether a remote mutation completed. Invalid
 native acknowledgement data is also an unknown outcome, not success.
 
@@ -120,8 +120,8 @@ usable. See the [system bridge catalog](../bridges/systems.md) and
 Foundry requirements and links to operation references.
 
 Packages use `systems/<id>/<generation>/` and `modules/<id>/<generation>/`.
-Only the exact Foundry generation is selected on each target, before Python
-imports or runtime probes. Missing generations do not fall back. New adapters
+Only the exact Foundry generation is selected on each target, before
+runtime probes. Missing generations do not fall back. New adapters
 are discovered by copying a complete directory; no registry edit is required.
 
 The system adapters expose explicit data reads, rule-aware rolls and selected

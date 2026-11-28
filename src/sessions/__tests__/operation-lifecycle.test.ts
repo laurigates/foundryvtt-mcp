@@ -42,8 +42,6 @@ async function nativeSession() {
     provider: { kind: 'socketio', baseUrl: 'http://native.test', writeEnabled: true },
     writeEnabled: true,
     integrationsEnabled: false,
-    pythonExecutable: 'python3',
-    integrationTimeoutMs: 1000,
   };
   const provider = new SocketIOProvider(
     config.provider as Extract<TargetConfig['provider'], { kind: 'socketio' }>,

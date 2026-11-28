@@ -65,10 +65,6 @@ export async function validatePackageFiles(pkg) {
   const { root, manifest } = pkg;
   await containedFile(root, 'manifest.json');
   await containedFile(root, 'README.md');
-  const entrypoint = await containedFile(root, manifest.entrypoint);
-  if (!entrypoint.endsWith('.py')) {
-    throw new Error(`Adapter entrypoint must be Python: ${root}`);
-  }
   if (
     manifest.schemaVersion !== 1 ||
     manifest.protocolVersion !== 1 ||

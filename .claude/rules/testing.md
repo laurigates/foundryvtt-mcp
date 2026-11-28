@@ -1,6 +1,6 @@
 # Testing Requirements
 
-The project uses Bun, Just, Vitest, Python unittest and Playwright. Prefer the `justfile` recipes; see [development.md](development.md) and the [Development Guide](../../docs/guides/development.md).
+The project uses Bun, Just, Vitest and Playwright. Prefer the `justfile` recipes; see [development.md](development.md) and the [Development Guide](../../docs/guides/development.md).
 
 ## Tiers
 
@@ -8,26 +8,25 @@ The project uses Bun, Just, Vitest, Python unittest and Playwright. Prefer the `
 |---|---|---|
 | Unit | `just test` | Vitest: core handlers, provider/session/catalog contracts, offline and fake-I/O cases |
 | Type safety | `just check-types` and `just check-types-scripts` | TypeScript source and scripts (separate tsconfigs) |
-| Python | `just test-python` | Python JSONL worker and system/module adapters |
-| Quality gate | `just qa` | Biome lint + both TypeScript checks + integration bindings + Vitest coverage + Python unittest |
-| Package smoke | `bun run smoke`, `smoke:dotenv`, `smoke:integrations`, `smoke:pack` | Startup, load order, optional Python runtime, installed package assets |
+| Quality gate | `just qa` | Biome lint + both TypeScript checks + integration bindings + Vitest coverage |
+| Package smoke | `bun run smoke`, `smoke:dotenv`, `smoke:integrations`, `smoke:pack` | Startup, load order, packaged integration contracts, installed package assets |
 | Live integration | `bun run test:integration` or `just test-integration-docker` | FoundryVTT over real authenticated transports; requires a configured server |
 | Browser E2E | `just test-e2e` | Playwright tests; requires browser and running setup |
 
-The regular repository test workflow runs build, script typechecking, Vitest, startup/dotenv/package smoke checks and Biome. Do not assume that it performs the Python, relay, or live Foundry tiers. Add tests to the relevant tier whenever a feature changes.
+The regular repository test workflow runs build, script typechecking, Vitest, startup/dotenv/package smoke checks and Biome. Do not assume that it performs the relay or live Foundry tiers. Add tests to the relevant tier whenever a feature changes.
 
 ## Architecture-specific coverage
 
-- Different `target_id` values must not share mutable world data, credentials, integration state or Python processes; identical upstream document IDs must remain isolated.
+- Different `target_id` values must not share mutable world data, credentials or integration state; identical upstream document IDs must remain isolated.
 - `ToolCatalog` must apply consistent rules in `tools/list` and `tools/call`. Test offline targets, unavailable capabilities, single/multiple target ambiguity, read-only configuration, conflicting integration schemas and target-qualified resources.
 - Providers must reject stale generations and world/origin changes. A lost write response is `outcome_unknown`, not permission to retry.
-- Test runtime probes, JSON Schema validation, arbitrary source-ID preservation, JSONL callbacks, missing Python and worker cleanup.
+- Test runtime probes, JSON Schema validation, arbitrary source-ID preservation, binding execution, missing packages and manager cleanup.
 - Test both native Socket.IO `modifyDocument` and paired relay document execution **when the functionality exists**. Remote APIs are not interchangeable.
 - Cache/query behavior includes incremental document broadcasts, explicit refresh, world-content search and plain-text excerpts.
 - Cover both single v13-style acknowledgements and v14 `{ results: [...] }` acknowledgements, including errors in side-effect responses and `modifyDocumentBatch` broadcasts.
 - Optional legacy REST augmentation belongs to one Socket.IO target. Cover read fallback and bridge cooldowns without changing another target's capabilities, credentials or write path.
 - Verify packaged imports and adapter bindings from a working directory outside the checkout.
-- Keep source tests (`src/**/__tests__`), Python tests (`python/tests/`, `systems/*/tests/`, `modules/*/tests/`) and live tests (`tests/integration/`) independent.
+- Keep source tests (`src/**/__tests__`), package tests (`systems/*/tests/`, `modules/*/tests/`) and live tests (`tests/integration/`) independent.
 
 ## Live Foundry tier
 

@@ -12,8 +12,6 @@ function catalogFor(schemas: Record<string, unknown>[]): ToolCatalog {
           id: String(index),
           provider: { kind: 'socketio', baseUrl: `http://${index}.test` },
           writeEnabled: false,
-          pythonExecutable: 'python3',
-          integrationTimeoutMs: 1000,
           integrationsEnabled: true,
         },
         provider: { isConnected: () => true, capabilities: new Set<string>() },

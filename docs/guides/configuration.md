@@ -35,7 +35,6 @@ With no `FOUNDRY_API_KEY` or explicit `FOUNDRY_PROVIDER`, this uses authenticate
 | `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional relay execution endpoint path |
 | `FOUNDRY_EXPECTED_WORLD_ID`, `FOUNDRY_EXPECTED_ORIGIN` | Optional destination-identity pins; world ID required for composite targets |
 | `FOUNDRY_WRITE_ENABLED` | Single-target write opt-in, default `false` |
-| `FOUNDRY_PYTHON_EXECUTABLE` | Optional Python executable (default `python3`) |
 | `FOUNDRY_TIMEOUT`, `FOUNDRY_RETRY_ATTEMPTS`, `FOUNDRY_RETRY_DELAY` | Native/legacy transport timeouts and read retry settings |
 | `LOG_LEVEL`, `NODE_ENV` | Server logging/environment |
 | `CACHE_ENABLED`, `CACHE_TTL_SECONDS`, `CACHE_MAX_SIZE` | Legacy cache configuration; `CACHE_MAX_SIZE` must be a positive integer |
@@ -76,7 +75,7 @@ Put the following in a **local, private** JSON file, for example `foundry-target
 
 The `.invalid` URLs are placeholders; do not use them as live endpoints. `FOUNDRY_TARGETS_JSON` accepts the same JSON inline as an alternative to a file. Each provider may use `usernameEnv`, `passwordEnv` and `apiKeyEnv` instead of literal credentials; do not specify a literal value and an environment reference for the same field.
 
-Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`), `pythonExecutable` (default `python3`), `integrationTimeoutMs` (default `10000`), and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. A Socket.IO provider can additionally configure `restUrl` together with `restApiKey` or `restApiKeyEnv` for historical bridge augmentation; native credentials remain required. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
+Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`) and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. A Socket.IO provider can additionally configure `restUrl` together with `restApiKey` or `restApiKeyEnv` for historical bridge augmentation; native credentials remain required. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
 
 ## Providers and capabilities
 

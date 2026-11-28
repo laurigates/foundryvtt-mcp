@@ -40,9 +40,8 @@ operation. Missing generation metadata or a missing exact-generation package
 never authorizes cross-generation fallback. The exact system version/minimum
 build checks below apply in addition to this package selection.
 
-For an isolated copy, run `node build.mjs --check`,
-`node --test tests/*.test.mjs` and
-`python3 -B -m unittest discover -s tests -v` from this directory.
+For an isolated copy, run `node build.mjs --check` and
+`node --test tests/*.test.mjs` from this directory.
 
 ## Core display projection
 
@@ -58,7 +57,7 @@ projection, not a live compatibility claim.
 Install PF2e **8.7.1** from its [official release](https://github.com/foundryvtt/pf2e/releases/tag/pf2e-8.7.1)
 in a compatible Foundry generation-14 installation and launch the intended world.
 The MCP package does not install a game system, create a world or migrate data.
-Use this MCP branch with Node.js 18+ and Python 3.10+; no extra Python packages are
+Use this MCP branch with Node.js 18+; no extra packages are
 required. Configure a `rest-api` or `composite` target with a ready paired client.
 The bridge needs `runtime.execute`; standalone `socketio` and historical
 `legacy-rest` do not provide it. See [Providers and targets](../../../docs/guides/providers-and-targets.md).
@@ -196,14 +195,13 @@ Version gates cannot certify every installed module combination. See the
 
 Authored sources are in `src/`. `build.mjs` produces standalone fixed bindings,
 probes and the manifest. Generated files are committed and no bundler runs in the
-production request path. The Python adapter uses its installed manifest as an
-allowlist and does not open an independent connection.
+production request path. The binding executes inside the host operation context and
+does not open an independent connection.
 
 ```bash
 node systems/pf2e/14/build.mjs --write
 node systems/pf2e/14/build.mjs --check
 node --test systems/pf2e/14/tests/*.test.mjs
-python3 -B -m unittest discover -s systems/pf2e/14/tests -p 'test_*.py' -v
 ```
 
 Local tests exercise invocation signatures, generated scripts, readiness,

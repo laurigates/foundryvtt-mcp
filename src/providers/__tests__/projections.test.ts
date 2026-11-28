@@ -127,7 +127,6 @@ function manifest(
     ...(generation === undefined ? {} : { foundryGeneration: generation }),
     adapterVersion: 'fixture',
     updatedAt: '2026-11-22',
-    entrypoint: 'adapter.py',
     status: 'experimental',
     upstream: { repository: null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: { foundryVersions: [], integrationVersions: [], tested: [], ...compatibility },

@@ -17,15 +17,14 @@ Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test
 
 This project uses **Bun** for dependency management (`bun.lock`) and **Just** for task recipes (`justfile`). Prefer Just for local/CI parity.
 
-- `just qa` — pre-commit gate: Biome lint, `tsc --noEmit` for `src/`, script typecheck via `tsconfig.scripts.json`, integration bindings, Vitest coverage and Python unittest.
+- `just qa` — pre-commit gate: Biome lint, `tsc --noEmit` for `src/`, script typecheck via `tsconfig.scripts.json`, integration bindings and Vitest coverage.
 - `just check-types` / `just check-types-scripts` — standalone TypeScript checks.
 - `just test` / `just test-coverage` — integration bindings followed by Vitest unit tests/coverage.
-- `just test-python` — Python worker/adapter unit tests.
 - `just lint` / `just lint-fix` — Biome check (fix only when intended).
 - `just build` — compile TypeScript.
 - `just test-e2e` — Playwright; requires its external runtime setup.
 - `just antipatterns` — ast-grep anti-pattern scan.
-- `bun run smoke`, `smoke:dotenv`, `smoke:integrations`, `smoke:pack` — startup, environment, Python package/runtime and distribution checks.
+- `bun run smoke`, `smoke:dotenv`, `smoke:integrations`, `smoke:pack` — startup, environment, packaged integration and distribution checks.
 
 The pre-commit hook checks staged secrets with **Gitleaks** and runs `lint-staged`/Biome. Formatting only selected files is preferable when unrelated pre-existing lint debt exists.
 
@@ -35,7 +34,7 @@ The pre-commit hook checks staged secrets with **Gitleaks** and runs `lint-stage
 - Resolve `target_id` via `src/sessions/`. Each target owns a provider, cache, integration lifecycle, write setting, operation queue, identity and generation. There must be no global mutable current world.
 - Core tool handlers depend on `FoundryCore` (`src/providers/types.ts`), not `FoundryClient` or transport internals. `src/foundry/client.ts` is only a compatibility export.
 - `src/tools/availability.ts` retains legacy transport helpers; the active server enforces per-target capabilities through `ToolCatalog`.
-- Put game-system-specific interpretation in `systems/` (including projections), module-specific APIs in `modules/`, and shared manifest/worker code in `src/integrations/` / `python/`.
+- Put game-system-specific interpretation in `systems/` (including projections), module-specific APIs in `modules/`, and shared manifest/loader code in `src/integrations/`.
 - Preserve exact upstream IDs in public tool names; validate schemas and runtime probes before advertising operations. There is no arbitrary-JS MCP tool.
 - Explicit writes require the selected target's write flag, provider capabilities and Foundry permissions. Do not replay unknown-outcome writes or fail over to another target.
 

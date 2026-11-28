@@ -6,6 +6,10 @@
 
 **Historical implementation baseline:** branch `feat/multiworld-provider-overhaul`, commit [742751dfd89ab604eed00ac2ce3fd154a35b82f0](https://github.com/p4535992/foundryvtt-mcp/commit/742751dfd89ab604eed00ac2ce3fd154a35b82f0), as described in the development discussion on **2026-11-22**. This draft also records the follow-up review reported in that discussion. The evidence section distinguishes the baseline from that final pass; neither is a statement about a later revision.
 
+> **Later change:** the Python adapter runtime described in this draft was removed
+> in favour of direct JavaScript binding execution. Read the Python transport
+> references as historical context, not as the current package format.
+
 The purpose of this draft is to make the expansion model concrete enough to discuss: how transports, sessions, generic document access, game rules and module workflows should coexist; how integrations should evolve with Foundry; and what evidence would be needed before accepting or supporting the design. Feedback may justify changing the implementation or splitting the work into smaller changes.
 
 ## 1. Motivation and scope

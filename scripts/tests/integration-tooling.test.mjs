@@ -156,10 +156,10 @@ test('discovery and assets reject sibling-generation aliases and escaping file p
   await symlink(v13.root, join(v14.root, '../15'));
   await assert.rejects(discoverIntegrationPackages(packageRoot), /alias/);
   await rm(join(v14.root, '../15'));
-  await assert.rejects(containedFile(v14.root, '../13/adapter.py'), /relative/);
-  await symlink(join(v13.root, 'adapter.py'), join(v14.root, 'sibling.py'));
-  await assert.rejects(containedFile(v14.root, 'sibling.py'), /escapes/);
-  await assert.rejects(containedFile(v14.root, join(v14.root, 'adapter.py')), /relative/);
+  await assert.rejects(containedFile(v14.root, '../13/binding.js'), /relative/);
+  await symlink(join(v13.root, 'bindings/get_status.js'), join(v14.root, 'sibling.js'));
+  await assert.rejects(containedFile(v14.root, 'sibling.js'), /escapes/);
+  await assert.rejects(containedFile(v14.root, join(v14.root, 'binding.js')), /relative/);
 });
 
 test('command arguments keep generation filtering explicit and reject malformed input', () => {

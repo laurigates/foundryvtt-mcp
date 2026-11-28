@@ -101,8 +101,6 @@ function fixture(
         }
       : { kind: 'socketio', baseUrl: `http://${id}.test` },
     writeEnabled: options.write ?? false,
-    pythonExecutable: 'python3',
-    integrationTimeoutMs: 1000,
     integrationsEnabled: true,
   };
   return {

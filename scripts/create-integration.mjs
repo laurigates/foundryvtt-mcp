@@ -36,22 +36,6 @@ for (const [name, content] of files) {
 console.log(manifest.kind + ':' + manifest.id + '/' + manifest.foundryGeneration + ': generated files ' + mode.slice(2));
 `;
 
-const adapterSource = String.raw`"""Unimplemented scaffold: the host probe prevents publishing its operation."""
-import json
-from pathlib import Path
-
-
-class Adapter:
-    def __init__(self):
-        manifest = json.loads(Path(__file__).with_name("manifest.json").read_text(encoding="utf-8"))
-        self.operations = frozenset(operation["id"] for operation in manifest["operations"])
-
-    async def execute(self, operation, arguments, context):
-        if operation not in self.operations or not isinstance(arguments, dict):
-            raise ValueError("Unknown operation or invalid arguments")
-        return await context.invoke(operation, arguments)
-`;
-
 const bindingSource =
   '// Scaffold only: implement a specific upstream contract before making its probe ready.\n' +
   'throw Object.assign(new Error("Integration skeleton is not implemented"), { code: "integration_not_ready" });\n';
@@ -150,7 +134,6 @@ export async function createIntegration({
     foundryGeneration,
     adapterVersion: '0.1.0',
     updatedAt: new Date().toISOString().slice(0, 10),
-    entrypoint: 'adapter.py',
     status: 'experimental',
     upstream: { repository: upstream ?? null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: {
@@ -186,7 +169,7 @@ Adapter version: 0.1.0. Upstream repository: ${upstream ?? 'not yet recorded'}. 
 4. Mark every roll, chat publication, resource consumption and mutation \`readOnly: false\`. Use the target write gate and runtime document permissions. After a dispatched action with uncertain outcome, report \`outcome_unknown\`; never retry or fall back automatically.
 5. Add meaningful binding/probe tests and operation examples. Update provenance and compatibility metadata honestly; source inspection alone is not a live compatibility test.
 
-From this folder, run \`node build.mjs --write\`, \`node build.mjs --check\`, and \`node --test tests/*.test.mjs\`. From the project checkout, \`npm run check:integrations\` and \`npm run test:bindings\` discover this folder automatically. Python uses the standard library; dependencies are never installed automatically.
+From this folder, run \`node build.mjs --write\`, \`node build.mjs --check\`, and \`node --test tests/*.test.mjs\`. From the project checkout, \`npm run check:integrations\` and \`npm run test:bindings\` discover this folder automatically. The host evaluates the generated bindings as JavaScript; dependencies are never installed automatically.
 
 ## Copy or install manually
 
@@ -194,7 +177,6 @@ Copy this complete folder to \`${kind === 'system' ? 'systems' : 'modules'}/${id
 `;
   const files = new Map([
     ['README.md', readme],
-    ['adapter.py', adapterSource],
     ['build.mjs', buildSource],
     [
       'src/registry.mjs',

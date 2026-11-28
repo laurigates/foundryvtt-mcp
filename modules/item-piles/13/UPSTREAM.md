@@ -243,7 +243,7 @@ No build/runtime import depends on a sibling package. Copy the whole directory
 to keep the variant independently reproducible.
 
 Local tests exercise the real generated JavaScript with controlled Foundry/API
-fixtures, JSON Schema contracts, real Python dispatch and error propagation. They
+fixtures, JSON Schema contracts, binding dispatch and error propagation. They
 cannot establish compatibility with a live game system, installed Item Piles
 configuration, custom macros or a real relay. Record a tested Foundry/module/system
 combination only after the smoke procedure in the README has been performed.

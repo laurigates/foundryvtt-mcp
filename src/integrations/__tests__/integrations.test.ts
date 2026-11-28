@@ -4,10 +4,6 @@ import { IntegrationManager } from '../manager.js';
 import { loadIntegrations, toolName } from '../manifest.js';
 
 const packageRoot = fileURLToPath(new URL('../../../', import.meta.url));
-// `python3` is not installed on every platform, so the interpreter is resolved
-// once here and honours the same override the server configuration accepts.
-const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
-const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 
 describe('integration packages', () => {
   it('preserves upstream IDs and loads both families', async () => {
@@ -17,6 +13,11 @@ describe('integration packages', () => {
       [...new Set(packages.map((entry) => `${entry.manifest.kind}:${entry.manifest.id}`))].sort(),
     ).toEqual(['module:item-piles', 'system:dnd5e', 'system:pf2e']);
   });
+
+  it('declares no Python entrypoint in any packaged manifest', async () => {
+    const packages = await loadIntegrations(packageRoot);
+    expect(packages.every((entry) => !('entrypoint' in entry.manifest))).toBe(true);
+  });
 });
 
 describe('session integration isolation', () => {
@@ -25,7 +26,6 @@ describe('session integration isolation', () => {
       new IntegrationManager({
         targetId,
         packageRoot,
-        pythonExecutable: python,
         execute: async () => ({ ready: true }),
       });
     const a = create('one');
@@ -36,7 +36,7 @@ describe('session integration isolation', () => {
       modules: [],
     };
     try {
-      await Promise.all([a.reconcile(environment, 1), b.reconcile(environment, 2)]);
+      await Promise.all([a.reconcile(environment), b.reconcile(environment)]);
       expect(a.getTools()).toEqual(b.getTools());
       expect(
         a.getTools().find((tool) => tool.name === 'system_dnd5e_get_actor_data')?.outputSchema,
@@ -53,13 +53,12 @@ describe('session integration isolation', () => {
     }
   });
 
-  it('selects one system and only active modules; invokes a real Python worker', async () => {
+  it('selects one system and only active modules; executes the packaged binding', async () => {
     const calls: Array<{ target: string; script: string; args: Record<string, unknown> }> = [];
     const make = (target: string) =>
       new IntegrationManager({
         targetId: target,
         packageRoot,
-        pythonExecutable: python,
         execute: async (script, args) => {
           calls.push({ target, script, args });
           if (script.includes('INTEGRATION_PROBE')) {
@@ -79,14 +78,16 @@ describe('session integration isolation', () => {
     const b = make('b');
     try {
       await Promise.all([
-        a.reconcile(
-          { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] },
-          1,
-        ),
-        b.reconcile(
-          { foundryVersion: '14.370', system: { id: 'pf2e', version: 'test' }, modules: [] },
-          1,
-        ),
+        a.reconcile({
+          foundryVersion: '14.370',
+          system: { id: 'dnd5e', version: 'test' },
+          modules: [],
+        }),
+        b.reconcile({
+          foundryVersion: '14.370',
+          system: { id: 'pf2e', version: 'test' },
+          modules: [],
+        }),
       ]);
       expect(a.has('system_dnd5e_get_actor_data')).toBe(true);
       expect(a.has('system_pf2e_get_actor_data')).toBe(false);
@@ -108,30 +109,23 @@ describe('session integration isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'custom',
       packageRoot,
-      pythonExecutable: python,
       execute: async (script) => (script.includes('INTEGRATION_PROBE') ? { ready: true } : []),
     });
     try {
-      await manager.reconcile(
-        {
-          foundryVersion: '14.370',
-          system: { id: 'custom-system', version: 'test' },
-          modules: [{ id: 'item-piles', version: 'test', active: true }],
-        },
-        3,
-      );
+      await manager.reconcile({
+        foundryVersion: '14.370',
+        system: { id: 'custom-system', version: 'test' },
+        modules: [{ id: 'item-piles', version: 'test', active: true }],
+      });
       expect(manager.has('module_item-piles_get_items')).toBe(true);
       expect(await manager.call('module_item-piles_get_items', { actor_uuid: 'Actor.x' })).toEqual(
         [],
       );
-      await manager.reconcile(
-        {
-          foundryVersion: '14.370',
-          system: { id: 'custom-system', version: 'test' },
-          modules: [{ id: 'item-piles', version: 'test', active: false }],
-        },
-        4,
-      );
+      await manager.reconcile({
+        foundryVersion: '14.370',
+        system: { id: 'custom-system', version: 'test' },
+        modules: [{ id: 'item-piles', version: 'test', active: false }],
+      });
       expect(manager.has('module_item-piles_get_items')).toBe(false);
       await expect(
         manager.call('module_item-piles_get_items', { actor_uuid: 'Actor.x' }),
@@ -141,12 +135,12 @@ describe('session integration isolation', () => {
     }
   });
 
-  it('reports unavailable runtimes and missing Python without claiming success', async () => {
+  it('reports unavailable runtimes and a failing probe without claiming success', async () => {
+    let probe: { ready: boolean; reason?: string } = { ready: true };
     const manager = new IntegrationManager({
       targetId: 'offline',
       packageRoot,
-      pythonExecutable: '/missing/python',
-      execute: async () => ({ ready: true }),
+      execute: async () => probe,
     });
     try {
       const env = {
@@ -154,14 +148,18 @@ describe('session integration isolation', () => {
         system: { id: 'dnd5e', version: 'test' },
         modules: [],
       };
-      await manager.reconcile({ ...env, runtimeAvailable: false }, 1);
+      await manager.reconcile({ ...env, runtimeAvailable: false });
       expect(manager.getTools()).toEqual([]);
       expect(manager.list().find((entry) => entry.id === 'dnd5e')?.state).toBe('unsupported');
-      await manager.reconcile({ ...env, ready: false }, 2);
+      await manager.reconcile({ ...env, ready: false });
       expect(manager.list().find((entry) => entry.id === 'dnd5e')?.state).toBe('not-ready');
-      await manager.reconcile(env, 3);
+      probe = { ready: false, reason: 'API removed' };
+      await manager.reconcile(env);
       expect(manager.getTools()).toEqual([]);
-      expect(manager.list().find((entry) => entry.id === 'dnd5e')?.state).toBe('error');
+      expect(manager.list().find((entry) => entry.id === 'dnd5e')).toMatchObject({
+        state: 'not-ready',
+        reason: 'API removed',
+      });
     } finally {
       await manager.close();
     }
@@ -172,14 +170,14 @@ describe('session integration isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'changed',
       packageRoot,
-      pythonExecutable: python,
       execute: async () => ({ ready, reason: ready ? undefined : 'API removed' }),
     });
     try {
-      await manager.reconcile(
-        { foundryVersion: '14.370', system: { id: 'pf2e', version: 'test' }, modules: [] },
-        1,
-      );
+      await manager.reconcile({
+        foundryVersion: '14.370',
+        system: { id: 'pf2e', version: 'test' },
+        modules: [],
+      });
       expect(manager.has('system_pf2e_get_actor_data')).toBe(true);
       ready = false;
       await expect(
@@ -197,12 +195,11 @@ describe('session integration isolation', () => {
     }
   });
 
-  it('preserves provider outcome codes through Python and never resends the binding', async () => {
+  it('preserves provider outcome codes and never resends the binding', async () => {
     let executions = 0;
     const manager = new IntegrationManager({
       targetId: 'errors',
       packageRoot,
-      pythonExecutable: python,
       execute: async (script) => {
         if (script.includes('INTEGRATION_PROBE')) {
           return { ready: true };
@@ -212,10 +209,11 @@ describe('session integration isolation', () => {
       },
     });
     try {
-      await manager.reconcile(
-        { foundryVersion: '14.370', system: { id: 'dnd5e', version: 'test' }, modules: [] },
-        1,
-      );
+      await manager.reconcile({
+        foundryVersion: '14.370',
+        system: { id: 'dnd5e', version: 'test' },
+        modules: [],
+      });
       await expect(
         manager.call('system_dnd5e_get_actor_data', { actor_uuid: 'Actor.x' }),
       ).rejects.toMatchObject({ code: 'outcome_unknown' });

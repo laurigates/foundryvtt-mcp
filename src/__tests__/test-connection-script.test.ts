@@ -27,8 +27,6 @@ function target(id: string, provider: ProviderConfig): TargetConfig {
     id,
     provider,
     writeEnabled: false,
-    pythonExecutable: 'python3',
-    integrationTimeoutMs: 1000,
     integrationsEnabled: false,
   };
 }

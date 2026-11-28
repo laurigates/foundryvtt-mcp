@@ -14,13 +14,13 @@ Each numeric directory is a complete independent package, for example
 directory convention: a future `15/` package follows the same contract, but it
 must be authored and checked before it becomes usable.
 
-Every generation package includes `manifest.json`, `adapter.py`, and `README.md`. Each declared
-operation identifies a fixed JavaScript binding and a runtime probe. Colocated
-`tests/` directories hold adapter contract tests. The shared loader/protocol is
-identical for both families.
+Every generation package includes `manifest.json`, `README.md`, and the fixed
+JavaScript bindings and probes it declares. Colocated `tests/` directories hold
+package contract tests. The shared loader is identical for both families; the
+host evaluates the bindings directly, with no separate adapter runtime.
 
-Keep runtime files and local helpers within that generation directory. Bindings,
-probes and the entrypoint cannot escape it through `..` or symlinks. Do not import
+Keep runtime files and local helpers within that generation directory. Bindings
+and probes cannot escape it through `..` or symlinks. Do not import
 code from a sibling generation: copying `14/` must not require `13/`. An optional
 README directly under the upstream ID can index the available generations; it
 is not an adapter package and has no manifest.
@@ -42,21 +42,21 @@ generation directory as a release artifact. Installation is local:
    keeping the exact upstream ID: `modules/<id>/14/` or `systems/<id>/14/`.
    Copy another generation as a separate sibling when needed. Do not merge a
    new package into an existing variant or leave a flat manifest at the ID root.
-3. Run `npm run check:integrations`, `npm run test:bindings` and
-   `npm run test:python` from the server checkout. A package can supply its own
-   generator and tests; runtime loading does not require a generator.
+3. Run `npm run check:integrations` and `npm run test:bindings` from the server
+   checkout. A package can supply its own generator and tests; runtime loading
+   does not require a generator.
 4. Refresh or reconnect the target, or restart the MCP server. Inspect
    `list_systems`, `list_modules` or `get_target_status` for the selected generation,
    upstream version observed in the world, unavailable operations and load errors.
 
-There is no central ID allowlist, provider dispatch table or Python registry to
+There is no central ID allowlist, provider dispatch table or adapter registry to
 edit. Discovery inspects the filesystem. Merely creating a directory does not
 activate it: its manifest, exact generation, installed upstream package, provider
 execution support and operation probes must agree. A missing generation does not
 enable a nearby version's tool set.
 
 These are trusted executable packages, not sandboxed uploads. The server does not
-clone GitHub repositories, install Python dependencies or execute arbitrary source
+clone GitHub repositories, install package dependencies or execute arbitrary source
 supplied in an MCP call. Keep external adapters in a maintained checkout or image;
 edits inside a transient `npx` cache or an installed dependency can disappear on
 upgrade. No network access is needed for package discovery or generation selection.
@@ -101,7 +101,6 @@ suffix; target routing determines which implementation runs.
 | `id` | Must exactly match the directory and upstream ID |
 | `foundryGeneration` | Integer `13` or later, required for a numeric generation directory and exactly equal to its name; omitted only by legacy flat packages |
 | `adapterVersion`, `updatedAt` | Our adapter version and last update date |
-| `entrypoint` | Python entrypoint relative to this directory |
 | `status` | `experimental` or `supported` |
 | `upstream` | Official repository, inspected source reference, upstream date and live verification date; unknowns use `null` (see [source references](#upstream-source-references)) |
 | `compatibility` | Exact version filters and actually tested combinations |
@@ -149,7 +148,7 @@ MCP client, including invalid data, recursion and any nested `$id` resources.
 `foundryGeneration` selects the package from the observed Foundry version:
 `14.370` selects `14/`. This is independent of the session generation counter,
 which increments when a connection is replaced. A target with an unknown Foundry
-version or no matching variant does not load that versioned Python adapter or
+version or no matching variant does not load that versioned package or
 probe its bindings. Other targets and independent integrations remain usable.
 
 After generation selection, an empty `foundryVersions` or `integrationVersions`
@@ -178,24 +177,6 @@ directory; the pinned upstream release identifies the system/module contract;
 `adapterVersion` identifies our implementation of that contract. Updating one
 generation never advances the source pin or adapter version of another.
 
-## Python adapter
-
-Expose an `Adapter` class with an async `execute` method:
-
-```python
-class Adapter:
-    async def execute(self, operation, arguments, context):
-        if operation != "get_actor_data":
-            raise ValueError(f"Unsupported operation: {operation}")
-        return await context.invoke(operation, arguments)
-```
-
-The context is bound to one target and one integration. `invoke` calls only the
-binding registered for the current operation. URL, credentials, relay client IDs,
-and provider selection belong to the Node host. A Python filename is loaded by
-path, so an upstream directory ID containing a hyphen needs no Python import-name
-normalization.
-
 ## Runtime binding and probe
 
 The provider supplies `args` from validated JSON input. A binding resolves Foundry
@@ -217,13 +198,13 @@ by the MCP caller. Do not claim a write is read-only to bypass target policy. A
 read may still trigger upstream logging or notifications; document upstream
 behavior accurately. Runtime execution permission remains an upstream setting.
 
-The Node host binds Python callback tokens to the operation's original session
-context. Each provider send rechecks that context, and a callback arriving after
-its call or worker has closed cannot start a replacement operation. Worker
-failure does not cancel a runtime request already sent: ordinary work on that
-target waits for the locally tracked request to settle. A failed mutating
-operation that already invoked the provider is reported as `outcome_unknown`
-unless the provider explicitly rejected execution. Never retry it automatically.
+The host runs each binding inside the operation's original session context. Each
+provider send rechecks that context, and a continuation arriving after its call or
+session has closed cannot start a replacement operation. A provider request that
+was already sent is not cancelled by a later failure: ordinary work on that target
+waits for the locally tracked request to settle. A failed mutating operation that
+already invoked the provider is reported as `outcome_unknown` unless the provider
+explicitly rejected execution. Never retry it automatically.
 Item Piles demonstrates mutating operations with `readOnly: false`, target-local
 write enablement and an additional runtime GM gate. System rolls and mutations
 also require write opt-in; their bindings check document ownership and any
@@ -251,7 +232,6 @@ fresh in-memory output without writing. Regeneration is a separate explicit
 npm run generate:integrations
 npm run check:integrations
 npm run test:bindings
-npm run test:python
 ```
 
 The scripts discover generation packages without hardcoded IDs. A package-local
@@ -261,7 +241,7 @@ step. Existing `generate:systems`, `check:systems`, `test:systems` and Item Pile
 aliases select their corresponding packages across generations.
 
 The manifest/protocol version remains `1`; versioned loading adds generation
-metadata and an optional worker-load field while preserving legacy flat packages.
+metadata while preserving legacy flat packages.
 Arguments remain JSON data for a fixed operation. `target_id` is reserved by the
 host; use fields such as `source_uuid` and `target_uuid` for documents participating
 in an operation. Keep the previous public contract when extending a package.
@@ -275,8 +255,8 @@ bundling or eliminate that discovery cost.
 
 The system matching the world's identity and Foundry generation is selected
 independently from active modules of that same generation. A missing system adapter leaves core document access and independent
-module integrations available. Each world has separate adapter instances and a
-separate optional Python process; the package code itself is shared on disk.
+module integrations available. Each world has separate integration manager
+instances; the package code itself is shared on disk.
 
 Runtime loading records a malformed package as an integration error and keeps
 unrelated valid packages usable. Every package involved in a public-name
@@ -396,7 +376,7 @@ operations and limitations. The installed upstream version is a session
 observation, separate from the adapter version and the inspected source baseline.
 
 Test input validation, DTO results, incorrect system/module context, API absence,
-and Python callback behavior. Verify two targets cannot share mutable adapter
+and binding execution behavior. Verify two targets cannot share mutable adapter
 state and that a new upstream version cannot silently change an existing public
 tool schema. Add explicit versioned operations if the public contract cannot
 remain compatible.
@@ -405,13 +385,12 @@ Run:
 
 ```bash
 npm test
-npm run test:python
 npm run build
 npm run smoke:integrations
 npm run smoke:pack
 ```
 
-The packed smoke launches a real Python worker from an installed distribution and
-a different working directory with a fake provider callback. It verifies the
-package boundary, not a live Foundry API. Update `compatibility.tested` only after
-the corresponding live test has actually been performed.
+The packed smoke loads the installed distribution's manifests and compiles their
+contracts from a different working directory. It verifies the package boundary,
+not a live Foundry API. Update `compatibility.tested` only after the corresponding
+live test has actually been performed.

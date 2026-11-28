@@ -6,19 +6,19 @@ Operations, source inspection notes and limitations belong in each package READM
 
 Each directory is named after the exact Foundry system ID. Each numeric child,
 such as `systems/<id>/13/` or `systems/<id>/14/`, is a complete independent
-package containing `manifest.json`, `adapter.py`, `README.md`, fixed bindings and
+package containing `manifest.json`, `README.md`, fixed bindings, probes and
 tests. Its `foundryGeneration` must match the directory. The session selects the
-adapter matching both the remote system and the exact Foundry generation. It never
+package matching both the remote system and the exact Foundry generation. It never
 substitutes another generation's package. An unknown system
 does not disable generic core operations or independent module integrations.
 
 Tool names are `system_{id}_{operation}`. IDs are preserved, including hyphens;
-the loader creates an internal valid Python import name independently.
+the loader resolves the package by path, so no import-name normalization is needed.
 
-The common loader, worker and availability checks live in `src/integrations/` and
-`python/foundry_mcp_modules/`. Each target has its own worker and adapter instances.
-Providers own credentials and connections. Adapters receive a target-bound proxy
-for invoking their registered bindings; they do not open HTTP connections.
+The common loader and availability checks live in `src/integrations/`. Each target
+has its own integration manager and package instances.
+Providers own credentials and connections. Bindings execute inside the target's
+operation context; they do not open HTTP connections.
 
 The bundled system adapters preserve their original raw Actor reads and add
 explicit system-specific reads, rolls and mutations based on pinned upstream

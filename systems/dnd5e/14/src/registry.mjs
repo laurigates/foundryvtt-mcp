@@ -14,7 +14,7 @@ export const legacyOperation = {
 export const operations = Object.freeze([...actors, ...activities].sort((a, b) => a.id.localeCompare(b.id)));
 export const metadata = Object.freeze({
   schemaVersion: 1, protocolVersion: 1, kind: 'system', foundryGeneration: 14, id: 'dnd5e', adapterVersion: '0.2.0',
-  updatedAt: '2026-11-22', entrypoint: 'adapter.py', status: 'experimental',
+  updatedAt: '2026-11-22', status: 'experimental',
   upstream: { repository: 'https://github.com/foundryvtt/dnd5e', reference: 'release-6.1.1@bc1b2c921e2f306dc5079f8de883ad64607118a6', updatedAt: '2026-11-16', verifiedAt: null },
   // Per-operation gates preserve the legacy raw Actor-data operation.
   compatibility: { foundryVersions: ['14'], integrationVersions: [], tested: [] },

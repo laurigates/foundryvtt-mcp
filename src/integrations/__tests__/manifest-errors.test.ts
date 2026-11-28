@@ -1,17 +1,11 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IntegrationManager } from '../manager.js';
 import { type IntegrationLoadFailure, loadIntegrations } from '../manifest.js';
 
 const roots: string[] = [];
-const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
-// `python3` is not installed on every platform, so the interpreter is resolved
-// once here and honours the same override the server configuration accepts.
-const defaultPython = process.platform === 'win32' ? 'python' : 'python3';
-const python = process.env.FOUNDRY_PYTHON_EXECUTABLE ?? defaultPython;
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -20,12 +14,6 @@ afterEach(async () => {
 async function fixtureRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'foundry-integration-manifests-'));
   roots.push(root);
-  const worker = join(root, 'python/foundry_mcp_modules');
-  await mkdir(worker, { recursive: true });
-  await copyFile(
-    join(sourceRoot, 'python/foundry_mcp_modules/worker.py'),
-    join(worker, 'worker.py'),
-  );
   return root;
 }
 
@@ -39,7 +27,6 @@ async function integration(root: string, id: string, operation = 'read'): Promis
     id,
     adapterVersion: 'test',
     updatedAt: '2026-11-22',
-    entrypoint: 'adapter.py',
     status: 'experimental',
     upstream: { repository: null, reference: null, updatedAt: null, verifiedAt: null },
     compatibility: { foundryVersions: [], integrationVersions: [], tested: [] },
@@ -60,10 +47,6 @@ async function integration(root: string, id: string, operation = 'read'): Promis
     writeFile(join(directory, 'README.md'), 'Test-only integration\n'),
     writeFile(join(directory, 'binding.js'), 'return {};\n'),
     writeFile(join(directory, 'probe.js'), 'return {ready: true};\n'),
-    writeFile(
-      join(directory, 'adapter.py'),
-      'class Adapter:\n    async def execute(self, operation, arguments, context):\n        return await context.invoke(operation, arguments)\n',
-    ),
   ]);
   return directory;
 }
@@ -92,18 +75,22 @@ describe('integration package failure isolation', () => {
   );
 
   it.each([
-    ['entrypoint', 'adapter.js'],
     ['binding', 'binding.py'],
     ['probe', 'probe.py'],
   ] as const)('rejects a manifest whose %s is not an allowed file type', async (field, value) => {
     const root = await fixtureRoot();
     const directory = await integration(root, 'typed');
     const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
-    if (field === 'entrypoint') {
-      manifest.entrypoint = value;
-    } else {
-      manifest.operations[0][field] = value;
-    }
+    manifest.operations[0][field] = value;
+    await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest));
+    await expect(loadIntegrations(root)).rejects.toMatchObject({ code: 'invalid_manifest' });
+  });
+
+  it('rejects a legacy manifest that still declares a Python entrypoint', async () => {
+    const root = await fixtureRoot();
+    const directory = await integration(root, 'legacy');
+    const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
+    manifest.entrypoint = 'adapter.py';
     await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest));
     await expect(loadIntegrations(root)).rejects.toMatchObject({ code: 'invalid_manifest' });
   });
@@ -147,18 +134,14 @@ describe('integration package failure isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'activation',
       packageRoot: root,
-      pythonExecutable: python,
       execute: async (script) => (script.includes('ready') ? { ready: true } : { ok: true }),
     });
     try {
-      await manager.reconcile(
-        {
-          foundryVersion: 'test',
-          system: { id: 'custom-system', version: 'test' },
-          modules: ['broken', 'healthy'].map((id) => ({ id, version: 'test', active: true })),
-        },
-        1,
-      );
+      await manager.reconcile({
+        foundryVersion: 'test',
+        system: { id: 'custom-system', version: 'test' },
+        modules: ['broken', 'healthy'].map((id) => ({ id, version: 'test', active: true })),
+      });
       expect(manager.has('module_broken_read')).toBe(false);
       expect(manager.has('module_healthy_read')).toBe(true);
       expect(manager.list().find((entry) => entry.id === 'broken')).toMatchObject({
@@ -178,18 +161,14 @@ describe('integration package failure isolation', () => {
     const manager = new IntegrationManager({
       targetId: 'world',
       packageRoot: root,
-      pythonExecutable: python,
       execute: async (script) => (script.includes('ready') ? { ready: true } : { ok: true }),
     });
     try {
-      await manager.reconcile(
-        {
-          foundryVersion: 'test',
-          system: { id: 'custom-system', version: 'test' },
-          modules: [{ id: 'healthy', version: 'test', active: true }],
-        },
-        1,
-      );
+      await manager.reconcile({
+        foundryVersion: 'test',
+        system: { id: 'custom-system', version: 'test' },
+        modules: [{ id: 'healthy', version: 'test', active: true }],
+      });
       expect(manager.list().find((entry) => entry.id === 'unused-system')).toMatchObject({
         state: 'error',
         operations: [],

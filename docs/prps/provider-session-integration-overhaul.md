@@ -1,5 +1,10 @@
 # Provider/session/integration overhaul — implementation record
 
+> **Historical record.** This document describes the implementation as of its
+> baseline. The Python adapter runtime it mentions was later removed: packages now
+> declare only fixed bindings and probes, and the host evaluates them directly.
+> Current behaviour is documented in the guides under `docs/guides/`.
+
 ## Goal
 
 Make all Foundry access target-scoped, preserve the existing core behind provider

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { z } from 'zod';
 import {
@@ -16,7 +15,6 @@ import {
   loadIntegrations,
   toolName,
 } from './manifest.js';
-import { PythonWorker, type WorkerInvocation } from './python-worker.js';
 import {
   type IntegrationEnvironment,
   IntegrationError,
@@ -30,8 +28,6 @@ const ProbeResult = z.object({ ready: z.boolean(), reason: z.string().optional()
 
 export interface IntegrationManagerOptions {
   targetId: string;
-  pythonExecutable?: string;
-  timeoutMs?: number;
   packageRoot?: string;
   writesEnabled?: boolean;
   execute: (script: string, args: Record<string, unknown>, readOnly: boolean) => Promise<unknown>;
@@ -52,28 +48,28 @@ interface PackageVariants {
   failures: IntegrationLoadFailure[];
 }
 
+/** One operation execution; its fence and write classification live only for this call. */
 interface IntegrationCall {
-  name: string;
-  revision: number;
   context: ProviderOperationContext | undefined;
   possibleWrites: number;
-  pendingWrites: Set<Promise<unknown>>;
 }
 
+// A dispatched write whose result was lost. A provider failure without a code is
+// treated the same way: the binding may already have mutated Foundry.
 const UNCERTAIN_WRITE_ERRORS = new Set([
-  'worker_timeout',
-  'worker_exited',
-  'worker_protocol',
-  'protocol_limit',
-  'worker_unavailable',
-  'python_unavailable',
   'stale_session',
   'session_changed',
   'session_closed',
   'invalid_output',
-  'adapter_error',
-  'provider_error',
 ]);
+
+function isUncertainWriteError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code: unknown = 'code' in error ? error.code : undefined;
+  return typeof code !== 'string' || UNCERTAIN_WRITE_ERRORS.has(code);
+}
 
 // These execution errors attest that this particular binding did not mutate
 // Foundry. A provider must use outcome_unknown for a response lost after sending.
@@ -92,11 +88,8 @@ const CONFIRMED_NO_WRITE_ERRORS = new Set([
 export class IntegrationManager {
   private readonly ajv = createContractAjv();
   private readonly packageRoot: string;
-  private worker: PythonWorker | undefined;
   private operations = new Map<string, RegisteredOperation>();
   private statuses: IntegrationStatus[] = [];
-  private calls = new Map<string, IntegrationCall>();
-  private readonly interruptedWrites = new Set<Promise<unknown>>();
   private revision = 0;
   private closed = false;
 
@@ -104,16 +97,12 @@ export class IntegrationManager {
     this.packageRoot = options.packageRoot ?? defaultPackageRoot();
   }
 
-  async reconcile(environment: IntegrationEnvironment, generation: number): Promise<void> {
+  async reconcile(environment: IntegrationEnvironment): Promise<void> {
     if (this.closed) {
       throw new IntegrationError('session_closed', 'Integration manager is closed');
     }
     const revision = ++this.revision;
     this.operations.clear();
-    this.calls.clear();
-    const oldWorker = this.worker;
-    this.worker = undefined;
-    await oldWorker?.close();
     const failures: IntegrationLoadFailure[] = [];
     const packages = await loadIntegrations(this.packageRoot, {
       onError: (failure) => failures.push(failure),
@@ -147,54 +136,13 @@ export class IntegrationManager {
       this.options.onChange?.();
       return;
     }
-    const worker = new PythonWorker({
-      targetId: this.options.targetId,
-      generation,
-      packageRoot: this.packageRoot,
-      ...(this.options.pythonExecutable ? { executable: this.options.pythonExecutable } : {}),
-      ...(this.options.timeoutMs === undefined ? {} : { timeoutMs: this.options.timeoutMs }),
-      invoke: (request) => this.invoke(request, revision),
-      onFailure: (error) => {
-        if (revision === this.revision && this.worker === worker) {
-          // Invalidate every continuation of the activation, including a remote
-          // probe already awaiting its response when this worker exits.
-          this.revision += 1;
-          this.operations.clear();
-          this.calls.clear();
-          for (const status of this.statuses) {
-            if (status.state === 'ready' || status.state === 'not-ready') {
-              status.state = 'error';
-              status.reason = error.message;
-              for (const operation of status.operations) {
-                operation.available = false;
-                operation.reason = error.message;
-              }
-            }
-          }
-          this.options.onChange?.();
-        }
-      },
-    });
-    this.worker = worker;
-    const current = () =>
-      revision === this.revision && !this.closed && this.worker === worker && worker.isRunning();
+    const current = () => revision === this.revision && !this.closed;
     try {
-      await worker.start();
       for (const { entry, status } of candidates) {
         if (!current()) {
           return;
         }
         try {
-          const key = `${entry.manifest.kind}:${entry.manifest.id}`;
-          await worker.load(
-            key,
-            entry.root,
-            entry.manifest.entrypoint,
-            entry.manifest.foundryGeneration,
-          );
-          if (!current()) {
-            return;
-          }
           for (const definition of entry.manifest.operations) {
             const name = toolName(entry.manifest.kind, entry.manifest.id, definition.id);
             const binding = entry.bindings.get(definition.id);
@@ -298,15 +246,8 @@ export class IntegrationManager {
   }
 
   async call(name: string, args: Record<string, unknown>): Promise<unknown> {
-    if (this.interruptedWrites.size > 0) {
-      throw new IntegrationError(
-        'operation_pending',
-        'An earlier integration write is still settling; it must not be replayed',
-      );
-    }
     const operation = this.operations.get(name);
-    const worker = this.worker;
-    if (this.closed || !operation || !worker) {
+    if (this.closed || !operation) {
       throw new IntegrationError(
         'integration_unavailable',
         `${name} is unavailable on target ${this.options.targetId}`,
@@ -347,25 +288,33 @@ export class IntegrationManager {
         'The integration session changed before execution',
       );
     }
-    const token = randomUUID();
     const call: IntegrationCall = {
-      name,
-      revision,
       context: captureOperationContext(),
       possibleWrites: 0,
-      pendingWrites: new Set(),
     };
-    this.calls.set(token, call);
     try {
-      const result = await worker.call(
-        `${operation.package.manifest.kind}:${operation.package.manifest.id}`,
-        operation.definition.id,
-        args,
-        token,
-      );
-      // A trusted adapter must not report completion while its own write callback
-      // is still running, even if it forgot to await context.invoke().
-      await Promise.all([...call.pendingWrites]);
+      const result = await withOperationContext(call.context, async () => {
+        // The provider dispatch inherits the caller's fence, so a delayed
+        // continuation cannot send a step in an operation that already ended.
+        assertOperationCurrent();
+        if (!operation.definition.readOnly) {
+          call.possibleWrites += 1;
+        }
+        try {
+          return await this.options.execute(operation.script, args, operation.definition.readOnly);
+        } catch (error) {
+          if (
+            !operation.definition.readOnly &&
+            error instanceof Error &&
+            'code' in error &&
+            typeof error.code === 'string' &&
+            CONFIRMED_NO_WRITE_ERRORS.has(error.code)
+          ) {
+            call.possibleWrites -= 1;
+          }
+          throw error;
+        }
+      });
       if (revision !== this.revision || this.closed) {
         throw new IntegrationError(
           'stale_session',
@@ -375,30 +324,17 @@ export class IntegrationManager {
       this.validate(operation.output, result, 'output');
       return result;
     } catch (error) {
-      if (
-        call.possibleWrites > 0 &&
-        error instanceof Error &&
-        'code' in error &&
-        typeof error.code === 'string' &&
-        UNCERTAIN_WRITE_ERRORS.has(error.code)
-      ) {
+      if (call.possibleWrites > 0 && isUncertainWriteError(error)) {
+        const code =
+          error instanceof Error && 'code' in error && typeof error.code === 'string'
+            ? ` (${error.code})`
+            : '';
         throw new IntegrationError(
           'outcome_unknown',
-          `Integration ${name} lost its result after a write was dispatched. Its outcome is unknown; it was not retried (${error.code})`,
+          `Integration ${name} lost its result after a write was dispatched. Its outcome is unknown; it was not retried${code}`,
         );
       }
       throw error;
-    } finally {
-      this.calls.delete(token);
-      // The session tracks the actual provider request through its operation
-      // context. Standalone managers also reject a replay while that write drains.
-      for (const pending of call.pendingWrites) {
-        this.interruptedWrites.add(pending);
-        const settled = () => {
-          this.interruptedWrites.delete(pending);
-        };
-        void pending.then(settled, settled);
-      }
     }
   }
 
@@ -406,7 +342,6 @@ export class IntegrationManager {
     this.closed = true;
     this.revision += 1;
     this.operations.clear();
-    this.calls.clear();
     for (const status of this.statuses) {
       if (status.state === 'ready' || status.state === 'not-ready') {
         status.state = 'not-ready';
@@ -419,76 +354,7 @@ export class IntegrationManager {
         }
       }
     }
-    await this.worker?.close();
-    this.worker = undefined;
     this.options.onChange?.();
-  }
-
-  private async invoke(request: WorkerInvocation, revision: number): Promise<unknown> {
-    const call = this.calls.get(request.callToken);
-    const operation = call ? this.operations.get(call.name) : undefined;
-    if (
-      !call ||
-      !operation ||
-      call.revision !== revision ||
-      revision !== this.revision ||
-      this.closed
-    ) {
-      throw new IntegrationError('stale_session', 'Unrecognized or expired integration invocation');
-    }
-    const identity = `${operation.package.manifest.kind}:${operation.package.manifest.id}`;
-    if (request.integration !== identity || request.operation !== operation.definition.id) {
-      throw new IntegrationError(
-        'invalid_binding',
-        'An adapter may invoke only its registered operation binding',
-      );
-    }
-    this.validate(operation.input, request.arguments, 'input');
-    if (!operation.definition.readOnly && !this.options.writesEnabled) {
-      throw new IntegrationError('writes_disabled', 'Writes are disabled for this target');
-    }
-    const execution = withOperationContext(call.context, async () => {
-      // The Python stdout listener was installed outside the original call's
-      // async context; restore its fence before marking or dispatching a write.
-      assertOperationCurrent();
-      if (!operation.definition.readOnly) {
-        call.possibleWrites += 1;
-      }
-      try {
-        return await this.options.execute(
-          operation.script,
-          request.arguments,
-          operation.definition.readOnly,
-        );
-      } catch (error) {
-        if (
-          !operation.definition.readOnly &&
-          error instanceof Error &&
-          'code' in error &&
-          typeof error.code === 'string' &&
-          CONFIRMED_NO_WRITE_ERRORS.has(error.code)
-        ) {
-          call.possibleWrites -= 1;
-        }
-        throw error;
-      }
-    });
-    if (!operation.definition.readOnly) {
-      call.pendingWrites.add(execution);
-      const settled = () => {
-        call.pendingWrites.delete(execution);
-      };
-      void execution.then(settled, settled);
-    }
-    const result = await execution;
-    if (revision !== this.revision || this.closed) {
-      throw new IntegrationError(
-        'stale_session',
-        'Provider result belongs to an earlier integration session',
-      );
-    }
-    this.validate(operation.output, result, 'output');
-    return result;
   }
 
   private async probe(operation: RegisteredOperation): Promise<void> {
@@ -514,7 +380,7 @@ export class IntegrationManager {
     }
   }
 
-  /** Choose exactly one package before importing Python or probing any runtime. */
+  /** Choose exactly one package before probing any runtime. */
   private select(
     packages: IntegrationPackage[],
     failures: IntegrationLoadFailure[],

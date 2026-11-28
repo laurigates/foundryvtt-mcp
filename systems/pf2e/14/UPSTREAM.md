@@ -186,5 +186,5 @@ fallback to a core patch or a second module transaction.
 The Node tests execute generated bindings/probes with controlled fixtures and
 exercise schemas, source/version gates, exact invocation options, live-instance
 wrapping, permissions, ambiguous contexts, secret results and uncertain writes.
-Python tests exercise manifest-bound dispatch. They are not tests in a licensed
+They are not tests in a licensed
 Foundry installation. No live PF2e/Foundry/module combination is recorded yet.

@@ -6,7 +6,6 @@
   "id": "dnd5e",
   "adapterVersion": "0.2.0",
   "updatedAt": "2026-11-22",
-  "entrypoint": "adapter.py",
   "status": "experimental",
   "upstream": {
     "repository": "https://github.com/foundryvtt/dnd5e",

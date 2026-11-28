@@ -217,10 +217,7 @@ function installInConsumer(tarball) {
     },
   );
   if (integrationSmoke.status !== 0) {
-    fail(
-      'Installed Python integration smoke failed',
-      integrationSmoke.stderr || integrationSmoke.stdout,
-    );
+    fail('Installed integration smoke failed', integrationSmoke.stderr || integrationSmoke.stdout);
   }
   process.stdout.write(integrationSmoke.stdout);
   console.log(`📥 Installed at: ${installedRoot}`);

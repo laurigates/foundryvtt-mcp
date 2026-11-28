@@ -92,12 +92,7 @@ test-integration *args:
 test-integration-docker:
     bun run test:integration:docker
 
-# Exercise the actual Python worker and packaged adapter contracts
-[group: "test"]
-test-python:
-    bun run test:python
-
-# Exercise the built worker and integration payloads without Foundry
+# Exercise the packaged integration payloads without Foundry
 [group: "test"]
 smoke-integrations:
     bun run smoke:integrations
@@ -158,7 +153,7 @@ check-types-scripts:
 
 # Run all quality checks (lint, types, tests)
 [group: "quality"]
-qa: lint check-types check-types-scripts test-coverage test-python
+qa: lint check-types check-types-scripts test-coverage
 
 ########## Documentation ##########
 

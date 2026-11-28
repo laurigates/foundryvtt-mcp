@@ -75,8 +75,6 @@ const TargetSchema = z
     expectedWorldId: z.string().min(1).optional(),
     expectedOrigin: HttpUrl.optional(),
     writeEnabled: z.boolean().default(false),
-    pythonExecutable: z.string().min(1).default('python3'),
-    integrationTimeoutMs: z.number().int().positive().default(10000),
     integrationsEnabled: z.boolean().default(true),
   })
   .strict()
@@ -185,8 +183,6 @@ export interface TargetConfig {
   expectedWorldId?: string;
   expectedOrigin?: string;
   writeEnabled: boolean;
-  pythonExecutable: string;
-  integrationTimeoutMs: number;
   integrationsEnabled: boolean;
 }
 
@@ -291,9 +287,6 @@ function parseTargets(input: unknown, env: NodeJS.ProcessEnv): TargetConfig[] {
           return target;
         }
         return {
-          ...(env.FOUNDRY_PYTHON_EXECUTABLE
-            ? { pythonExecutable: env.FOUNDRY_PYTHON_EXECUTABLE }
-            : {}),
           ...target,
           provider: resolveProviderSecrets(target.provider, env),
         };
@@ -327,8 +320,6 @@ function parseTargets(input: unknown, env: NodeJS.ProcessEnv): TargetConfig[] {
       id: target.id,
       provider,
       writeEnabled: target.writeEnabled,
-      pythonExecutable: target.pythonExecutable,
-      integrationTimeoutMs: target.integrationTimeoutMs,
       integrationsEnabled: target.integrationsEnabled,
       ...(target.label !== undefined ? { label: target.label } : {}),
       ...(target.expectedWorldId !== undefined ? { expectedWorldId: target.expectedWorldId } : {}),
