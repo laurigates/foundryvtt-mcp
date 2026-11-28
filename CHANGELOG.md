@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.7.0...foundryvtt-mcp-v1.7.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **diagnostics:** point at the released REST bridge manifest ([#345](https://github.com/laurigates/foundryvtt-mcp/issues/345)) ([2f1181e](https://github.com/laurigates/foundryvtt-mcp/commit/2f1181eb53f46e073d805b1487e8bdc224072548))
+
 ## [1.7.0](https://github.com/laurigates/foundryvtt-mcp/compare/foundryvtt-mcp-v1.6.3...foundryvtt-mcp-v1.7.0) (2026-11-24)
 
 
