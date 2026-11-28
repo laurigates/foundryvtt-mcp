@@ -124,10 +124,12 @@ const TOOL_MATRIX: Readonly<Record<string, Row>> = {
  * then returns an empty list or an unavailable message.
  */
 const RESOURCE_MATRIX: Readonly<Record<string, Row>> = {
+  // In dual mode the bridge identity is re-verified around every REST call, so a
+  // cell that uses the bridge also asks `GET /api/world` (ADR-0011).
   'foundry://actors': {
     socket: 'socket',
     rest: 'rest GET /api/actors',
-    dual: 'socket + rest GET /api/actors',
+    dual: 'socket + rest GET /api/world + rest GET /api/actors',
   },
   'foundry://items': { socket: 'socket', rest: 'rest GET /api/items', dual: 'socket' },
   'foundry://scenes': { socket: 'socket', rest: 'none', dual: 'socket' },
@@ -143,7 +145,7 @@ const RESOURCE_MATRIX: Readonly<Record<string, Row>> = {
   'foundry://system/diagnostics': {
     socket: 'none',
     rest: 'rest GET /api/diagnostics/health',
-    dual: 'rest GET /api/diagnostics/health',
+    dual: 'rest GET /api/world + rest GET /api/diagnostics/health',
   },
 };
 

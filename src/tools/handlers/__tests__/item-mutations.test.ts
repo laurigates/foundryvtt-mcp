@@ -301,15 +301,15 @@ describe('FoundryClient item mutations (modifyDocument)', () => {
       baseUrl: 'http://localhost:30000',
       writeEnabled: opts.writeEnabled ?? true,
     });
-    // The ack echoes the first created/updated document (or empty for delete).
+    // A created document receives its server id; deletes return ids (or an empty result).
     const emit = vi.fn(((_event, payload, cb) => {
       const op = (
         payload as {
-          operation?: { data?: unknown[]; updates?: unknown[] };
+          operation?: { data?: Record<string, unknown>[]; updates?: Record<string, unknown>[] };
         }
       ).operation;
       const echoed = op?.data?.[0] ?? op?.updates?.[0];
-      cb({ result: echoed ? [echoed] : [] });
+      cb({ result: echoed ? [{ _id: VALID_ITEM_ID, ...echoed }] : [] });
     }) as SocketEmitMock);
     if (opts.connected !== false) {
       (client as unknown as { socket: { connected: boolean; emit: SocketEmitMock } }).socket = {

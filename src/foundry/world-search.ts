@@ -62,9 +62,10 @@ function decodeEntity(entity: string): string {
  * quadratic on text full of '<' with no '>', and this text is recomputed on
  * every query, so a scanner is required. The result is plain text that is
  * returned in an MCP type: 'text' field for the model to read; it is never
- * rendered as HTML.
+ * rendered as HTML. Exported so tool handlers that return plain text reuse this
+ * scanner instead of a multi-character regex.
  */
-function stripMarkup(value: string): string {
+export function stripMarkup(value: string): string {
   const n = value.length;
   let out = '';
   let i = 0;

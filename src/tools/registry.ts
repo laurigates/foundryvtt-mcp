@@ -6,7 +6,7 @@
  */
 
 import { logger } from '../utils/logger.js';
-import type { Tool, ToolContext, ToolResult } from './base.js';
+import { normalizeToolContext, type Tool, type ToolContextInput, type ToolResult } from './base.js';
 import { RollDiceTool } from './handlers/dice.js';
 
 /**
@@ -24,7 +24,7 @@ export class ToolRegistry {
    */
   register(tool: Tool): void {
     if (this.tools.has(tool.name)) {
-      logger.warn(`Tool '${tool.name}' is already registered, replacing...`);
+      throw new Error(`Duplicate tool registration: ${tool.name}`);
     }
 
     this.tools.set(tool.name, tool);
@@ -37,7 +37,7 @@ export class ToolRegistry {
   async execute(
     name: string,
     args: Record<string, unknown>,
-    context: ToolContext,
+    context: ToolContextInput,
   ): Promise<ToolResult> {
     const tool = this.tools.get(name);
 
@@ -45,7 +45,7 @@ export class ToolRegistry {
       throw new Error(`Unknown tool: ${name}`);
     }
 
-    return await tool.execute(args, context);
+    return await tool.execute(args, normalizeToolContext(context));
   }
 
   /**

@@ -357,6 +357,23 @@ describe('handleGetHealthStatus', () => {
     } as unknown as FoundryClient;
   }
 
+  it('does not label a runtime relay as an inherited native socket transport', async () => {
+    const provider = worldClient(true);
+    Object.defineProperty(provider, 'kind', { value: 'rest-api' });
+    const text = getText(await handleGetHealthStatus({}, provider, healthClient(makeHealth())));
+    expect(text).toContain('**Provider:** REST API relay');
+    expect(text).not.toContain('**Socket.IO:**');
+    expect(text).not.toContain('**REST bridge:**');
+  });
+
+  it('keeps health output available for providers without a legacy connection report', async () => {
+    const provider = worldClient(true);
+    Reflect.deleteProperty(provider, 'getConnectionReport');
+    const text = getText(await handleGetHealthStatus({}, provider, healthClient(makeHealth())));
+    expect(text).toContain('✅ Connected');
+    expect(text).toContain('**Title:** Test World');
+  });
+
   it('renders real world and system-health values, not placeholders', async () => {
     const text = getText(
       await handleGetHealthStatus({}, worldClient(true), healthClient(makeHealth())),

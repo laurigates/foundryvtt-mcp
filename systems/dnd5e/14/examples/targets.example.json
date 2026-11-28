@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "id": "dnd5e-14-demo",
+      "label": "D&D5e system integration examples",
+      "expectedWorldId": "REPLACE_WITH_WORLD_ID",
+      "expectedOrigin": "https://foundry.example.invalid",
+      "writeEnabled": true,
+      "integrationsEnabled": true,
+      "provider": {
+        "kind": "composite",
+        "core": {
+          "kind": "socketio",
+          "baseUrl": "https://foundry.example.invalid",
+          "usernameEnv": "FOUNDRY_DEMO_USERNAME",
+          "passwordEnv": "FOUNDRY_DEMO_PASSWORD"
+        },
+        "execution": {
+          "kind": "rest-api",
+          "relayUrl": "https://relay.example.invalid",
+          "apiKeyEnv": "FOUNDRY_DEMO_RELAY_API_KEY",
+          "clientId": "REPLACE_WITH_PAIRED_RUNTIME_CLIENT_ID"
+        }
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { FoundryClient } from '../../../foundry/client.js';
-import type { WorldActor, WorldCombat } from '../../../foundry/types.js';
+import type { FoundryActor, WorldCombat } from '../../../foundry/types.js';
 import { handleGetCombatState } from '../combat.js';
 
 function getText(result: { content: Array<{ type: string; text: string }> }): string {
@@ -61,7 +61,7 @@ describe('handleGetCombatState', () => {
     });
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
@@ -88,7 +88,7 @@ describe('handleGetCombatState', () => {
     });
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
@@ -106,7 +106,7 @@ describe('handleGetCombatState', () => {
     });
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
@@ -118,41 +118,37 @@ describe('handleGetCombatState', () => {
     expect(text).toContain('[HIDDEN]');
   });
 
-  it('appends HP/AC from raw actor when actorId resolves', async () => {
+  it('appends HP/AC from projected actor when actorId resolves', async () => {
     const combat = buildCombat({
       combatants: [buildCombatant({ name: 'Orc', initiative: 12, actorId: 'actor-99' })],
     });
-    const rawActor: WorldActor = {
+    const rawActor: FoundryActor = {
       _id: 'actor-99',
       name: 'Orc',
       type: 'npc',
-      system: {
-        attributes: {
-          hp: { value: 12, max: 20 },
-          ac: { value: 14 },
-        },
-      },
+      hp: { value: 12, max: 20 },
+      ac: { value: 14 },
     };
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(rawActor),
+      getActor: vi.fn().mockResolvedValue(rawActor),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
     const text = getText(result);
 
-    expect(client.getRawActor).toHaveBeenCalledWith('actor-99');
+    expect(client.getActor).toHaveBeenCalledWith('actor-99');
     expect(text).toContain('HP: 12/20');
     expect(text).toContain('AC: 14');
   });
 
-  it('omits HP/AC when raw actor lookup returns undefined', async () => {
+  it('omits HP/AC when projected actor lookup returns undefined', async () => {
     const combat = buildCombat({
       combatants: [buildCombatant({ name: 'Ghost', initiative: 7, actorId: 'missing-id' })],
     });
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
@@ -167,7 +163,7 @@ describe('handleGetCombatState', () => {
     const combat = buildCombat({ round: 2, combatants: [] });
     const client = {
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     } as unknown as FoundryClient;
 
     const result = await handleGetCombatState({}, client);
@@ -181,7 +177,7 @@ describe('handleGetCombatState — turn order (#214)', () => {
   const makeClient = (combat: WorldCombat) =>
     ({
       getCombatState: vi.fn().mockReturnValue(combat),
-      getRawActor: vi.fn().mockReturnValue(undefined),
+      getActor: vi.fn().mockResolvedValue(undefined),
     }) as unknown as FoundryClient;
 
   it('does not reorder the cached combatants array (a read must not mutate the cache)', async () => {

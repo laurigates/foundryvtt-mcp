@@ -9,8 +9,8 @@
  */
 
 import type { z } from 'zod';
-import type { FoundryClient } from '../foundry/client.js';
 import { unwrapOptionalEnvelope } from '../foundry/rest-mappers.js';
+import type { FoundryCore } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 import type { LogPatternSearchParams, LogSearchParams } from './types.js';
 import {
@@ -36,7 +36,7 @@ type ErrorDiagnosis = z.infer<typeof ErrorDiagnosisSchema>;
  * @class DiagnosticsClient
  * @example
  * ```typescript
- * const diagnostics = new DiagnosticsClient(foundryClient);
+ * const diagnostics = new DiagnosticsClient(provider);
  *
  * // Get recent errors
  * const errors = await diagnostics.getRecentLogs({ level: 'error', lines: 20 });
@@ -52,9 +52,14 @@ export class DiagnosticsClient {
   /**
    * Create a new DiagnosticsClient instance
    *
-   * @param foundryClient - The FoundryClient instance to use for API calls
+   * @param provider - The FoundryCore instance to use for API calls
    */
-  constructor(private foundryClient: FoundryClient) {}
+  constructor(private provider: Pick<FoundryCore, 'get' | 'requestRestDiagnostics'>) {}
+
+  /** Let the selected provider apply its bridge URL and transport availability rules. */
+  private request(url: string) {
+    return this.provider.requestRestDiagnostics?.(url) ?? this.provider.get(url);
+  }
 
   /**
    * Get recent log entries with optional filtering
@@ -105,7 +110,7 @@ export class DiagnosticsClient {
       const queryString = searchParams.toString();
       const url = `/api/diagnostics/logs${queryString ? `?${queryString}` : ''}`;
 
-      const response = await this.foundryClient.restGet(url);
+      const response = await this.request(url);
       const parsed = LogResponseSchema.parse(
         unwrapOptionalEnvelope(response.data, '/api/diagnostics/logs'),
       );
@@ -169,7 +174,7 @@ export class DiagnosticsClient {
       }
 
       const url = `/api/diagnostics/search?${searchParams.toString()}`;
-      const response = await this.foundryClient.restGet(url);
+      const response = await this.request(url);
       const parsed = LogSearchResponseSchema.parse(
         unwrapOptionalEnvelope(response.data, '/api/diagnostics/search'),
       );
@@ -210,7 +215,7 @@ export class DiagnosticsClient {
     try {
       logger.debug('DiagnosticsClient | Getting system health');
 
-      const response = await this.foundryClient.restGet('/api/diagnostics/health');
+      const response = await this.request('/api/diagnostics/health');
       const parsed = SystemHealthSchema.parse(
         unwrapOptionalEnvelope(response.data, '/api/diagnostics/health'),
       );
@@ -261,7 +266,7 @@ export class DiagnosticsClient {
       searchParams.set('timeframe', timeframe.toString());
 
       const url = `/api/diagnostics/errors?${searchParams.toString()}`;
-      const response = await this.foundryClient.restGet(url);
+      const response = await this.request(url);
       const parsed = ErrorDiagnosisSchema.parse(
         unwrapOptionalEnvelope(response.data, '/api/diagnostics/errors'),
       );
@@ -364,7 +369,7 @@ export class DiagnosticsClient {
    */
   async isAvailable(): Promise<boolean> {
     try {
-      await this.foundryClient.restGet('/api/diagnostics/health');
+      await this.request('/api/diagnostics/health');
       return true;
     } catch (error) {
       logger.debug('DiagnosticsClient | Diagnostics API not available:', error);

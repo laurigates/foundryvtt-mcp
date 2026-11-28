@@ -33,6 +33,149 @@ const { logger } = await import('../../utils/logger.js');
 const mockAxios = vi.mocked(axios);
 const mockIo = vi.mocked(io);
 
+describe('authenticateFoundry — bounded, cancellable authentication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJoinCookieResponse();
+    mockJoinPostSuccess();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.resetAllMocks();
+  });
+
+  function pendingJoinSocket() {
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    const socket = {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        handlers.set(event, handler);
+      }),
+      off: vi.fn((event: string) => handlers.delete(event)),
+      emit: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    mockIo.mockReturnValue(socket as unknown as Socket);
+    return { socket, handlers };
+  }
+
+  it('bounds both HTTP stages by default', async () => {
+    await authenticateFoundry('http://localhost:30000', 'aaaaaaaaaaaaaaaa', 'pw');
+    expect(mockAxios.get).toHaveBeenCalledWith(
+      'http://localhost:30000/join',
+      expect.objectContaining({ timeout: 10000 }),
+    );
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'http://localhost:30000/join',
+      expect.any(Object),
+      expect.objectContaining({ timeout: 10000 }),
+    );
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'keeps authentication bounded for an invalid timeout (%s)',
+    async (timeout) => {
+      await authenticateFoundry('http://localhost:30000', 'aaaaaaaaaaaaaaaa', 'pw', undefined, {
+        timeout,
+      });
+      expect(mockAxios.get).toHaveBeenCalledWith(
+        'http://localhost:30000/join',
+        expect.objectContaining({ timeout: 10000 }),
+      );
+      expect(mockAxios.post).toHaveBeenCalledWith(
+        'http://localhost:30000/join',
+        expect.any(Object),
+        expect.objectContaining({ timeout: 10000 }),
+      );
+    },
+  );
+
+  it('forwards timeout and cancellation to both HTTP stages', async () => {
+    const controller = new AbortController();
+    const options = { timeout: 37, signal: controller.signal };
+    await authenticateFoundry(
+      'http://localhost:30000',
+      'aaaaaaaaaaaaaaaa',
+      'pw',
+      undefined,
+      options,
+    );
+    expect(mockAxios.get).toHaveBeenCalledWith(
+      'http://localhost:30000/join',
+      expect.objectContaining(options),
+    );
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      'http://localhost:30000/join',
+      expect.any(Object),
+      expect.objectContaining(options),
+    );
+  });
+
+  it('does not start a request when its signal is already aborted', async () => {
+    const controller = new AbortController();
+    const reason = new Error('Connection closed');
+    controller.abort(reason);
+    await expect(
+      authenticateFoundry('http://localhost:30000', 'Gamemaster', 'pw', undefined, {
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(reason);
+    expect(mockAxios.get).not.toHaveBeenCalled();
+    expect(mockIo).not.toHaveBeenCalled();
+    expect(mockAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('aborts the join socket, cleans up listeners, and ignores late acknowledgements', async () => {
+    const controller = new AbortController();
+    const { socket, handlers } = pendingJoinSocket();
+    let acknowledge: ((data: unknown) => void) | undefined;
+    socket.emit.mockImplementation((_event: string, callback: (data: unknown) => void) => {
+      acknowledge = callback;
+    });
+    const reason = new Error('Connection closed');
+    const authentication = authenticateFoundry(
+      'http://localhost:30000',
+      'Gamemaster',
+      'pw',
+      undefined,
+      { signal: controller.signal },
+    );
+    const rejected = expect(authentication).rejects.toBe(reason);
+    await vi.waitFor(() => expect(handlers.has('session')).toBe(true));
+    handlers.get('session')?.();
+    expect(acknowledge).toBeDefined();
+    controller.abort(reason);
+    await rejected;
+    acknowledge?.({ users: [{ _id: 'aaaaaaaaaaaaaaaa', name: 'Gamemaster' }] });
+    await Promise.resolve();
+    expect(socket.disconnect).toHaveBeenCalledOnce();
+    expect(handlers.size).toBe(0);
+    expect(mockAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('times out join data and releases the socket', async () => {
+    vi.useFakeTimers();
+    const { socket, handlers } = pendingJoinSocket();
+    const authentication = authenticateFoundry(
+      'http://localhost:30000',
+      'Gamemaster',
+      'pw',
+      undefined,
+      { timeout: 37 },
+    );
+    const rejected = expect(authentication).rejects.toThrow('Timeout resolving user ID');
+    await vi.advanceTimersByTimeAsync(0);
+    handlers.get('session')?.();
+    expect(socket.emit).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(37);
+    await rejected;
+    expect(socket.disconnect).toHaveBeenCalledOnce();
+    expect(handlers.size).toBe(0);
+    expect(mockAxios.post).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 /**
  * Builds a successful axios GET /join response that yields a session cookie.
  */

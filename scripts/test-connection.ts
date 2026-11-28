@@ -1,228 +1,80 @@
 #!/usr/bin/env node
 
-/**
- * Test script to verify FoundryVTT connection and basic functionality
- * Run with: npm run test-connection
- */
-
-// Must precede every other import: see src/load-env.ts (#206).
+/** Read-only connectivity checks for every configured target. */
 import '../src/load-env.js';
-import axios from 'axios';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { config } from '../src/config/index.js';
-import { FoundryClient } from '../src/foundry/client.js';
+import { FoundrySessionManager } from '../src/sessions/index.js';
 
-/**
- * True when a REST-mode request failed because the target's REST module does
- * not serve the route at all (the bridge's catch-all 404), as opposed to a
- * transport or server error. See issue #194.
- */
-function isRestRouteMissing(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 404;
-}
-
-function printRestRouteMissing(what: string, route: string): void {
-  console.log(`ℹ️  ${what} not exposed by this REST module (404 on ${route}).`);
-  console.log("   The target instance's REST module does not serve this endpoint —");
-  console.log('   expected with older/other REST module builds; not a client defect.');
-  console.log('   Actor/scene reads are canonical over Socket.IO: unset FOUNDRY_API_KEY.\n');
-}
-
-async function testConnection() {
-  console.log('🧪 FoundryVTT MCP Server - Connection Test\n');
-
+export async function testConnection(): Promise<void> {
+  console.log('FoundryVTT MCP connection checks\n');
+  const sessions = new FoundrySessionManager(config.targets, { monitorIntervalMs: 0 });
+  let failures = 0;
   try {
-    console.log('📋 Configuration:');
-    console.log(`   URL: ${config.foundry.url}`);
-
-    // Analyze URL type
-    const url = new URL(config.foundry.url);
-    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    const isHTTPS = url.protocol === 'https:';
-    const hasCustomPort = url.port && url.port !== '80' && url.port !== '443';
-
-    if (isLocal) {
-      console.log(`   Setup Type: 🏠 Local Development`);
-    } else if (isHTTPS) {
-      console.log(`   Setup Type: 🌐 Reverse Proxy / Remote (SSL)`);
-    } else if (hasCustomPort) {
-      console.log(`   Setup Type: 🖥️  Network/IP with custom port`);
-    } else {
-      console.log(`   Setup Type: 🖥️  Remote/Network`);
-    }
-
-    // Transport is selected purely by apiKey presence (client.ts): set → REST
-    // API mode; unset → Socket.IO mode (the default, full worldData path).
-    console.log(`   Transport: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
-    console.log(`   API Key: ${config.foundry.apiKey ? '✅ Configured' : '❌ Not set'}`);
-    console.log(`   Username: ${config.foundry.username ? '✅ Configured' : '❌ Not set'}\n`);
-
-    // Initialize client
-    const client = new FoundryClient({
-      baseUrl: config.foundry.url,
-      // Omit unset values: exactOptionalPropertyTypes rejects explicit undefined.
-      ...(config.foundry.apiKey ? { apiKey: config.foundry.apiKey } : {}),
-      ...(config.foundry.username ? { username: config.foundry.username } : {}),
-      ...(config.foundry.password ? { password: config.foundry.password } : {}),
-      socketPath: config.foundry.socketPath,
-      timeout: config.foundry.timeout,
-    });
-
-    console.log('🔗 Testing connection...');
-    const connected = await client.testConnection();
-
-    if (connected) {
-      console.log('✅ Connection successful!\n');
-    } else {
-      console.log('❌ Connection failed\n');
-      return;
-    }
-
-    // Test dice rolling
-    console.log('🎲 Testing dice rolling...');
-    let diceOk = false;
-    try {
-      const roll = await client.rollDice('1d20+5', 'Connection test');
-      console.log(`   Result: ${roll.total} (${roll.breakdown})`);
-      console.log(`   Source: ${roll.source}`);
-      // In REST mode a local roll means /api/dice/roll failed (#254, #265).
-      if (config.foundry.apiKey && roll.source !== 'server') {
-        console.log('❌ Dice rolling fell back to the local roller: /api/dice/roll failed\n');
-      } else {
-        diceOk = true;
-        console.log('✅ Dice rolling works!\n');
+    await sessions.start();
+    for (const session of sessions.all()) {
+      const status = session.status();
+      console.log(`Target: ${status.target_id} (${status.provider})`);
+      console.log(`State: ${status.state}`);
+      if (status.world) {
+        console.log(`World: ${status.world.id} / system: ${status.system?.id ?? 'unknown'}`);
       }
-    } catch (error) {
-      console.log(`❌ Dice rolling failed: ${error instanceof Error ? error.message : error}\n`);
-    }
-
-    // Test actor search
-    console.log('👥 Testing actor search...');
-    try {
-      const { actors, total } = await client.searchActors({ limit: 3 });
-      console.log(`   Found ${total} actors (showing ${actors.length})`);
-      if (actors.length > 0) {
-        actors.forEach((actor) => {
-          console.log(`   - ${actor.name} (${actor.type})`);
-        });
-        console.log('✅ Actor search works!\n');
-      } else {
-        console.log('ℹ️  No actors found (the world may have none)\n');
+      if (status.state !== 'ready') {
+        failures++;
+        console.log(`Connection failed: ${status.error ?? 'Target is unavailable'}\n`);
+        continue;
       }
-    } catch (error) {
-      if (config.foundry.apiKey && isRestRouteMissing(error)) {
-        printRestRouteMissing('Actor search', 'GET /api/actors');
-      } else {
-        console.log(`⚠️  Actor search limited: ${error instanceof Error ? error.message : error}\n`);
+      console.log(`Capabilities: ${status.capabilities.join(', ')}`);
+      if (session.provider.capabilities.has('core.read')) {
+        try {
+          const actors = await session.run((provider) => provider.searchActors({ limit: 3 }));
+          console.log(`Actor read succeeded: ${actors.actors.length} result(s)`);
+          if (actors.total === 0) {
+            console.log('No actors found (the world may have none)');
+          }
+        } catch (error) {
+          failures++;
+          console.log(
+            `Actor read failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
       }
-    }
-
-    // Test scene info
-    console.log('🗺️  Testing scene information...');
-    try {
-      const scene = await client.getCurrentScene();
-      console.log(`   Current scene: ${scene.name}`);
-      console.log(`   Dimensions: ${scene.width}x${scene.height}`);
-      console.log('✅ Scene information works!\n');
-    } catch (error) {
-      if (config.foundry.apiKey && isRestRouteMissing(error)) {
-        printRestRouteMissing('Scene info', 'GET /api/scenes/current');
-      } else {
-        console.log(`⚠️  Scene info limited: ${error instanceof Error ? error.message : error}\n`);
+      // The historical REST transport must roll on the authenticated server.
+      // A local fallback indicates the REST dice endpoint was unavailable.
+      if (session.config.provider.kind === 'legacy-rest') {
+        try {
+          const roll = await session.run((provider) => provider.rollDice('1d20'));
+          if (roll.source !== 'server') {
+            failures++;
+            console.log('REST dice roll failed: the provider fell back to local rolling');
+          }
+        } catch (error) {
+          failures++;
+          console.log(
+            `REST dice roll failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
       }
-    }
-
-    // Test the live Socket.IO connection (no-op equivalent in REST mode)
-    console.log('🔌 Testing Socket.IO connection...');
-    try {
-      await client.connect();
-      console.log('✅ Socket.IO connection established!\n');
-
-      // Give it a moment to connect
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      await client.disconnect();
-      console.log('✅ Disconnected cleanly\n');
-    } catch (error) {
-      console.log(
-        `⚠️  WebSocket connection issues: ${error instanceof Error ? error.message : error}\n`,
-      );
-    }
-
-    console.log('🎉 Connection test completed!');
-    console.log('\n📝 Summary:');
-    console.log('   - Basic connection: ✅');
-    console.log(`   - Dice rolling: ${diceOk ? '✅' : '❌'}`);
-    console.log(
-      `   - Data access: ${config.foundry.apiKey ? '🌐 REST (coverage depends on the target module; Socket.IO is the full-data path)' : '✅ Full worldData'}`,
-    );
-    console.log(`   - Connection: ${config.foundry.apiKey ? '🌐 REST API' : '🔌 Socket.IO'}`);
-
-    if (!config.foundry.apiKey) {
-      console.log(
-        '\n💡 Optional: the REST bridge adds prepared actor values, compendium search and diagnostics.',
-      );
-      console.log(
-        '   1. Get the module and bridge server from https://github.com/laurigates/foundryvtt-local-rest-api',
-      );
-      console.log('      (no published release yet; install from a checkout)');
-      console.log('   2. Enable the module, turn on its REST API and copy the API key');
-      console.log(
-        '   3. Start the bridge server (port 3030) and keep a Gamemaster logged in through a browser',
-      );
-      console.log(
-        '   4. Set FOUNDRY_API_KEY and FOUNDRY_REST_URL (e.g. http://localhost:3030) in .env, keeping',
-      );
-      console.log('      the Socket.IO credentials (dual mode)');
-      console.log('   5. Restart the MCP server');
-    }
-  } catch (error) {
-    console.error('❌ Test failed:', error);
-    console.log('\n🔧 Troubleshooting:');
-
-    try {
-      const url = new URL(config.foundry.url);
-      const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-      const isHTTPS = url.protocol === 'https:';
-
-      if (isLocal) {
-        console.log('   Local Development Issues:');
-        console.log('   1. Ensure FoundryVTT is running on your local machine');
-        console.log('   2. Check that the port (usually 30000) is correct');
-        console.log('   3. Try accessing FoundryVTT directly: http://localhost:30000');
-        console.log('   4. Verify no firewall blocking the connection');
-      } else if (isHTTPS) {
-        console.log('   Reverse Proxy / Remote Issues:');
-        console.log('   1. Ensure FoundryVTT is accessible at the configured URL');
-        console.log('   2. Check SSL certificate is valid and not expired');
-        console.log('   3. Verify reverse proxy is forwarding to FoundryVTT correctly');
-        console.log('   4. Test WebSocket upgrades are working (required for FoundryVTT)');
-        console.log('   5. Try accessing FoundryVTT directly in your browser');
-      } else {
-        console.log('   Network/Remote Issues:');
-        console.log('   1. Ensure FoundryVTT is running and accessible');
-        console.log('   2. Check network connectivity to the target server');
-        console.log('   3. Verify the port is open and not blocked by firewall');
-        console.log('   4. Test direct browser access to the URL');
+      console.log(`Integration status: ${JSON.stringify(status.integrations)}`);
+      if (status.integrationError) {
+        console.log(`Optional integrations unavailable: ${status.integrationError}`);
       }
-
-      console.log('\n   General Steps:');
-      console.log('   • Double-check FOUNDRY_URL in .env file');
-      console.log('   • Review the setup guide: SETUP_GUIDE.md');
-      console.log('   • Run with LOG_LEVEL=debug for detailed logs');
-    } catch {
-      console.log('   1. Ensure FoundryVTT is running');
-      console.log('   2. Check FOUNDRY_URL in .env file');
-      console.log('   3. Verify network connectivity');
-      console.log('   4. Review the setup guide: SETUP_GUIDE.md');
+      console.log('');
     }
-
-    process.exit(1);
+  } finally {
+    await sessions.close();
   }
+  console.log(
+    `Checked ${config.targets.length} target(s); ${failures} connection/read failure(s).`,
+  );
+  process.exitCode = failures > 0 ? 1 : 0;
 }
 
-// Helper to check if script is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testConnection().catch(console.error);
+const entrypoint = process.argv[1];
+if (entrypoint && realpathSync(entrypoint) === fileURLToPath(import.meta.url)) {
+  testConnection().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : 'Connection checks failed');
+    process.exitCode = 1;
+  });
 }
-
-export { testConnection };

@@ -1,0 +1,21 @@
+{
+  "target_id": "dnd5e-13-demo",
+  "calls": [
+    {
+      "id": "raw_actor",
+      "name": "system_dnd5e_get_actor_data",
+      "arguments": {
+        "target_id": "dnd5e-13-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR_ID"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "inspect_actor_source",
+      "steps": [
+        "raw_actor"
+      ]
+    }
+  ]
+}

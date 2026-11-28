@@ -82,6 +82,36 @@ describe('FoundryClient', () => {
   });
 
   describe('testConnection authentication', () => {
+    it('checks a connected REST client without replacing its session generation', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { success: true, data: { id: 'world-1' } },
+      });
+      await client.connect();
+      const generation = client.getGeneration();
+      const connect = vi.spyOn(client, 'connect');
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(connect).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
+      expect(client.getGeneration()).toBe(generation);
+    });
+
+    it('does not reconnect an already authenticated native client during diagnostics', async () => {
+      client = new FoundryClient({ baseUrl: 'http://localhost:30000' });
+      vi.spyOn(client, 'isConnected').mockReturnValue(true);
+      const connect = vi.spyOn(client, 'connect').mockResolvedValue();
+      const generation = client.getGeneration();
+
+      await expect(client.testConnection()).resolves.toBe(true);
+
+      expect(connect).not.toHaveBeenCalled();
+      expect(client.getGeneration()).toBe(generation);
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
+    });
+
     it('probes /api/world for a valid REST key without username/password', async () => {
       client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
       mockAxiosInstance.get.mockResolvedValue({
@@ -978,6 +1008,7 @@ describe('FoundryClient', () => {
       expect(handler).toBeDefined();
       handler?.({
         userId: 'test-user',
+        world: { id: 'world-1' },
         actors: [],
         scenes: [],
         items: [],
@@ -1067,8 +1098,8 @@ describe('FoundryClient', () => {
     const WORLD_DATA = {
       userId: 'test-user-id',
       world: { id: 'w', title: 'Test World' },
-      system: { id: 'dnd5e', version: '3.3.1' },
-      release: { version: '12.331' },
+      system: { id: 'dnd5e', version: '6.0.6' },
+      release: { version: '14.369' },
       actors: [],
       scenes: [],
       items: [],
@@ -1359,6 +1390,7 @@ describe('FoundryClient', () => {
         'gm',
         'secret',
         '/foundry/socket.io/',
+        { timeout: 10000, signal: expect.any(AbortSignal) },
       );
     });
 

@@ -2,6 +2,8 @@
 
 This guide walks you through setting up the FoundryVTT MCP Server.
 
+> **Scope:** the steps below describe primarily the legacy **single-target Socket.IO** setup. For multiple worlds, the `rest-api` relay, `composite` providers and per-target write settings on `feat/multiworld-provider-overhaul`, use the [provider and target configuration guide](docs/guides/providers-and-targets.md) and [current configuration reference](docs/guides/configuration.md). The published npm package may not include these branch-only changes.
+
 ## Quick Start
 
 1. **Install dependencies**:

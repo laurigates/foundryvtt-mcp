@@ -10,8 +10,8 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
 import type { WorldEffect } from '../../foundry/types.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /** Raw token fields we read to resolve its actor and link state. */
@@ -30,7 +30,7 @@ interface TokenActorRef {
  */
 export async function handleMoveToken(
   args: { tokenId: string; x: number; y: number; sceneId?: string },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { tokenId, x, y, sceneId } = args;
 
@@ -46,7 +46,7 @@ export async function handleMoveToken(
     throw new McpError(ErrorCode.InvalidParams, 'x and y are required and must be finite numbers');
   }
 
-  const located = foundryClient.findToken(tokenId, sceneId);
+  const located = provider.findToken(tokenId, sceneId);
   if (!located) {
     throw new McpError(
       ErrorCode.InvalidRequest,
@@ -56,7 +56,7 @@ export async function handleMoveToken(
 
   return withToolError('move token', async () => {
     const tokenName = (located.token as TokenActorRef).name ?? tokenId;
-    await foundryClient.moveToken(located.scene._id, tokenId, x, y);
+    await provider.moveToken(located.scene._id, tokenId, x, y);
 
     return {
       content: [
@@ -84,7 +84,7 @@ export async function handleMoveToken(
  */
 export async function handleApplyStatusEffect(
   args: { tokenId: string; statusId: string; active?: boolean; sceneId?: string },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { tokenId, statusId, sceneId } = args;
   const active = args.active ?? true;
@@ -96,7 +96,7 @@ export async function handleApplyStatusEffect(
     throw new McpError(ErrorCode.InvalidParams, 'statusId is required and must be a string');
   }
 
-  const located = foundryClient.findToken(tokenId, sceneId);
+  const located = provider.findToken(tokenId, sceneId);
   if (!located) {
     throw new McpError(
       ErrorCode.InvalidRequest,
@@ -122,7 +122,7 @@ export async function handleApplyStatusEffect(
 
   // Find an existing effect carrying this status (matches toggleStatusEffect).
   const effects: WorldEffect[] = linked
-    ? (foundryClient.getRawActor(actorId)?.effects ?? [])
+    ? (provider.getRawActor(actorId)?.effects ?? [])
     : (token.delta?.effects ?? []);
   const existing = effects.find((e) => e.statuses?.includes(statusId));
 
@@ -137,7 +137,7 @@ export async function handleApplyStatusEffect(
           true,
         );
       }
-      const effect = await foundryClient.createActorStatusEffect(parentActorUuid, statusId);
+      const effect = await provider.createActorStatusEffect(parentActorUuid, statusId);
       return statusResult(
         `Applied status effect '${statusId}' (effect ${effect._id}).`,
         tokenId,
@@ -156,7 +156,7 @@ export async function handleApplyStatusEffect(
         false,
       );
     }
-    await foundryClient.deleteActorEffect(parentActorUuid, existing._id);
+    await provider.deleteActorEffect(parentActorUuid, existing._id);
     return statusResult(
       `Removed status effect '${statusId}' (effect ${existing._id}).`,
       tokenId,

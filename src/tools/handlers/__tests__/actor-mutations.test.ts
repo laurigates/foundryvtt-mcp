@@ -145,11 +145,13 @@ describe('Actor mutation handlers', () => {
         baseUrl: 'http://localhost:30000',
         writeEnabled: opts.writeEnabled ?? true,
       });
-      if (opts.worldActor) {
-        (client as unknown as { worldData: { actors: unknown[] } }).worldData = {
-          actors: [opts.worldActor],
-        };
-      } else {
+      // Keep the system descriptor while exercising upstream's raw-cache validation.
+      (client as unknown as { worldData: unknown }).worldData = {
+        system: { id: 'dnd5e' },
+        release: { version: '14.370' },
+        ...(opts.worldActor ? { actors: [opts.worldActor] } : {}),
+      };
+      if (!opts.worldActor) {
         if (opts.actor) {
           vi.spyOn(client, 'getActor').mockResolvedValue(
             opts.actor as unknown as Awaited<ReturnType<FoundryClient['getActor']>>,

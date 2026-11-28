@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { FoundryClient } from '../foundry/client.js';
+import type { FoundryCore } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 
 export interface CombatState {
@@ -61,7 +61,7 @@ export class CombatManager extends EventEmitter {
   private turnTimer: NodeJS.Timeout | undefined;
   private readonly TURN_WARNING_TIME = 30000; // 30 seconds
 
-  constructor(_foundryClient: FoundryClient) {
+  constructor(_provider: FoundryCore) {
     super();
     this.setupEventHandlers();
   }

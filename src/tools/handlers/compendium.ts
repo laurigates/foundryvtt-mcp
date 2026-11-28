@@ -8,7 +8,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { CompendiumSearchParams, FoundryClient } from '../../foundry/client.js';
+import type { CompendiumSearchParams, FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 interface CompendiumFilters {
@@ -34,7 +34,7 @@ export async function handleSearchCompendium(
     limit?: number;
     cursor?: string;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { query, filters, limit = 20, cursor } = args;
 
@@ -63,7 +63,7 @@ export async function handleSearchCompendium(
       params.source = filters.source;
     }
 
-    const result = await foundryClient.searchCompendium(params);
+    const result = await provider.searchCompendium(params);
 
     const entryList = result.results
       .map((entry) => {

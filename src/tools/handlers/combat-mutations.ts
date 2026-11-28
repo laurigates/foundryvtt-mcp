@@ -9,8 +9,8 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
 import type { WorldCombat, WorldScene } from '../../foundry/types.js';
+import type { FoundryCore } from '../../providers/types.js';
 import {
   getCurrentCombatant,
   getTurnOrder,
@@ -78,11 +78,8 @@ export function computeNextTurn(
  * combat's `settings.skipDefeated` (if present in the worldData snapshot), then
  * to `false`.
  */
-export async function handleNextTurn(
-  args: { skipDefeated?: boolean },
-  foundryClient: FoundryClient,
-) {
-  const combat = foundryClient.getCombatState();
+export async function handleNextTurn(args: { skipDefeated?: boolean }, provider: FoundryCore) {
+  const combat = provider.getCombatState();
   if (!combat) {
     throw new McpError(ErrorCode.InvalidRequest, 'No active combat to advance.');
   }
@@ -91,7 +88,7 @@ export async function handleNextTurn(
 
   return withToolError('advance combat turn', async () => {
     const { turn, round } = computeNextTurn(combat, skipDefeated);
-    await foundryClient.updateCombat(combat._id, { turn, round });
+    await provider.updateCombat(combat._id, { turn, round });
 
     const current = getTurnOrder(combat)[turn];
     const currentName = current ? current.name : 'unknown';
@@ -113,17 +110,14 @@ export async function handleNextTurn(
 /**
  * Ends (deletes) the active combat encounter (FR-018).
  */
-export async function handleEndCombat(
-  _args: Record<string, unknown>,
-  foundryClient: FoundryClient,
-) {
-  const combat = foundryClient.getCombatState();
+export async function handleEndCombat(_args: Record<string, unknown>, provider: FoundryCore) {
+  const combat = provider.getCombatState();
   if (!combat) {
     throw new McpError(ErrorCode.InvalidRequest, 'No active combat to end.');
   }
 
   return withToolError('end combat', async () => {
-    await foundryClient.endCombat(combat._id);
+    await provider.endCombat(combat._id);
 
     return {
       content: [
@@ -155,7 +149,7 @@ The active combat encounter has been removed.`,
  */
 export async function handleSetInitiative(
   args: { combatantId: string; initiative: number; combatId?: string },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { combatantId, initiative, combatId } = args;
 
@@ -169,7 +163,7 @@ export async function handleSetInitiative(
     );
   }
 
-  const activeCombat = foundryClient.getCombatState();
+  const activeCombat = provider.getCombatState();
   const resolvedCombatId = combatId ?? activeCombat?._id;
   if (!resolvedCombatId) {
     throw new McpError(
@@ -184,13 +178,13 @@ export async function handleSetInitiative(
   const acting = combat ? getCurrentCombatant(combat) : undefined;
 
   return withToolError('set combatant initiative', async () => {
-    await foundryClient.setCombatantInitiative(resolvedCombatId, combatantId, initiative);
+    await provider.setCombatantInitiative(resolvedCombatId, combatantId, initiative);
 
     let reanchored = '';
     if (combat && acting) {
       const turn = turnIndexAfterInitiativeChange(combat, { combatantId, initiative }, acting._id);
       if (turn !== undefined && turn !== combat.turn) {
-        await foundryClient.updateCombat(resolvedCombatId, { turn });
+        await provider.updateCombat(resolvedCombatId, { turn });
         reanchored = `
 **Still acting:** ${acting.name} (turn ${turn + 1} of ${combat.combatants.length})`;
       }
@@ -219,11 +213,11 @@ export async function handleSetInitiative(
  */
 export async function handleStartCombat(
   args: { tokenIds?: string[]; sceneId?: string },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { tokenIds, sceneId } = args ?? {};
 
-  const scenes = foundryClient.getScenes();
+  const scenes = provider.getScenes();
   const scene: WorldScene | undefined = sceneId
     ? scenes.find((s) => s._id === sceneId)
     : scenes.find((s) => s.active);
@@ -262,7 +256,7 @@ export async function handleStartCombat(
   }
 
   return withToolError('start combat', async () => {
-    const { combatId, combatantCount } = await foundryClient.startCombat(scene._id, seeds);
+    const { combatId, combatantCount } = await provider.startCombat(scene._id, seeds);
 
     return {
       content: [

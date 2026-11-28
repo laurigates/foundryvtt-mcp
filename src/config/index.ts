@@ -9,6 +9,12 @@
  */
 
 import { z } from 'zod';
+import {
+  legacyConfigForTarget,
+  loadTargetConfiguration,
+  normalizeLegacyTarget,
+  type TargetConfig,
+} from './targets.js';
 
 /** An integer setting whose validation messages name its environment variable. */
 function integerFromEnv(name: string) {
@@ -116,9 +122,13 @@ const ConfigSchema = z.object({
  * TypeScript type derived from the ConfigSchema
  *
  * This type provides compile-time type checking for configuration objects
- * and ensures consistency between the schema and type definitions.
+ * and keeps pre-provider configuration objects valid for existing embedders.
+ * The exported runtime `config` uses ResolvedConfig, with required targets.
  */
-type Config = z.infer<typeof ConfigSchema>;
+type Config = z.infer<typeof ConfigSchema> & { targets?: TargetConfig[] };
+
+/** Validated runtime configuration always has an explicit, normalized target list. */
+type ResolvedConfig = Config & { targets: TargetConfig[] };
 
 /**
  * Loads and validates configuration from environment variables
@@ -136,7 +146,7 @@ type Config = z.infer<typeof ConfigSchema>;
  * console.log(`FoundryVTT URL: ${config.foundry.url}`);
  * ```
  */
-function loadConfig(): Config {
+function loadConfig(): ResolvedConfig {
   const rawConfig = {
     serverName: process.env.MCP_SERVER_NAME,
     serverVersion: process.env.MCP_SERVER_VERSION,
@@ -144,7 +154,11 @@ function loadConfig(): Config {
     nodeEnv: process.env.NODE_ENV,
 
     foundry: {
-      url: process.env.FOUNDRY_URL,
+      url:
+        process.env.FOUNDRY_URL ??
+        (process.env.FOUNDRY_PROVIDER === 'rest-api'
+          ? process.env.FOUNDRY_REST_RELAY_URL
+          : undefined),
       apiKey: process.env.FOUNDRY_API_KEY,
       restUrl: process.env.FOUNDRY_REST_URL || undefined,
       username: process.env.FOUNDRY_USERNAME,
@@ -169,7 +183,16 @@ function loadConfig(): Config {
   };
 
   try {
-    return ConfigSchema.parse(rawConfig);
+    const configuredTargets = loadTargetConfiguration();
+    const firstTarget = configuredTargets?.[0];
+    const parsed = ConfigSchema.parse({
+      ...rawConfig,
+      foundry: firstTarget ? legacyConfigForTarget(firstTarget) : rawConfig.foundry,
+    });
+    return {
+      ...parsed,
+      targets: configuredTargets ?? [normalizeLegacyTarget(parsed.foundry)],
+    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Configuration validation failed:');
@@ -190,6 +213,11 @@ function loadConfig(): Config {
       console.error('  • Ensure FOUNDRY_URL includes protocol (http:// or https://)');
       console.error('  • For setup guidance, see: SETUP_GUIDE.md');
       console.error('  • Run the setup wizard: npm run setup');
+    } else {
+      console.error(
+        'Configuration validation failed:',
+        error instanceof Error ? error.message : 'Unknown configuration error',
+      );
     }
 
     // In test environment, throw error instead of exiting process
@@ -204,7 +232,7 @@ function loadConfig(): Config {
 /**
  * Cached configuration instance
  */
-let _config: Config | null = null;
+let _config: ResolvedConfig | null = null;
 
 /**
  * Gets the global configuration instance
@@ -225,12 +253,12 @@ let _config: Config | null = null;
  * }
  * ```
  */
-export const config = new Proxy({} as Config, {
+export const config = new Proxy({} as ResolvedConfig, {
   get(_target, prop) {
     if (_config === null) {
       _config = loadConfig();
     }
-    return _config[prop as keyof Config];
+    return _config[prop as keyof ResolvedConfig];
   },
 });
 
@@ -254,4 +282,4 @@ export function resetConfig(): void {
  * }
  * ```
  */
-export type { Config };
+export type { Config, ResolvedConfig };

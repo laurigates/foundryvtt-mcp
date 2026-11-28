@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { WorldData } from '../types.js';
 import {
   applyDocumentBroadcast,
+  applyDocumentBroadcastWithStatus,
   applyUserActivity,
   type DocumentBroadcast,
   parseDocumentBroadcast,
@@ -58,6 +59,84 @@ const broadcast = (over: Partial<DocumentBroadcast> = {}): DocumentBroadcast => 
   ...over,
 });
 
+describe('applyDocumentBroadcastWithStatus', () => {
+  it('separates applied changes, irrelevant traffic, and gaps that require refresh', () => {
+    const world = buildWorldData();
+    expect(applyDocumentBroadcastWithStatus(world, broadcast())).toBe('applied');
+    expect(applyDocumentBroadcastWithStatus(world, broadcast({ type: 'Setting' }))).toBe(
+      'irrelevant',
+    );
+    expect(applyDocumentBroadcastWithStatus(world, broadcast({ result: [] }))).toBe('irrelevant');
+    expect(
+      applyDocumentBroadcastWithStatus(world, broadcast({ action: 'delete', result: ['missing'] })),
+    ).toBe('irrelevant');
+    expect(
+      applyDocumentBroadcastWithStatus(
+        world,
+        broadcast({ action: 'update', result: [{ _id: 'missing' }] }),
+      ),
+    ).toBe('unhandled');
+  });
+
+  it('preserves the boolean API while reporting partially applied batches as unhandled', () => {
+    const world = buildWorldData();
+    const event = broadcast({ result: [{ _id: JOURNAL_ID, name: 'Known' }, null] });
+    expect(applyDocumentBroadcastWithStatus(world, event)).toBe('unhandled');
+    expect(world.journal[0]?.name).toBe('Known');
+    expect(applyDocumentBroadcast(buildWorldData(), event)).toBe(true);
+  });
+
+  it('marks unresolved cached parents and synthetic token actors as unhandled', () => {
+    const world = buildWorldData();
+    expect(
+      applyDocumentBroadcastWithStatus(
+        world,
+        broadcast({ type: 'Item', parentUuid: 'Actor.missing', result: [{ _id: ITEM_ID }] }),
+      ),
+    ).toBe('unhandled');
+    expect(
+      applyDocumentBroadcastWithStatus(
+        world,
+        broadcast({
+          type: 'ActiveEffect',
+          parentUuid: `Scene.${SCENE_ID}.Token.${TOKEN_ID}.Actor.${ACTOR_ID}`,
+          result: [{ _id: 'effect0000000000' }],
+        }),
+      ),
+    ).toBe('unhandled');
+  });
+
+  it('applies journal page creation, nested updates, and idempotent deletion', () => {
+    const world = buildWorldData();
+    world.journal.push({ _id: JOURNAL_ID, name: 'Journal' });
+    const page = {
+      _id: 'page000000000000',
+      name: 'Chapter',
+      type: 'text',
+      text: { content: 'Before', format: 1 },
+    };
+    const event: DocumentBroadcast = {
+      type: 'JournalEntryPage',
+      action: 'create',
+      parentUuid: `JournalEntry.${JOURNAL_ID}`,
+      result: [page],
+    };
+    expect(applyDocumentBroadcastWithStatus(world, event)).toBe('applied');
+    expect(
+      applyDocumentBroadcastWithStatus(world, {
+        ...event,
+        action: 'update',
+        result: [{ _id: page._id, text: { content: 'After' } }],
+      }),
+    ).toBe('applied');
+    expect(world.journal[0]?.pages?.[0]?.text).toEqual({ content: 'After', format: 1 });
+    const deletion: DocumentBroadcast = { ...event, action: 'delete', result: [page._id] };
+    expect(applyDocumentBroadcastWithStatus(world, deletion)).toBe('applied');
+    expect(applyDocumentBroadcastWithStatus(world, deletion)).toBe('irrelevant');
+    expect(world.journal[0]?.pages).toEqual([]);
+  });
+});
+
 describe('parseDocumentBroadcast', () => {
   it('parses a top-level broadcast', () => {
     expect(
@@ -84,6 +163,10 @@ describe('parseDocumentBroadcast', () => {
     ['missing type', { action: 'create', result: [] }],
     ['unknown action', { type: 'Actor', action: 'frobnicate', result: [] }],
     ['non-array result', { type: 'Actor', action: 'create', result: 'x' }],
+    [
+      'invalid parent identity',
+      { type: 'Item', action: 'update', result: [], operation: { parentUuid: 7 } },
+    ],
     ['an error payload', { type: 'Actor', action: 'create', result: [], error: { message: 'no' } }],
   ])('rejects %s', (_label, payload) => {
     expect(parseDocumentBroadcast(payload)).toBeNull();

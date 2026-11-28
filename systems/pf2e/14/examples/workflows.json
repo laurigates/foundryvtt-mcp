@@ -1,0 +1,285 @@
+{
+  "target_id": "pf2e-14-demo",
+  "calls": [
+    {
+      "id": "actor_source",
+      "name": "system_pf2e_get_actor_data",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "actor_summary",
+      "name": "system_pf2e_get_actor_summary",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "statistics",
+      "name": "system_pf2e_get_statistics",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "statistic",
+      "name": "system_pf2e_get_statistic",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "statistic_slug": "perception"
+      }
+    },
+    {
+      "id": "conditions",
+      "name": "system_pf2e_get_conditions",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "inventory",
+      "name": "system_pf2e_get_inventory",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "currency",
+      "name": "system_pf2e_get_currency",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "resource",
+      "name": "system_pf2e_get_resource",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "resource_slug": "focus"
+      }
+    },
+    {
+      "id": "strikes",
+      "name": "system_pf2e_get_strikes",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "spellcasting",
+      "name": "system_pf2e_get_spellcasting",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR"
+      }
+    },
+    {
+      "id": "skill_check",
+      "name": "system_pf2e_roll_skill",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "skill": "acrobatics",
+        "dc": 20,
+        "message_mode": "public",
+        "create_message": true
+      }
+    },
+    {
+      "id": "saving_throw",
+      "name": "system_pf2e_roll_save",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "save": "reflex",
+        "dc": 20,
+        "message_mode": "public",
+        "create_message": true
+      }
+    },
+    {
+      "id": "perception_check",
+      "name": "system_pf2e_roll_perception",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "dc": 20,
+        "message_mode": "public",
+        "create_message": true
+      }
+    },
+    {
+      "id": "statistic_check",
+      "name": "system_pf2e_roll_statistic",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "statistic_slug": "perception",
+        "dc": 20,
+        "message_mode": "self",
+        "create_message": true
+      }
+    },
+    {
+      "id": "strike_attack",
+      "name": "system_pf2e_roll_strike",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "token_uuid": "Scene.REPLACE_SCENE.Token.REPLACE_ORIGIN",
+        "target_token_uuid": "Scene.REPLACE_SCENE.Token.REPLACE_TARGET",
+        "strike_index": 0,
+        "expected_item_uuid": "Actor.REPLACE_ACTOR.Item.REPLACE_WEAPON",
+        "attack_number": 1,
+        "create_message": true
+      }
+    },
+    {
+      "id": "condition_on",
+      "name": "system_pf2e_set_condition",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "condition_slug": "prone",
+        "active": true
+      }
+    },
+    {
+      "id": "condition_increase",
+      "name": "system_pf2e_increase_condition",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "condition_slug": "frightened",
+        "amount": 1,
+        "maximum": 4
+      }
+    },
+    {
+      "id": "condition_decrease",
+      "name": "system_pf2e_decrease_condition",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "condition_slug": "frightened",
+        "force_remove": false
+      }
+    },
+    {
+      "id": "resource_set",
+      "name": "system_pf2e_set_resource",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "resource_slug": "focus",
+        "value": 2
+      }
+    },
+    {
+      "id": "currency_add",
+      "name": "system_pf2e_add_currency",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "coins": {
+          "gp": 1
+        }
+      }
+    },
+    {
+      "id": "currency_remove",
+      "name": "system_pf2e_remove_currency",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "coins": {
+          "gp": 1
+        },
+        "by_value": true
+      }
+    },
+    {
+      "id": "daily_preparation",
+      "name": "system_pf2e_recharge",
+      "arguments": {
+        "target_id": "pf2e-14-demo",
+        "actor_uuid": "Actor.REPLACE_ACTOR",
+        "duration": "day"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "inspect",
+      "steps": [
+        "actor_source",
+        "actor_summary",
+        "statistics",
+        "statistic",
+        "conditions",
+        "inventory",
+        "currency",
+        "resource",
+        "strikes",
+        "spellcasting"
+      ]
+    },
+    {
+      "id": "checks",
+      "steps": [
+        "statistics",
+        "skill_check",
+        "saving_throw",
+        "perception_check",
+        "statistic_check"
+      ]
+    },
+    {
+      "id": "conditions_resources",
+      "steps": [
+        "conditions",
+        "condition_on",
+        "condition_increase",
+        "condition_decrease",
+        "resource",
+        "resource_set"
+      ]
+    },
+    {
+      "id": "currency",
+      "steps": [
+        "currency",
+        "currency_add",
+        "currency_remove",
+        "currency"
+      ]
+    },
+    {
+      "id": "strike",
+      "steps": [
+        "strikes",
+        "strike_attack"
+      ]
+    },
+    {
+      "id": "preparation",
+      "steps": [
+        "resource",
+        "spellcasting",
+        "daily_preparation",
+        "resource",
+        "spellcasting"
+      ]
+    }
+  ]
+}

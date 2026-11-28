@@ -2,6 +2,48 @@
 
 ![FoundryVTT MCP — AI assistants at your virtual tabletop](docs/assets/banner.webp)
 
+## Provider and integration overhaul
+
+This branch introduces target-scoped providers for all MCP access, independent
+connections to multiple Foundry worlds, and JavaScript integrations in separate
+`systems/<id>/<foundry-generation>/` and `modules/<id>/<foundry-generation>/`
+directories. Each generation has a self-contained package. Exact upstream IDs are preserved in tool
+names: `system_{id}_{operation}` and `module_{id}_{operation}`. Existing environment
+configuration is converted into one target; explicit multi-target calls use `target_id`.
+
+- [Providers and target configuration](docs/guides/providers-and-targets.md)
+- [Development guide and project handoff](docs/guides/development.md)
+- [Backward compatibility and migration boundaries](docs/guides/backward-compatibility.md)
+- [Writing system and module integrations](docs/guides/writing-integrations.md)
+- [Choosing core, system and module calls](docs/guides/core-system-module-calls.md)
+- [Architecture decisions and rationale](docs/adrs/0011-provider-session-integration-overhaul.md)
+- [Implementation and verification record](docs/prps/provider-session-integration-overhaul.md)
+- [Example target configuration](examples/targets.example.json)
+
+Available integrations are listed in the [module bridge catalog](docs/bridges/modules.md)
+and [system bridge catalog](docs/bridges/systems.md). These catalogs record adapter
+versions, upstream source references, Foundry requirements and verification
+status, and link to each package's README for installation, operations and examples.
+The integration support and maintenance scope starts at **Foundry VTT 13,
+inclusive**; earlier generations are outside that scope. The loader selects the
+package matching the connected target's generation, then applies its upstream
+version and capability checks. A missing generation remains unavailable; the
+server does not borrow another generation's adapter. Individual package gates
+and actually tested combinations are documented separately. Integration packages
+are plain JavaScript, so the core and every integration share the same Node.js
+runtime.
+
+To add an external integration, copy its complete generation directory under
+the matching system or module ID. No central registration table is required.
+See [installing and creating adapters](docs/guides/writing-integrations.md#install-a-third-party-adapter)
+for the package contract, validation commands and migration from the older layout.
+
+Provider lifecycles keep delayed multi-step calls bound to their original
+session; interrupted mutations can still have unknown remote outcomes and are
+never replayed automatically. A composite target requires both its native and
+relay connections. See the provider guide for freshness, shutdown and failure
+semantics, and the dated verification record for the checks actually performed.
+
 [![npm version](https://img.shields.io/npm/v/foundryvtt-mcp)](https://www.npmjs.com/package/foundryvtt-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -9,14 +51,16 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that i
 
 ## Features
 
-- **Dice Rolling** — dice terms and integer modifiers with `+`/`-`; advanced modifier syntax is not supported across all transports.
-- **Data Querying** — actors, world items, scenes, journals, users and combat; compendium search with the optional REST bridge.
-- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (authenticated Socket.IO, permissions and write flag required).
+- **Dice Rolling** — dice terms and numeric modifiers; available syntax depends on the provider
+- **Data Querying** — actors, world items, scenes, journals, users and combat; optional compendium search through the historical `legacy-rest` bridge.
+- **Game State Mutations** — opt-in tools for actor attributes, owned items, journals, tokens and combat (target-local write enablement, provider capability and Foundry permissions required; the native and relay write paths differ).
 - **Content Helpers** — locally generated NPC and loot *text*; `lookup_rule` is a placeholder, not a rules database.
-- **World Search** — case-insensitive **name** search for actors, world items, scenes and journals (not full-text page search).
+- **World Search** — searches names and selected narrative content in actors, items, scenes and journals, with plain-text match excerpts
 - **Live Connection** — Socket.IO loads the active world, follows document updates and provides a `refresh_world_data` tool to re-synchronize the cached snapshot.
-- **MCP Resources** — `foundry://` URIs for direct reads.
-- **Optional REST Bridge (dual mode)** — the [foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api) module and bridge server, added alongside Socket.IO with `FOUNDRY_API_KEY` and `FOUNDRY_REST_URL`, supply prepared dnd5e values (AC, max HP, saves), Foundry's dice engine, compendium search and diagnostics. The module installs from its [manifest URL](https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json) (current release v2.1.2, Foundry v13 and v14); see [the setup notes](docs/guides/configuration.md#optional-rest-bridge-augment).
+- **MCP Resources** — target-qualified `foundry://targets/<target_id>/...` URIs; unqualified aliases remain available with one configured target.
+- **Target-scoped providers** — choose `socketio`, historical `legacy-rest`, paired `rest-api` relay, or explicit `composite`. `FOUNDRY_API_KEY` selects only the historical bridge; relay keys and per-target write permissions are separate. See the [provider guide](docs/guides/providers-and-targets.md).
+- **Optional REST read augmentation** — a Socket.IO target can also use the [historical REST bridge](https://github.com/laurigates/foundryvtt-local-rest-api) for prepared actor values, Foundry's dice engine, compendium search and diagnostics. Native writes and the world cache stay on that target's Socket.IO connection; see [bridge configuration](docs/guides/configuration.md#optional-rest-bridge-augment).
+- **System and module bridges** — optional packages with fixed API operations, JSON results, target-scoped activation and package-specific compatibility checks.
 
 See the **[MCP capability matrix](docs/guides/capabilities.md)** for the complete tool, resource and mode inventory (the canonical source for counts is [`src/tools/definitions.ts`](src/tools/definitions.ts) and [`src/tools/resources.ts`](src/tools/resources.ts)). For remote installations, see the [Linux server / local MCP client guide](docs/guides/remote-linux.md).
 
@@ -46,7 +90,7 @@ It is recommended to create a separate FoundryVTT user account for the MCP serve
 
 ### Installation
 
-Run directly without installing — no clone needed:
+For the **published package** (which may not yet include this branch's overhaul), run without cloning:
 
 ```bash
 bunx foundryvtt-mcp
@@ -100,6 +144,8 @@ Add to your VS Code MCP settings:
 }
 ```
 
+To use and test **this overhaul branch** rather than the published package, follow the [branch checkout instructions](docs/guides/providers-and-targets.md#run-the-overhaul-branch).
+
 ### Development Setup
 
 For local development or contributing (this example clones the upstream source; see [Running a fork checkout](docs/guides/integration.md#running-a-fork-checkout) to use your own branch):
@@ -117,14 +163,21 @@ To configure manually, see the [Configuration Guide](docs/guides/configuration.m
 
 ## Environment Variables
 
+The following credentials configure the legacy single-target mode. For explicit
+providers, relay credentials, and several worlds, use the
+[target configuration guide](docs/guides/providers-and-targets.md).
+
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FOUNDRY_URL` | Yes | FoundryVTT server URL (e.g., `http://localhost:30000`) |
-| `FOUNDRY_USERNAME` | Socket.IO | FoundryVTT user account |
-| `FOUNDRY_PASSWORD` | Socket.IO | FoundryVTT user password |
-| `FOUNDRY_USER_ID` | No | Optional alternative to `FOUNDRY_USERNAME`: bypass username-to-ID resolution |
-| `FOUNDRY_API_KEY` | No | Key of the optional [REST bridge](docs/guides/configuration.md#optional-rest-bridge-augment); with `FOUNDRY_REST_URL` and Socket.IO credentials it enables dual mode (see the [capability matrix](docs/guides/capabilities.md#connection-modes)) |
-| `FOUNDRY_REST_URL` | No | REST bridge server URL (e.g. `http://localhost:3030`); without it, `FOUNDRY_API_KEY` selects the deprecated REST-only mode |
+| `FOUNDRY_URL` | Single native/legacy target | FoundryVTT server URL (e.g., `http://localhost:30000`) |
+| `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user account |
+| `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT user password |
+| `FOUNDRY_USER_ID` | No | Bypass username-to-ID resolution |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; with `FOUNDRY_REST_URL` and native credentials, augments the single Socket.IO target |
+| `FOUNDRY_REST_URL` | No | Historical bridge URL (e.g. `http://localhost:3030`); without this URL or native credentials, a key retains `legacy-rest` |
+| `FOUNDRY_PROVIDER` | No | Explicit `socketio`, `legacy-rest`, `rest-api`, or `composite` |
+| `FOUNDRY_TARGETS_FILE` | No | JSON configuration for one or several explicit targets |
+| `FOUNDRY_TARGETS_JSON` | No | Inline alternative to `FOUNDRY_TARGETS_FILE` |
 | `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default: `false`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
 | `FOUNDRY_TIMEOUT` | No | Request timeout in ms (default: `10000`) |
@@ -141,6 +194,11 @@ Ask your AI assistant things like:
 
 ## Available Tools
 
+The catalog exposes operations supported by at least one connected target.
+Calls with multiple configured targets must specify `target_id`. Use
+`list_targets`, `get_target_status`, `list_modules`, and `list_systems` to inspect
+availability; `reconnect_target` recovers an individual configured connection.
+
 ### Data Access
 
 - `search_actors` — find characters, NPCs, monsters
@@ -154,11 +212,13 @@ Ask your AI assistant things like:
 - `get_combat_state` — combat state and initiative order
 - `get_chat_messages` — recent chat history
 
-### Write Operations (require `FOUNDRY_WRITE_ENABLED=true`)
+### Write Operations (require target-local write enablement)
 
-Game-state mutations are **disabled by default**. They use the Socket.IO
-`modifyDocument` protocol over an authenticated session, and the connected user
-needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
+Game-state mutations are **disabled by default**. Native operations use Socket.IO
+`modifyDocument`; the relay backend uses fixed bindings to Foundry document APIs.
+The selected connection/runtime user needs the appropriate permissions. Set
+`FOUNDRY_WRITE_ENABLED=true` in legacy single-target configuration, or
+`writeEnabled: true` on the individual explicit target.
 
 - `start_combat` — begin a new encounter, seeding combatants from tokens (does
   not check for an existing combat — calling it during an active one creates a
@@ -178,7 +238,7 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 ### World
 
-- `search_world` — case-insensitive **name** search across world actors, items, scenes and journals
+- `search_world` — search names and selected narrative fields across actors, items, scenes and journals
 - `get_world_summary` — overview of the current world state
 - `refresh_world_data` — reload world data from FoundryVTT; needed after a dropped
   connection, whose missed updates are never replayed into the cache
@@ -187,11 +247,17 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 - `roll_dice` — roll dice; dice terms (`NdS`) and whole numbers joined by `+`/`-`, with
   unsupported notation (`4d6kh3`, `1d20r1`, `*`) rejected rather than dropped.
-  Parentheses are the one transport difference: FoundryVTT evaluates them when
-  the REST bridge is configured, the local roller rejects them otherwise
+  Additional notation depends on the provider: native local rolling is limited,
+  while the relay executes a Foundry Roll in its paired runtime. The historical
+  bridge also uses Foundry's dice engine; parentheses require that remote engine
+  and are rejected by the native local roller
 - `lookup_rule` — **stub**: returns a templated placeholder, consults no rules source
 
 ### Content Generation
+
+These existing demonstration helpers are available only for selected game
+systems. The [system bridge catalog](docs/bridges/systems.md#core-text-demonstrations)
+records their availability and limitations. They do not implement game rules.
 
 - `generate_npc` — generate NPC text (not written to the world)
 - `generate_loot` — generate treasure text from a challenge rating (not written to the world)
@@ -208,8 +274,14 @@ needs GM/owner permission. Set `FOUNDRY_WRITE_ENABLED=true` to enable them.
 
 ## Available Resources
 
-- `foundry://actors` — up to 100 world actor summaries and their IDs, plus the total count
-- `foundry://items` — up to 100 world item summaries and their IDs, plus the total count
+With multiple targets, use `foundry://targets/<target_id>/<path>`, for example
+`foundry://targets/campaign-a/actors`. The aliases below are listed and accepted
+when exactly one target is configured and ready. Resource availability follows
+provider capabilities. Core tool results preserve their existing content; target
+and session information is added in `_meta`.
+
+- `foundry://actors` — up to 100 actor summaries and IDs, plus the total count
+- `foundry://items` — up to 100 item summaries and IDs, plus the total count
 - `foundry://scenes` — all scenes
 - `foundry://scenes/current` — current active scene
 - `foundry://journals` — all journal entries

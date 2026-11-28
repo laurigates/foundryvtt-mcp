@@ -6,17 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagnosticsClient } from '../../diagnostics/client.js';
 import type { FoundryClient } from '../../foundry/client.js';
 import type { DiagnosticSystem } from '../../utils/diagnostics.js';
-import type { ToolContext } from '../base.js';
+import type { ProviderToolContext } from '../base.js';
 import { getAllTools } from '../definitions.js';
 import { RollDiceTool } from '../handlers/dice.js';
 import { toolRegistry } from '../registry.js';
 
 describe('Tool Registry', () => {
-  let mockContext: ToolContext;
+  let mockContext: ProviderToolContext;
 
   beforeEach(() => {
     mockContext = {
-      foundryClient: {
+      provider: {
         rollDice: vi.fn().mockResolvedValue({
           formula: '1d20+5',
           total: 15,

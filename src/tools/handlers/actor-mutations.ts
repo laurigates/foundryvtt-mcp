@@ -7,7 +7,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { AttributePatch, FoundryClient } from '../../foundry/client.js';
+import type { AttributePatch, FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -23,7 +23,7 @@ export async function handleUpdateActorAttribute(
     actorId: string;
     patch: AttributePatch;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { actorId, patch } = args;
 
@@ -43,7 +43,7 @@ export async function handleUpdateActorAttribute(
   }
 
   return withToolError('update actor attributes', async () => {
-    const result = await foundryClient.updateActorAttribute(actorId, patch);
+    const result = await provider.updateActorAttribute(actorId, patch);
 
     const updatedList = Object.entries(result.updatedAttributes)
       .map(([path, value]) => `- **${path}** → ${String(value)}`)

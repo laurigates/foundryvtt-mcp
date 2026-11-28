@@ -31,9 +31,12 @@ function mockFoundryClient(allMessages: MockChatMessage[]): FoundryClient {
   } as unknown as FoundryClient;
 }
 
+function messageText(result: Awaited<ReturnType<typeof handleGetChatMessages>>): string {
+  return (result as { content: Array<{ type: string; text: string }> }).content[0]?.text ?? '';
+}
+
 function countLines(result: Awaited<ReturnType<typeof handleGetChatMessages>>): number {
-  const text =
-    (result as { content: Array<{ type: string; text: string }> }).content[0]?.text ?? '';
+  const text = messageText(result);
   // Header line is "**Recent Chat Messages** (N)\n\n<lines>"; count message lines after the header
   const body = text.split('\n\n').slice(1).join('\n\n').trim();
   if (body === '' || text.includes('No chat messages found.')) {
@@ -68,5 +71,24 @@ describe('handleGetChatMessages — limit clamp', () => {
     const client = mockFoundryClient(buildMessages(50));
     await handleGetChatMessages({ limit: 5 }, client);
     expect(client.getChatMessages).toHaveBeenCalledWith(5);
+  });
+});
+
+describe('handleGetChatMessages — markup sanitization', () => {
+  it('leaves no angle bracket when markup is split across tags', async () => {
+    const client = mockFoundryClient([
+      {
+        _id: 'msg-nested',
+        content: '<scr<script>ipt>alert(1)</script>',
+        user: 'user-1',
+        timestamp: Date.UTC(2024, 0, 1),
+      },
+    ]);
+
+    const text = messageText(await handleGetChatMessages({}, client));
+
+    // A single-pass tag regex would rebuild "<script>" from this input.
+    expect(text).not.toContain('<');
+    expect(text).toContain('alert(1)');
   });
 });

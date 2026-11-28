@@ -13,6 +13,12 @@ import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
 import { logger } from '../utils/logger.js';
 
+/** Bounds every authentication stage and lets its owning connection cancel it. */
+export interface FoundryAuthOptions {
+  timeout?: number;
+  signal?: AbortSignal;
+}
+
 /**
  * Socket.IO connection options carrying a FoundryVTT session.
  *
@@ -60,7 +66,8 @@ export function socketOrigin(baseUrl: string): string {
 /**
  * Extracts the session cookie value from a GET /join response.
  */
-async function getSessionCookie(baseUrl: string): Promise<string> {
+async function getSessionCookie(baseUrl: string, options: FoundryAuthOptions): Promise<string> {
+  options.signal?.throwIfAborted();
   const res = await axios.get(`${baseUrl}/join`, {
     // Matches the POST /join (#305); harmless here, and keeps both requests
     // looking like the same browser-origin login flow.
@@ -68,7 +75,10 @@ async function getSessionCookie(baseUrl: string): Promise<string> {
     // Accept 200 (join page) and 302 (redirect after cookie set)
     validateStatus: (status) => status === 200 || status === 302,
     maxRedirects: 0,
+    timeout: options.timeout ?? 10000,
+    ...(options.signal ? { signal: options.signal } : {}),
   });
+  options.signal?.throwIfAborted();
 
   const cookies = res.headers['set-cookie'];
   if (!cookies) {
@@ -97,7 +107,9 @@ async function resolveUserId(
   user: string,
   session: string,
   socketPath?: string,
+  options: FoundryAuthOptions = {},
 ): Promise<string> {
+  options.signal?.throwIfAborted();
   // FoundryVTT document IDs are 16-character alphanumeric strings
   if (/^[a-zA-Z0-9]{16}$/.test(user)) {
     logger.debug('User identifier is already a document _id', { userId: user });
@@ -108,47 +120,83 @@ async function resolveUserId(
 
   return new Promise((resolve, reject) => {
     const socket = io(socketOrigin(baseUrl), sessionSocketOptions(session, socketPath));
+    let settled = false;
+    let requested = false;
 
     const cleanup = () => {
+      clearTimeout(timeout);
       socket.off('session', onSession);
       socket.off('connect_error', onConnectError);
-    };
-
-    const timeout = setTimeout(() => {
-      cleanup();
+      options.signal?.removeEventListener('abort', onAbort);
       socket.disconnect();
-      reject(new Error('Timeout resolving user ID via getJoinData'));
-    }, 10000);
+    };
+    const fail = (error: unknown) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onAbort = () => fail(options.signal?.reason ?? new Error('Authentication aborted'));
+    const timeout = setTimeout(
+      () => fail(new Error('Timeout resolving user ID via getJoinData')),
+      options.timeout ?? 10000,
+    );
 
     const onSession = () => {
-      socket.emit('getJoinData', (data: { users?: Array<{ _id: string; name: string }> }) => {
-        clearTimeout(timeout);
-        cleanup();
-        socket.disconnect();
+      if (settled || requested) {
+        return;
+      }
+      requested = true;
+      try {
+        socket.emit('getJoinData', (data: { users?: unknown[] } | null) => {
+          if (settled) {
+            return;
+          }
+          if (!Array.isArray(data?.users)) {
+            fail(new Error('getJoinData returned no users'));
+            return;
+          }
 
-        if (!data?.users || !Array.isArray(data.users)) {
-          return reject(new Error('getJoinData returned no users'));
-        }
+          const users = data.users.filter(
+            (value): value is { _id: string; name: string } =>
+              typeof value === 'object' &&
+              value !== null &&
+              '_id' in value &&
+              typeof value._id === 'string' &&
+              value._id.length > 0 &&
+              'name' in value &&
+              typeof value.name === 'string',
+          );
+          const found = users.find((u) => u.name.toLowerCase() === user.toLowerCase());
+          if (!found) {
+            logger.debug('User not found in FoundryVTT user list', {
+              available: users.map((u) => u.name).join(', '),
+            });
+            fail(new Error(`User "${user}" not found`));
+            return;
+          }
 
-        const found = data.users.find((u) => u.name.toLowerCase() === user.toLowerCase());
-        if (!found) {
-          const available = data.users.map((u) => u.name).join(', ');
-          logger.debug('User not found in FoundryVTT user list', { available });
-          return reject(new Error(`User "${user}" not found`));
-        }
-
-        logger.debug('Resolved user document _id', { displayName: user, _id: found._id });
-        resolve(found._id);
-      });
+          settled = true;
+          cleanup();
+          logger.debug('Resolved user document _id', { displayName: user, _id: found._id });
+          resolve(found._id);
+        });
+      } catch (error) {
+        fail(error);
+      }
     };
 
     const onConnectError = (err: Error) => {
-      clearTimeout(timeout);
-      cleanup();
-      socket.disconnect();
-      reject(new Error(`Socket.IO connection failed during user resolution: ${err.message}`));
+      fail(new Error(`Socket.IO connection failed during user resolution: ${err.message}`));
     };
 
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    if (options.signal?.aborted) {
+      onAbort();
+      return;
+    }
     socket.on('session', onSession);
     socket.on('connect_error', onConnectError);
   });
@@ -159,6 +207,7 @@ async function resolveUserId(
  *
  * @param socketPath Socket.IO endpoint for the user-resolution handshake;
  *   defaults to `/socket.io/` (see {@link sessionSocketOptions}).
+ * @param options Timeout per HTTP/socket stage (default 10 seconds) and cancellation signal.
  * @returns Session cookie and resolved user document _id
  */
 export async function authenticateFoundry(
@@ -166,7 +215,15 @@ export async function authenticateFoundry(
   user: string,
   password: string,
   socketPath?: string,
+  options: FoundryAuthOptions = {},
 ): Promise<{ session: string; userId: string }> {
+  const authOptions = {
+    ...options,
+    timeout:
+      options.timeout !== undefined && Number.isFinite(options.timeout) && options.timeout > 0
+        ? options.timeout
+        : 10000,
+  };
   // Warn when credentials are sent over plaintext HTTP to a non-localhost host
   try {
     const parsed = new URL(baseUrl);
@@ -187,12 +244,13 @@ export async function authenticateFoundry(
   }
 
   // Step 1: Get session cookie
-  const session = await getSessionCookie(baseUrl);
+  const session = await getSessionCookie(baseUrl, authOptions);
 
   // Step 2: Resolve user to document _id
-  const userId = await resolveUserId(baseUrl, user, session, socketPath);
+  const userId = await resolveUserId(baseUrl, user, session, socketPath, authOptions);
 
   // Step 3: POST /join as JSON with document _id
+  authOptions.signal?.throwIfAborted();
   const joinRes = await axios.post(
     `${baseUrl}/join`,
     {
@@ -210,6 +268,8 @@ export async function authenticateFoundry(
       password,
     },
     {
+      timeout: authOptions.timeout,
+      ...(authOptions.signal ? { signal: authOptions.signal } : {}),
       headers: {
         'Content-Type': 'application/json',
         Cookie: `session=${session}`,
@@ -228,6 +288,7 @@ export async function authenticateFoundry(
         status === 200 || status === 302 || status === 400 || status === 401,
     },
   );
+  authOptions.signal?.throwIfAborted();
 
   if (joinRes.data?.status !== 'success' && joinRes.data?.redirect !== '/game') {
     // FoundryVTT v13+ answers a rejected /join with a plain-text i18n key

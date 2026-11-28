@@ -157,6 +157,19 @@ describe('modifyDocument acknowledgement — v14 `{ results }` form', () => {
       /unrecognized modifyDocument acknowledgement/i,
     );
   });
+
+  it.each([
+    { results: [deactivateOldCombat] },
+    { results: [deactivateOldCombat, { result: [], sideEffect: false }] },
+  ])('does not infer a successful write from side effects or an empty primary: %j', async (ack) => {
+    const { client, emit } = buildWriteClient(() => ack);
+    Reflect.set(client, 'worldData', { world: { id: 'world' } });
+    await expect(client.startCombat(SCENE_ID, [])).rejects.toMatchObject({
+      code: 'outcome_unknown',
+    });
+    expect(client.isWorldDataStale()).toBe(true);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('parseDocumentBroadcastBatch', () => {

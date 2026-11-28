@@ -2,45 +2,58 @@
 
 ## Test-Driven Development
 
-Follow RED -> GREEN -> REFACTOR:
-1. Write a failing test that defines desired behavior
-2. Implement minimal code to pass the test
-3. Refactor while keeping tests green
+Follow **RED → GREEN → REFACTOR**:
+1. Write a failing test that describes the desired behavior.
+2. Implement the smallest change that makes it pass.
+3. Refactor without breaking the tests.
+
+For cross-target behavior, test both a single configured target and multiple isolated targets. A mock or fake relay does not establish live Foundry compatibility.
 
 ## Commit Conventions
 
-Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
+Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`. Add a scope when useful (`fix(sessions):`). Do not include credentials or generated secret-bearing target files in a commit.
 
-Include scope when applicable: `feat(tools):`, `fix(auth):`
+## Build and Test
 
-## Build & Test
+This project uses **Bun** for dependency management (`bun.lock`) and **Just** for task recipes (`justfile`). Prefer Just for local/CI parity.
 
-This project uses **bun** as the package manager and **`just`** as the task
-runner (`bun.lock`, `justfile`). Prefer the `just` recipes — they are what CI
-runs and keep local/CI parity.
+- `just qa` — pre-commit gate: Biome lint, `tsc --noEmit` for `src/`, script typecheck via `tsconfig.scripts.json`, integration bindings and Vitest coverage.
+- `just check-types` / `just check-types-scripts` — standalone TypeScript checks.
+- `just test` / `just test-coverage` — integration bindings followed by Vitest unit tests/coverage.
+- `just lint` / `just lint-fix` — Biome check (fix only when intended).
+- `just build` — compile TypeScript.
+- `just test-e2e` — Playwright; requires its external runtime setup.
+- `just antipatterns` — ast-grep anti-pattern scan.
+- `bun run smoke`, `smoke:dotenv`, `smoke:integrations`, `smoke:pack` — startup, environment, packaged integration and distribution checks.
 
-- `just qa` — one-shot gate before committing: biome lint + `tsc` + Vitest. Run this first.
-- `just check-types` — `tsc --noEmit` only
-- `just test` — unit tests (Vitest); `just test-coverage` for coverage
-- `just lint` / `just lint-fix` — biome check (the linter+formatter); `lint-fix` auto-fixes
-- `just build` — compile TypeScript
-- `just test-e2e` — end-to-end tests (Playwright, headless)
-- `just antipatterns` — ast-grep anti-pattern scan
+The pre-commit hook checks staged secrets with **Gitleaks** and runs `lint-staged`/Biome. Formatting only selected files is preferable when unrelated pre-existing lint debt exists.
 
-A pre-commit hook (lint-staged) runs `biome check --write` on staged files, so
-formatting is auto-applied at commit time. When only specific files need
-formatting (e.g. avoiding pre-existing lint debt elsewhere), run
-`bunx biome check --write <paths>` on just those files.
+## Architecture boundaries
+
+- `src/index.ts` owns the MCP transport. `src/tools/catalog.ts` owns tool/resource discovery **and** dispatch.
+- Resolve `target_id` via `src/sessions/`. Each target owns a provider, cache, integration lifecycle, write setting, operation queue, identity and generation. There must be no global mutable current world.
+- Core tool handlers depend on `FoundryCore` (`src/providers/types.ts`), not `FoundryClient` or transport internals. `src/foundry/client.ts` is only a compatibility export.
+- `src/tools/availability.ts` retains legacy transport helpers; the active server enforces per-target capabilities through `ToolCatalog`.
+- Put game-system-specific interpretation in `systems/` (including projections), module-specific APIs in `modules/`, and shared manifest/loader code in `src/integrations/`.
+- Preserve exact upstream IDs in public tool names; validate schemas and runtime probes before advertising operations. There is no arbitrary-JS MCP tool.
+- Explicit writes require the selected target's write flag, provider capabilities and Foundry permissions. Do not replay unknown-outcome writes or fail over to another target.
+
+See [Development Guide](../../docs/guides/development.md), [ADR-011](../../docs/adrs/0011-provider-session-integration-overhaul.md) and [Writing integrations](../../docs/guides/writing-integrations.md).
 
 ## Type Safety
 
-- Never use `as any` in production code — use proper interfaces or `Partial<T>`
-- Validate external data (API responses, Socket.IO payloads) with Zod schemas instead of bare `as X` casts
-- Prefer runtime type guards (`typeof`, `isRecord()`) over type assertions for dynamic data
-- Avoid `as unknown as X` double-casts — they indicate a missing type definition
+- Do not use `as any` in production; prefer proper interfaces or `Partial<T>`.
+- Validate untrusted responses, Socket.IO events and relay/worker payloads with Zod, JSON Schema or runtime guards before projecting them.
+- Prefer type guards (`typeof`, `isRecord()`) to assertions; avoid `as unknown as T` double-casts.
+- Keep provider capability contracts and MCP input/output schemas consistent across targets.
 
 ## Resource Cleanup
 
-- Classes with `setInterval`/`setTimeout` must provide a `destroy()` method
-- Socket.IO event listeners must be cleaned up with `socket.off()` on all exit paths (resolve, reject, timeout)
-- EventEmitter subclasses must call `removeAllListeners()` in their cleanup method
+- Owners of timers, sockets, subprocesses and event listeners must expose and invoke a lifecycle cleanup method (`close()` or `destroy()`).
+- Remove Socket.IO listeners on all exit paths and cancel/reject pending work when its generation is invalidated.
+- EventEmitter subclasses must release their listeners during cleanup.
+- Session shutdown and reconnection must not affect a different target's resources.
+
+## Verification evidence
+
+Run `just qa` and relevant smoke tests before committing implementation changes. Record exact commands and results; do not infer live compatibility from unit tests, fake relays or a startup banner. Do not update integration `compatibility.tested` without a performed live test.

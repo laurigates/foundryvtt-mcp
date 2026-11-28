@@ -74,6 +74,7 @@ test-watch:
 # Generate test coverage report
 [group: "test"]
 test-coverage:
+    bun run test:bindings
     bun run test:coverage
 
 # Test connection to FoundryVTT server
@@ -90,6 +91,11 @@ test-integration *args:
 [group: "test"]
 test-integration-docker:
     bun run test:integration:docker
+
+# Exercise the packaged integration payloads without Foundry
+[group: "test"]
+smoke-integrations:
+    bun run smoke:integrations
 
 ########## E2E Testing ##########
 

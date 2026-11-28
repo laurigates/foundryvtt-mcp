@@ -1,0 +1,404 @@
+{
+  "target_id": "dnd5e-14-demo",
+  "instructions": "Manual recipes, not an executable batch. Replace every REPLACE_* UUID/ID and verify preconditions. Activity rolls use explicit base context; activation does not automatically carry context into later calls.",
+  "calls": [
+    {
+      "id": "raw_actor",
+      "name": "system_dnd5e_get_actor_data",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID"
+      }
+    },
+    {
+      "id": "actor_summary",
+      "name": "system_dnd5e_get_actor_summary",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID"
+      }
+    },
+    {
+      "id": "inventory",
+      "name": "system_dnd5e_get_actor_items",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID"
+      }
+    },
+    {
+      "id": "spell_inventory",
+      "name": "system_dnd5e_get_actor_items",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "item_type": "spell"
+      }
+    },
+    {
+      "id": "item",
+      "name": "system_dnd5e_get_item_data",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID"
+      }
+    },
+    {
+      "id": "effects",
+      "name": "system_dnd5e_get_effects",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID"
+      }
+    },
+    {
+      "id": "roll_data",
+      "name": "system_dnd5e_get_roll_data",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID"
+      }
+    },
+    {
+      "id": "system_config",
+      "name": "system_dnd5e_get_system_config",
+      "arguments": {
+        "target_id": "dnd5e-14-demo"
+      }
+    },
+    {
+      "id": "activities",
+      "name": "system_dnd5e_get_activities",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID"
+      }
+    },
+    {
+      "id": "activity",
+      "name": "system_dnd5e_get_activity",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_ACTIVITY_ID"
+      }
+    },
+    {
+      "id": "preview_fire",
+      "name": "system_dnd5e_calculate_damage",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "damages": [
+          {
+            "type": "fire",
+            "value": 7
+          }
+        ],
+        "multiplier": 1
+      }
+    },
+    {
+      "id": "ability",
+      "name": "system_dnd5e_roll_ability_check",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "ability": "str",
+        "chat_message": true,
+        "roll_mode": "public"
+      }
+    },
+    {
+      "id": "save",
+      "name": "system_dnd5e_roll_saving_throw",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "ability": "con",
+        "dc": 14,
+        "chat_message": true,
+        "roll_mode": "gm"
+      }
+    },
+    {
+      "id": "skill",
+      "name": "system_dnd5e_roll_skill",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "skill": "ath",
+        "ability": "str",
+        "chat_message": true
+      }
+    },
+    {
+      "id": "tool",
+      "name": "system_dnd5e_roll_tool_check",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "tool": "smith",
+        "ability": "str",
+        "chat_message": true
+      }
+    },
+    {
+      "id": "death_save",
+      "name": "system_dnd5e_roll_death_save",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "chat_message": true
+      }
+    },
+    {
+      "id": "concentration",
+      "name": "system_dnd5e_roll_concentration",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "dc": 12,
+        "chat_message": true
+      }
+    },
+    {
+      "id": "hit_die",
+      "name": "system_dnd5e_roll_hit_die",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "denomination": "d8",
+        "chat_message": true
+      }
+    },
+    {
+      "id": "fire_damage",
+      "name": "system_dnd5e_apply_damage",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "damages": [
+          {
+            "type": "fire",
+            "value": 7
+          }
+        ],
+        "multiplier": 1
+      }
+    },
+    {
+      "id": "healing",
+      "name": "system_dnd5e_apply_damage",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "damages": [
+          {
+            "type": "healing",
+            "value": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "short_rest",
+      "name": "system_dnd5e_short_rest",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "new_day": false,
+        "chat_message": false
+      }
+    },
+    {
+      "id": "long_rest",
+      "name": "system_dnd5e_long_rest",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "new_day": true,
+        "chat_message": false
+      }
+    },
+    {
+      "id": "condition_on",
+      "name": "system_dnd5e_set_condition",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "condition": "blinded",
+        "active": true
+      }
+    },
+    {
+      "id": "condition_off",
+      "name": "system_dnd5e_set_condition",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "actor_uuid": "Actor.REPLACE_HERO_ID",
+        "condition": "blinded",
+        "active": false
+      }
+    },
+    {
+      "id": "activate_base",
+      "name": "system_dnd5e_activate_activity",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_ACTIVITY_ID",
+        "chat_message": false
+      }
+    },
+    {
+      "id": "activate_spell",
+      "name": "system_dnd5e_activate_activity",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_LEVEL1_SPELL_ID",
+        "activity_id": "REPLACE_ACTIVITY_ID",
+        "spell_slot": "spell1",
+        "chat_message": false
+      }
+    },
+    {
+      "id": "weapon_attack",
+      "name": "system_dnd5e_roll_activity_attack",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_ATTACK_ID",
+        "attack_mode": "oneHanded",
+        "ability": "str",
+        "ammunition_id": null,
+        "chat_message": true
+      }
+    },
+    {
+      "id": "weapon_damage",
+      "name": "system_dnd5e_roll_activity_damage",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_ATTACK_ID",
+        "critical": false,
+        "ability": "str",
+        "attack_mode": "oneHanded",
+        "ammunition_id": null,
+        "chat_message": true
+      }
+    },
+    {
+      "id": "base_damage",
+      "name": "system_dnd5e_roll_activity_damage",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_DAMAGE_ID",
+        "critical": false,
+        "chat_message": true
+      }
+    },
+    {
+      "id": "stored_formula",
+      "name": "system_dnd5e_roll_activity_formula",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_ITEM_ID",
+        "activity_id": "REPLACE_UTILITY_ID",
+        "chat_message": true
+      }
+    },
+    {
+      "id": "spell_item",
+      "name": "system_dnd5e_get_item_data",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_LEVEL1_SPELL_ID"
+      }
+    },
+    {
+      "id": "spell_activity",
+      "name": "system_dnd5e_get_activity",
+      "arguments": {
+        "target_id": "dnd5e-14-demo",
+        "item_uuid": "Actor.REPLACE_HERO_ID.Item.REPLACE_LEVEL1_SPELL_ID",
+        "activity_id": "REPLACE_ACTIVITY_ID"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "inspect_world_actor",
+      "steps": [
+        "system_config",
+        "raw_actor",
+        "actor_summary",
+        "inventory",
+        "effects",
+        "activities"
+      ]
+    },
+    {
+      "id": "ability_and_skill_checks",
+      "steps": [
+        "actor_summary",
+        "ability",
+        "save",
+        "skill",
+        "tool"
+      ]
+    },
+    {
+      "id": "typed_damage_then_recovery",
+      "steps": [
+        "actor_summary",
+        "preview_fire",
+        "fire_damage",
+        "actor_summary",
+        "healing",
+        "actor_summary"
+      ]
+    },
+    {
+      "id": "boolean_condition",
+      "steps": [
+        "effects",
+        "condition_on",
+        "effects",
+        "condition_off"
+      ]
+    },
+    {
+      "id": "short_rest_with_explicit_hit_die",
+      "steps": [
+        "actor_summary",
+        "hit_die",
+        "short_rest",
+        "actor_summary",
+        "effects"
+      ]
+    },
+    {
+      "id": "independent_weapon_rolls",
+      "steps": [
+        "item",
+        "activities",
+        "weapon_attack",
+        "weapon_damage"
+      ]
+    },
+    {
+      "id": "resource_activation_only",
+      "steps": [
+        "spell_inventory",
+        "spell_item",
+        "spell_activity",
+        "activate_spell",
+        "actor_summary",
+        "spell_item"
+      ]
+    }
+  ]
+}

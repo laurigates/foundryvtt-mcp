@@ -13,6 +13,7 @@ Model Context Protocol (MCP) server bridging AI assistants with FoundryVTT table
 ## Essential Commands
 
 ```bash
+just qa                # Lint, TypeScript (src + scripts), bindings and Vitest coverage
 bun run build          # Compile TypeScript
 bun run dev            # Development mode with hot reload
 bun test               # Unit tests (Vitest)
@@ -28,82 +29,96 @@ bun run test-connection # Test MCP→FoundryVTT connection
 
 ### Data Flow
 
-1. AI assistant calls MCP tool → `src/tools/router.ts`
-2. Router dispatches to handler → `src/tools/handlers/`
-3. Handler queries cached worldData → `src/foundry/client.ts`
-4. Response returned as MCP result
+1. MCP discovery and calls use `src/tools/catalog.ts`.
+2. The catalog resolves `target_id` through `src/sessions/`.
+3. Core handlers consume the target's `FoundryCore` provider interface.
+4. System/module packages declare fixed bindings that the target's integration
+   manager evaluates through the same target's execution provider.
+5. Responses include target and session provenance.
 
 ### Key Modules
 
 | Module | Path | Purpose |
 |--------|------|---------|
-| Client | `src/foundry/client.ts` | Socket.IO connection, world state cache |
+| Providers | `src/providers/` | Core port, per-instance cache, transport and execution backends |
+| Sessions | `src/sessions/` | Target routing, independent lifecycle, identity and generation checks |
+| Integrations | `src/integrations/` | Manifest loader, operation availability, binding execution |
+| Systems/modules | `systems/`, `modules/` | Separate packages: bindings, probes, manifests and READMEs |
 | Auth | `src/foundry/auth.ts` | 4-step Socket.IO authentication |
-| Config | `src/config/index.ts` | Zod-validated environment config |
+| Config | `src/config/index.ts`, `src/config/targets.ts` | Validated environment and target configuration |
 | Tools | `src/tools/definitions.ts` | MCP tool schemas |
-| Router | `src/tools/router.ts` | Request→handler dispatch |
+| Catalog | `src/tools/catalog.ts` | Unified discovery, target routing and dispatch |
 | Types | `src/foundry/types.ts` | FoundryVTT entity interfaces |
 
 ### Authentication & transport selection
 
-`src/foundry/transport.ts` (`resolveTransportPlan`) picks one of three modes
-from configuration alone (empty values count as unset); the design is
-[ADR-011](docs/adrs/0011-dual-mode-transport.md):
+Providers are selected per target before dispatch: `socketio`, `legacy-rest`,
+`rest-api`, or `composite`. A Socket.IO target may add the historical REST bridge
+with `restUrl` and `restApiKey`; the bridge augments reads within that target.
+Socket.IO remains primary, and a failed bridge read falls back to the native
+answer or an unavailable value. The composite instead combines native core
+access with ThreeHats relay execution and verifies their remote identities.
+Operations never change target or retry automatically after an uncertain mutation.
 
-- **`socket`** (default, no `FOUNDRY_API_KEY`): authenticates with
-  `FOUNDRY_USERNAME`/`FOUNDRY_PASSWORD` and loads the live `worldData` cache.
-- **`dual`** (`FOUNDRY_API_KEY` + `FOUNDRY_REST_URL` + Socket.IO credentials):
-  Socket.IO stays primary; the REST bridge
-  ([laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api),
-  module + Node bridge server on `:3030`) augments it with prepared dnd5e values,
-  Foundry's dice engine, compendium search, logs and system health. A failed
-  bridge call falls back to the Socket.IO answer; `connect()` never fails
-  because of the bridge. A transport failure pauses the whole bridge, a 5xx
-  (e.g. no GM browser client) pauses that capability, both for 30 s; a 4xx
-  pauses nothing. The bridge fixes the prepared values and the
-  diagnostics/compendium routes depend on (foundryvtt-local-rest-api#8, #6)
-  shipped in its v2.1.0; dual mode was checked by hand against a live world
-  on 2026-11-26 (see `docs/guides/capabilities.md`).
-- **`rest`** (deprecated: the key without Socket.IO credentials, or without
-  `FOUNDRY_REST_URL`): the old REST-only mode against `FOUNDRY_URL`, with a
-  startup warning. It probes the bridge's authenticated `/api/world`
-  (`probeRestModule()` in `src/foundry/rest-probe.ts`); `/api/status` is served
-  unauthenticated by Foundry core, so it proves neither the module nor the key.
-- `USE_REST_MODULE` (seen in some `.env`/example files) is **not read** by
-  `src/config/index.ts` — it is a no-op.
+Without explicit target configuration, legacy environment settings become one
+target. `resolveTransportPlan` selects native Socket.IO by default, Socket.IO
+with the optional bridge when `FOUNDRY_API_KEY`, `FOUNDRY_REST_URL` and native
+credentials are present, and the historical `legacy-rest` provider for a key
+without that complete combination. `FOUNDRY_PROVIDER` selects a provider
+explicitly. ThreeHats uses separate `FOUNDRY_REST_RELAY_URL`,
+`FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` settings.
+`USE_REST_MODULE` remains a no-op.
 
-**One table decides sources and tool exposure**: `src/foundry/capabilities.ts`
-lists, per capability, the sources that can serve it and the preferred one, and
-maps every tool to its capabilities. `src/tools/availability.ts` derives
-`tools/list` and the CallTool gate from it; `FoundryClient` routes reads with it.
-Write tools are offered only where Socket.IO is connected **and**
-`FOUNDRY_WRITE_ENABLED=true`. A direct `CallTool` for a hidden tool is rejected
-with a reason naming the actual cause; a name absent from the table falls
-through to the router's "Unknown tool" error. The per-mode result is recorded in
-`docs/guides/capabilities.md` and pinned by
-`src/tools/__tests__/capability-matrix.test.ts`; field differences between the
-transports are `KNOWN_GAPS` in `src/foundry/parity.ts`.
+`src/foundry/client.ts` is only a compatibility export. Application code uses
+provider interfaces. See [ADR-011](docs/adrs/0011-provider-session-integration-overhaul.md)
+and the [configuration guide](docs/guides/providers-and-targets.md).
+
+**Tool availability is target-scoped.** `src/tools/catalog.ts` is authoritative
+for MCP discovery, dispatch, resources and schema conflicts. It checks target
+readiness, provider capabilities, target-local writes, and D&D 5e-only demo
+helpers. A tool may be listed because one configured target supports it but
+remain unavailable for a different target; every call is rechecked.
+
+`src/tools/availability.ts` is retained for transport-only compatibility helpers and
+tests, **not** used as the multi-target MCP gateway. The server exposes 33
+static core tools, 5 management tools and any compatible dynamically loaded
+system/module operations. Management discovery remains available while worlds
+are offline; resources are target-qualified (`foundry://targets/<id>/actors`).
+
+Write operations require `writeEnabled` on the selected target and the matching
+provider and remote permissions. Native Socket.IO core writes use
+`modifyDocument`; the standalone relay executes fixed Foundry document APIs.
+Composite mode uses Socket.IO for core work and the relay for packaged integration
+bindings. A write with an unknown outcome is never retried or failed over
+automatically.
+
+See [capabilities](docs/guides/capabilities.md),
+[development](docs/guides/development.md) and
+[write protocol](.claude/rules/foundry-write-protocol.md).
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FOUNDRY_URL` | Yes | FoundryVTT server URL |
-| `FOUNDRY_USERNAME` | Socket.IO, dual | FoundryVTT user |
-| `FOUNDRY_PASSWORD` | Socket.IO, dual | FoundryVTT password |
+| `FOUNDRY_URL` | Single native/legacy target | FoundryVTT server URL |
+| `FOUNDRY_USERNAME` | Native authentication | FoundryVTT user |
+| `FOUNDRY_PASSWORD` | Native authentication | FoundryVTT password |
 | `FOUNDRY_USER_ID` | No | Bypass username→ID resolution |
-| `FOUNDRY_API_KEY` | No | REST bridge key; with `FOUNDRY_REST_URL` and credentials → dual mode |
-| `FOUNDRY_REST_URL` | No | REST bridge server URL (e.g. `http://localhost:3030`) |
-| `FOUNDRY_WRITE_ENABLED` | No | Enable game-state mutations — `true` required for the write tools (default `false`) |
+| `FOUNDRY_API_KEY` | No | Historical `/api/*` bridge key; paired with `FOUNDRY_REST_URL` and native credentials, augments the single Socket.IO target |
+| `FOUNDRY_REST_URL` | No | Historical bridge URL; a key without this URL or native credentials retains `legacy-rest` |
+| `FOUNDRY_WRITE_ENABLED` | No | Legacy single-target write opt-in; explicit targets use their own `writeEnabled` (default `false`) |
+| `FOUNDRY_PROVIDER` | No | Select `socketio`, `legacy-rest`, `rest-api` or `composite` in legacy configuration |
+| `FOUNDRY_REST_RELAY_URL` / `FOUNDRY_REST_API_KEY` / `FOUNDRY_REST_CLIENT_ID` | Relay | Paired runtime relay settings, distinct from `FOUNDRY_API_KEY` |
 | `LOG_LEVEL` | No | `debug` for verbose output |
 | `FOUNDRY_TIMEOUT` | No | Request timeout (ms, default 10000) |
+| `FOUNDRY_TARGETS_FILE` / `FOUNDRY_TARGETS_JSON` | No | Mutually exclusive explicit target configuration; `FOUNDRY_URL` is not required when used |
 
 ## Rules
 
 See `.claude/rules/` for detailed guidelines:
 - `development.md` — TDD workflow, commit conventions, build commands
 - `testing.md` — Test tiers (unit, integration, E2E) and requirements
-- `foundry-write-protocol.md` — transports (Socket.IO primary, REST bridge augment) and the `modifyDocument` write protocol
+- `foundry-write-protocol.md` — target providers, optional REST read augmentation and the native/relay write protocols
 - `document-management.md` — Document detection and organization
 
 ## Reference

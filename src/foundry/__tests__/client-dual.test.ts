@@ -25,6 +25,8 @@ vi.mock('../../utils/logger.js', () => ({
 vi.mock('../../config/index.js', () => ({ config: { logLevel: 'info' } }));
 
 const { FoundryClient } = await import('../client.js');
+const { SocketIOProvider } = await import('../../providers/socketio.js');
+const { LegacyRestProvider } = await import('../../providers/legacy-rest.js');
 const { logger } = await import('../../utils/logger.js');
 const { io } = await import('socket.io-client');
 const { authenticateFoundry } = await import('../auth.js');
@@ -174,11 +176,18 @@ function buildSocket() {
 describe('FoundryClient dual transport', () => {
   let http: MockAxiosInstance;
   let rest: MockAxiosInstance;
+  let bridgeRead: ReturnType<typeof vi.fn>;
+  let bridgeWorld: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     http = mockAxiosInstance();
     rest = mockAxiosInstance();
+    bridgeRead = vi.fn();
+    bridgeWorld = vi.fn().mockResolvedValue({ data: REST_WORLD });
+    rest.get.mockImplementation((url: string, ...args: unknown[]) =>
+      url === '/api/world' ? bridgeWorld() : bridgeRead(url, ...args),
+    );
     vi.mocked(axios).create = vi.fn((cfg?: { baseURL?: string }) =>
       cfg?.baseURL === BRIDGE_URL ? rest : http,
     ) as never;
@@ -209,12 +218,7 @@ describe('FoundryClient dual transport', () => {
   ) {
     const harness = buildSocket();
     vi.mocked(io).mockReturnValue(harness.socket as never);
-    rest.get.mockImplementation(async (url: string) => {
-      if (url === '/api/world') {
-        return restWorld();
-      }
-      throw new Error(`unexpected GET ${url}`);
-    });
+    bridgeWorld.mockImplementation(restWorld);
     const client = dualClient();
     const connecting = client.connect();
     await vi.waitFor(() => expect(harness.listeners.get('session')?.length).toBe(1));
@@ -226,6 +230,58 @@ describe('FoundryClient dual transport', () => {
   describe('construction', () => {
     it('reports dual mode', () => {
       expect(dualClient().getTransportMode()).toBe('dual');
+    });
+
+    it('keeps an explicit native provider native when a historical apiKey is present', async () => {
+      const config = {
+        kind: 'socketio' as const,
+        baseUrl: FOUNDRY_URL,
+        apiKey: 'stale-key',
+        username: 'gm',
+        password: 'secret',
+      };
+      const provider = new SocketIOProvider(config);
+      expect(provider.kind).toBe('socketio');
+      expect(provider.getTransportMode()).toBe('socket');
+      expect(provider.capabilities.has('diagnostics.read')).toBe(false);
+      await expect(provider.get('/api/diagnostics/logs')).rejects.toMatchObject({
+        code: 'unsupported_operation',
+      });
+      expect(http.get).not.toHaveBeenCalled();
+    });
+
+    it('enables the explicit native bridge without changing the core provider', () => {
+      const provider = new SocketIOProvider({
+        kind: 'socketio',
+        baseUrl: FOUNDRY_URL,
+        username: 'gm',
+        password: 'secret',
+        restUrl: BRIDGE_URL,
+        restApiKey: 'bridge-key',
+        writeEnabled: true,
+      });
+      expect(provider.kind).toBe('socketio');
+      expect(provider.getTransportMode()).toBe('dual');
+      expect(provider.capabilities.has('diagnostics.read')).toBe(true);
+      expect(provider.capabilities.has('core.write')).toBe(true);
+      const restRequest = rest.interceptors.request.use.mock.calls[0]?.[0];
+      expect(restRequest({ headers: {} }).headers['x-api-key']).toBe('bridge-key');
+    });
+
+    it('keeps explicit legacy-rest read-only even with native credentials and a bridge URL', () => {
+      const provider = new LegacyRestProvider({
+        kind: 'legacy-rest',
+        baseUrl: FOUNDRY_URL,
+        apiKey: 'bridge-key',
+        restUrl: BRIDGE_URL,
+        username: 'gm',
+        password: 'secret',
+        writeEnabled: true,
+      });
+      expect(provider.kind).toBe('legacy-rest');
+      expect(provider.getTransportMode()).toBe('rest');
+      expect(provider.capabilities.has('core.write')).toBe(false);
+      expect(provider.getConnectionReport().rest.baseUrl).toBe(BRIDGE_URL);
     });
 
     it('sends the key only to the bridge, on its own HTTP client', () => {
@@ -310,11 +366,11 @@ describe('FoundryClient dual transport', () => {
         },
       ]);
 
-      rest.get.mockClear();
+      bridgeRead.mockClear();
       rest.post.mockClear();
       await client.getActor(ACTOR_ID);
       expect((await client.rollDice('1d6')).source).toBe('local');
-      expect(rest.get).not.toHaveBeenCalled();
+      expect(bridgeRead).not.toHaveBeenCalled();
       expect(rest.post).not.toHaveBeenCalled();
     });
 
@@ -331,23 +387,73 @@ describe('FoundryClient dual transport', () => {
     });
   });
 
+  describe('target identity of the optional bridge', () => {
+    it.each([
+      { id: 'another-world' },
+      { system: 'pf2e' },
+      { origin: 'https://another-foundry.example' },
+    ])('withholds every bridge capability when /api/world differs: %j', async (change) => {
+      const { client } = await connectDual(async () => ({
+        data: { ...REST_WORLD, data: { ...REST_WORLD.data, ...change } },
+      }));
+      bridgeRead.mockResolvedValue({ data: REST_ACTOR });
+
+      const actor = await client.getActor(ACTOR_ID);
+      expect(actor.ac).toBeUndefined();
+      expect(actor.hp?.value).toBe(51);
+      expect((await client.searchCompendium({ query: 'fire' })).restAvailable).toBe(false);
+      await expect(client.requestRestDiagnostics('/api/diagnostics/logs')).rejects.toThrow(
+        /unavailable/,
+      );
+      expect(bridgeRead).not.toHaveBeenCalled();
+      expect(client.isConnected()).toBe(true);
+      expect(client.getConnectionReport().rest.state).toBe('invalid-response');
+    });
+
+    it('detects a bridge world switch even while the native connection is unchanged', async () => {
+      const { client } = await connectDual();
+      const generation = client.getGeneration();
+      bridgeWorld.mockResolvedValue({
+        data: { ...REST_WORLD, data: { ...REST_WORLD.data, id: 'other' } },
+      });
+      bridgeRead.mockResolvedValue({ data: REST_ACTOR });
+
+      expect((await client.getActor(ACTOR_ID)).ac).toBeUndefined();
+      expect(client.getGeneration()).toBe(generation);
+      expect(bridgeRead).not.toHaveBeenCalled();
+    });
+
+    it('discards an answer after a world switch without replaying the request', async () => {
+      const { client } = await connectDual();
+      bridgeWorld.mockResolvedValueOnce({ data: REST_WORLD }).mockResolvedValueOnce({
+        data: { ...REST_WORLD, data: { ...REST_WORLD.data, id: 'other' } },
+      });
+      bridgeRead.mockResolvedValue({ data: REST_ACTOR });
+
+      const actor = await client.getActor(ACTOR_ID);
+      expect(actor.ac).toBeUndefined();
+      expect(actor.derivedUnavailable).toEqual(['hpMax', 'ac']);
+      expect(bridgeRead).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('bridge errors answered over HTTP (5xx pauses a capability, 4xx does not)', () => {
     it('pauses actor-derived after a 5xx instead of waiting for the bridge timeout on every call', async () => {
       const { client } = await connectDual();
-      rest.get.mockClear();
-      rest.get.mockRejectedValue(bridgeTimeout500());
+      bridgeRead.mockClear();
+      bridgeRead.mockRejectedValue(bridgeTimeout500());
 
       await client.getActor(ACTOR_ID);
       await client.getActor(ACTOR_ID);
       const result = await client.searchActors({ query: 'paladin' });
 
-      expect(rest.get).toHaveBeenCalledTimes(1);
+      expect(bridgeRead).toHaveBeenCalledTimes(1);
       expect(result.actors[0]?.derivedUnavailable).toEqual(['hpMax', 'ac']);
     });
 
     it('keeps other capabilities on the bridge while one is paused', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValue(bridgeTimeout500());
+      bridgeRead.mockRejectedValue(bridgeTimeout500());
       await client.getActor(ACTOR_ID);
       rest.post.mockResolvedValueOnce({
         data: {
@@ -378,17 +484,17 @@ describe('FoundryClient dual transport', () => {
       const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
       try {
         const { client } = await connectDual();
-        rest.get.mockClear();
-        rest.get.mockRejectedValueOnce(bridgeTimeout500());
+        bridgeRead.mockClear();
+        bridgeRead.mockRejectedValueOnce(bridgeTimeout500());
         await client.getActor(ACTOR_ID);
         await client.getActor(ACTOR_ID);
-        expect(rest.get).toHaveBeenCalledTimes(1);
+        expect(bridgeRead).toHaveBeenCalledTimes(1);
 
         now.mockReturnValue(1_000_000 + 30_001);
-        rest.get.mockResolvedValueOnce({ data: REST_ACTOR });
+        bridgeRead.mockResolvedValueOnce({ data: REST_ACTOR });
         const actor = await client.getActor(ACTOR_ID);
 
-        expect(rest.get).toHaveBeenCalledTimes(2);
+        expect(bridgeRead).toHaveBeenCalledTimes(2);
         expect(actor.ac).toEqual({ value: 18 });
         expect(client.getConnectionReport().rest.paused).toBeUndefined();
       } finally {
@@ -398,21 +504,21 @@ describe('FoundryClient dual transport', () => {
 
     it('falls back per call on a 4xx and keeps asking the bridge', async () => {
       const { client } = await connectDual();
-      rest.get.mockClear();
-      rest.get.mockRejectedValue(httpFailure(400, { success: false, message: 'id is required' }));
+      bridgeRead.mockClear();
+      bridgeRead.mockRejectedValue(httpFailure(400, { success: false, message: 'id is required' }));
 
       await client.getActor(ACTOR_ID);
       await client.getActor(ACTOR_ID);
       const actor = await client.getActor(ACTOR_ID);
 
-      expect(rest.get).toHaveBeenCalledTimes(3);
+      expect(bridgeRead).toHaveBeenCalledTimes(3);
       expect(actor.derivedUnavailable).toEqual(['hpMax', 'ac']);
     });
 
     it('reports a 4xx as rejected, a 5xx as a server error with its pause, never as unreachable', async () => {
       const { client } = await connectDual();
 
-      rest.get.mockRejectedValueOnce(httpFailure(404));
+      bridgeRead.mockRejectedValueOnce(httpFailure(404));
       await client.getActor(ACTOR_ID);
       expect(client.getConnectionReport().rest).toMatchObject({
         reachable: true,
@@ -421,7 +527,7 @@ describe('FoundryClient dual transport', () => {
       });
       expect(client.getConnectionReport().rest.paused).toBeUndefined();
 
-      rest.get.mockRejectedValueOnce(bridgeTimeout500());
+      bridgeRead.mockRejectedValueOnce(bridgeTimeout500());
       await client.getActor(ACTOR_ID);
       expect(client.getConnectionReport().rest).toMatchObject({
         reachable: true,
@@ -439,24 +545,24 @@ describe('FoundryClient dual transport', () => {
 
     it('pauses system health after a diagnostics 5xx and says so', async () => {
       const { client } = await connectDual();
-      rest.get.mockClear();
-      rest.get.mockRejectedValue(httpFailure(500));
+      bridgeRead.mockClear();
+      bridgeRead.mockRejectedValue(httpFailure(500));
 
       await expect(client.restGet('/api/diagnostics/health')).rejects.toThrow(/HTTP 500/);
       await expect(client.restGet('/api/diagnostics/health')).rejects.toThrow(/paused/);
 
-      expect(rest.get).toHaveBeenCalledTimes(1);
+      expect(bridgeRead).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('derived actor values (preferred source: REST)', () => {
     it('overlays AC, max HP and save totals from the bridge on the Socket.IO actor', async () => {
       const { client } = await connectDual();
-      rest.get.mockResolvedValueOnce({ data: REST_ACTOR });
+      bridgeRead.mockResolvedValueOnce({ data: REST_ACTOR });
 
       const actor = await client.getActor(ACTOR_ID);
 
-      expect(rest.get).toHaveBeenLastCalledWith(`/api/actors/${ACTOR_ID}`);
+      expect(bridgeRead).toHaveBeenLastCalledWith(`/api/actors/${ACTOR_ID}`);
       expect(actor.ac).toEqual({ value: 18 });
       expect(actor.hp).toEqual({ value: 51, max: 64, temp: 0 });
       expect(actor.abilities?.str).toEqual({ value: 18, mod: 4, save: 7 });
@@ -467,7 +573,7 @@ describe('FoundryClient dual transport', () => {
 
     it('falls back to the Socket.IO answer and its labels when the bridge fails', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValue(
+      bridgeRead.mockRejectedValue(
         Object.assign(new Error('Request failed with status code 500'), {
           response: { status: 500 },
         }),
@@ -481,7 +587,7 @@ describe('FoundryClient dual transport', () => {
 
     it('falls back when the bridge answers an unknown shape', async () => {
       const { client } = await connectDual();
-      rest.get.mockResolvedValueOnce({ data: { id: ACTOR_ID, hp: { value: 1 } } });
+      bridgeRead.mockResolvedValueOnce({ data: { id: ACTOR_ID, hp: { value: 1 } } });
 
       const actor = await client.getActor(ACTOR_ID);
 
@@ -491,7 +597,7 @@ describe('FoundryClient dual transport', () => {
     it('logs a failing capability once, not on every call', async () => {
       const { client } = await connectDual();
       vi.mocked(logger.warn).mockClear();
-      rest.get.mockRejectedValue(
+      bridgeRead.mockRejectedValue(
         Object.assign(new Error('HTTP 500'), { response: { status: 500 } }),
       );
 
@@ -504,18 +610,18 @@ describe('FoundryClient dual transport', () => {
 
     it('stops calling an unreachable bridge for a while instead of paying its timeout each time', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValue(transportFailure());
+      bridgeRead.mockRejectedValue(transportFailure());
 
       await client.getActor(ACTOR_ID);
-      const callsAfterFirst = rest.get.mock.calls.length;
+      const callsAfterFirst = bridgeRead.mock.calls.length;
       await client.getActor(ACTOR_ID);
 
-      expect(rest.get.mock.calls.length).toBe(callsAfterFirst);
+      expect(bridgeRead.mock.calls.length).toBe(callsAfterFirst);
     });
 
     it('overlays search results by actor id', async () => {
       const { client } = await connectDual();
-      rest.get.mockResolvedValueOnce({
+      bridgeRead.mockResolvedValueOnce({
         data: {
           success: true,
           data: [{ ...REST_ACTOR.data, abilities: undefined }],
@@ -526,7 +632,7 @@ describe('FoundryClient dual transport', () => {
 
       const result = await client.searchActors({ query: 'paladin', limit: 5 });
 
-      expect(rest.get).toHaveBeenLastCalledWith('/api/actors', {
+      expect(bridgeRead).toHaveBeenLastCalledWith('/api/actors', {
         params: { query: 'paladin', limit: 5 },
       });
       expect(result.actors[0]?.hp).toEqual({ value: 51, max: 64, temp: 0 });
@@ -536,7 +642,7 @@ describe('FoundryClient dual transport', () => {
 
     it('keeps Socket.IO search results when the bridge search fails', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValue(new Error('boom'));
+      bridgeRead.mockRejectedValue(new Error('boom'));
 
       const result = await client.searchActors({ query: 'paladin' });
 
@@ -548,12 +654,12 @@ describe('FoundryClient dual transport', () => {
   describe('Socket.IO-preferred reads do not touch the bridge', () => {
     it('reads world info from the snapshot', async () => {
       const { client } = await connectDual();
-      rest.get.mockClear();
+      bridgeRead.mockClear();
 
       const world = await client.getWorldInfo();
 
       expect(world.title).toBe('Test World');
-      expect(rest.get).not.toHaveBeenCalled();
+      expect(bridgeRead).not.toHaveBeenCalled();
     });
   });
 
@@ -589,7 +695,7 @@ describe('FoundryClient dual transport', () => {
   describe('compendium (REST only)', () => {
     it('maps the bridge answer', async () => {
       const { client } = await connectDual();
-      rest.get.mockResolvedValueOnce({
+      bridgeRead.mockResolvedValueOnce({
         data: {
           success: true,
           data: [
@@ -612,7 +718,7 @@ describe('FoundryClient dual transport', () => {
 
     it('degrades to the unavailable result, with the reason, when the bridge call fails', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValueOnce(
+      bridgeRead.mockRejectedValueOnce(
         Object.assign(new Error('Request failed with status code 404'), {
           response: { status: 404 },
         }),
@@ -629,7 +735,7 @@ describe('FoundryClient dual transport', () => {
   describe('restGet (diagnostics)', () => {
     it('returns the bridge body in dual mode', async () => {
       const { client } = await connectDual();
-      rest.get.mockResolvedValueOnce({ data: { logs: [], total: 0 } });
+      bridgeRead.mockResolvedValueOnce({ data: { logs: [], total: 0 } });
 
       await expect(client.restGet('/api/diagnostics/logs')).resolves.toEqual({
         data: { logs: [], total: 0 },
@@ -638,7 +744,7 @@ describe('FoundryClient dual transport', () => {
 
     it('fails with a clear message when the bridge is down', async () => {
       const { client } = await connectDual();
-      rest.get.mockRejectedValueOnce(transportFailure());
+      bridgeRead.mockRejectedValueOnce(transportFailure());
 
       await expect(client.restGet('/api/diagnostics/health')).rejects.toThrow(
         /REST bridge.*unavailable/,

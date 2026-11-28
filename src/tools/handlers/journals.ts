@@ -3,15 +3,16 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
+import { stripMarkup } from '../../foundry/world-search.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 export async function handleSearchJournals(
   args: { query: string; limit?: number },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   return withToolError('search journals', async () => {
-    const results = foundryClient.searchJournals(args.query);
+    const results = provider.searchJournals(args.query);
     const limit = args.limit || 10;
     const limited = results.slice(0, limit);
 
@@ -44,9 +45,9 @@ export async function handleSearchJournals(
   });
 }
 
-export async function handleGetJournal(args: { journalId: string }, foundryClient: FoundryClient) {
+export async function handleGetJournal(args: { journalId: string }, provider: FoundryCore) {
   return withToolError('get journal', async () => {
-    const journal = foundryClient.getJournal(args.journalId);
+    const journal = provider.getJournal(args.journalId);
 
     if (!journal) {
       throw new McpError(ErrorCode.InvalidParams, `Journal not found: ${args.journalId}`);
@@ -56,8 +57,7 @@ export async function handleGetJournal(args: { journalId: string }, foundryClien
       journal.pages
         ?.map((p) => {
           const content =
-            p.text?.content
-              ?.replace(/<[^>]+>/g, '')
+            stripMarkup(p.text?.content ?? '')
               .trim()
               .slice(0, 500) || '';
           return `### ${p.name}\n${content}${content.length >= 500 ? '...' : ''}`;

@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "fields": {
+    "hpValue": "attributes.hp.value",
+    "hpMax": "attributes.hp.max",
+    "hpTemp": "attributes.hp.temp",
+    "ac": "attributes.ac.value",
+    "level": "details.level",
+    "biography": "details.biography.value"
+  },
+  "abilities": "abilities",
+  "itemFields": {
+    "description": "description.value",
+    "rarity": "rarity"
+  },
+  "bounds": [
+    {
+      "path": "attributes.hp.value",
+      "label": "HP value",
+      "maximumPath": "attributes.hp.max",
+      "addPath": "attributes.hp.temp",
+      "fallbackMaximum": "hp.max",
+      "fallbackAdd": "hp.temp",
+      "maximumLabel": "max + temp"
+    },
+    {
+      "pattern": "^spells\\.(spell\\w+|pact)\\.value$",
+      "label": "spell slot value",
+      "maximumPath": "spells.$1.max"
+    },
+    {
+      "path": "attributes.exhaustion",
+      "label": "exhaustion",
+      "minimum": 0,
+      "maximum": 10,
+      "overrides": [
+        {
+          "paths": [
+            "rules",
+            "_source.rules",
+            "attributes.exhaustion.rules"
+          ],
+          "values": [
+            "2014",
+            "legacy"
+          ],
+          "maximum": 6
+        }
+      ]
+    }
+  ],
+  "preparedActorValues": true,
+  "derived": {
+    "abilityModifier": {
+      "offset": 10,
+      "divisor": 2
+    },
+    "level": {
+      "actorType": "character",
+      "itemType": "class",
+      "path": "system.levels"
+    },
+    "proficiency": {
+      "path": "attributes.prof",
+      "levelOffset": 1,
+      "step": 4,
+      "base": 2
+    },
+    "ac": {
+      "calculationPath": "attributes.ac.calc",
+      "flatValuePath": "attributes.ac.flat",
+      "flatMode": "flat"
+    },
+    "unavailable": {
+      "hpMax": "attributes.hp",
+      "ac": "attributes.ac"
+    }
+  }
+}

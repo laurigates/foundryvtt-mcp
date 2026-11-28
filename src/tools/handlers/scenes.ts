@@ -4,7 +4,7 @@
  * Handles scene information retrieval and management.
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -14,12 +14,12 @@ export async function handleGetSceneInfo(
   args: {
     sceneId?: string;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { sceneId } = args;
 
   return withToolError('get scene info', async () => {
-    const scene = await foundryClient.getCurrentScene(sceneId);
+    const scene = await provider.getCurrentScene(sceneId);
 
     return {
       content: [

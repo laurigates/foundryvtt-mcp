@@ -2,15 +2,15 @@
  * World-level tool handlers: cross-collection search, summary, refresh
  */
 
-import type { FoundryClient } from '../../foundry/client.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 export async function handleSearchWorld(
   args: { query: string; limit?: number },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   return withToolError('search world', async () => {
-    const results = foundryClient.searchWorld(args.query);
+    const results = provider.searchWorld(args.query);
     const limit = args.limit || 5;
 
     // Keep name-only search output backward compatible; content matches add a short context.
@@ -69,13 +69,10 @@ export async function handleSearchWorld(
   });
 }
 
-export async function handleGetWorldSummary(
-  _args: Record<string, unknown>,
-  foundryClient: FoundryClient,
-) {
+export async function handleGetWorldSummary(_args: Record<string, unknown>, provider: FoundryCore) {
   return withToolError('get world summary', async () => {
-    const worldInfo = await foundryClient.getWorldInfo();
-    const counts = foundryClient.getWorldSummary();
+    const worldInfo = await provider.getWorldInfo();
+    const counts = provider.getWorldSummary();
 
     const countLines = Object.entries(counts)
       .map(([key, count]) => `- **${key}**: ${count}`)
@@ -99,23 +96,25 @@ ${countLines || 'No data available — not connected.'}`,
 
 export async function handleRefreshWorldData(
   _args: Record<string, unknown>,
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   return withToolError('refresh world data', async () => {
-    await foundryClient.refreshWorldData();
-    const counts = foundryClient.getWorldSummary();
-
-    const countLines = Object.entries(counts)
-      .map(([key, count]) => `- **${key}**: ${count}`)
-      .join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `World data refreshed successfully.\n\n**Collection Counts:**\n${countLines}`,
-        },
-      ],
-    };
+    await provider.refreshWorldData();
+    return formatWorldRefreshResult(provider.getWorldSummary());
   });
+}
+
+/** Shared by the legacy handler and target lifecycle refresh without refreshing twice. */
+export function formatWorldRefreshResult(counts: Record<string, number>) {
+  const countLines = Object.entries(counts)
+    .map(([key, count]) => `- **${key}**: ${count}`)
+    .join('\n');
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `World data refreshed successfully.\n\n**Collection Counts:**\n${countLines}`,
+      },
+    ],
+  };
 }

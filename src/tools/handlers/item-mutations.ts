@@ -9,8 +9,8 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { FoundryClient } from '../../foundry/client.js';
 import type { ActorItemCreateSource } from '../../foundry/types.js';
+import type { FoundryCore } from '../../providers/types.js';
 import { withToolError } from './utils.js';
 
 /**
@@ -22,7 +22,7 @@ export async function handleCreateActorItem(
     actorId: string;
     source: ActorItemCreateSource;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { actorId, source } = args;
 
@@ -48,7 +48,7 @@ export async function handleCreateActorItem(
   }
 
   return withToolError('create item', async () => {
-    const newItem = await foundryClient.createActorItem(actorId, source);
+    const newItem = await provider.createActorItem(actorId, source);
 
     const origin =
       source.type === 'compendium'
@@ -82,7 +82,7 @@ export async function handleUpdateActorItem(
     itemId: string;
     patch: Record<string, unknown>;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { actorId, itemId, patch } = args;
 
@@ -97,7 +97,7 @@ export async function handleUpdateActorItem(
   }
 
   return withToolError('update item', async () => {
-    const updatedItem = await foundryClient.updateActorItem(actorId, itemId, patch);
+    const updatedItem = await provider.updateActorItem(actorId, itemId, patch);
 
     return {
       content: [
@@ -124,7 +124,7 @@ export async function handleDeleteActorItem(
     actorId: string;
     itemId: string;
   },
-  foundryClient: FoundryClient,
+  provider: FoundryCore,
 ) {
   const { actorId, itemId } = args;
 
@@ -136,7 +136,7 @@ export async function handleDeleteActorItem(
   }
 
   return withToolError('delete item', async () => {
-    await foundryClient.deleteActorItem(actorId, itemId);
+    await provider.deleteActorItem(actorId, itemId);
 
     return {
       content: [

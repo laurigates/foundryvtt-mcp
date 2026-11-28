@@ -1,106 +1,135 @@
 # Configuration Guide
 
-## Environment Variables
+One MCP server process can connect to **one or several separately configured Foundry targets**. Every target selects a provider, has its own connection and cache, and can enable writes independently. The schema and default values are implemented in `src/config/targets.ts`. See [Providers and targets](providers-and-targets.md) for all provider options and the [example JSON](../../examples/targets.example.json).
 
-Copy `.env.example` and set the required values:
+## Choose exactly one configuration style
 
-```bash
-cp .env.example .env
+1. **Legacy/single-target environment:** ordinary `FOUNDRY_*` settings become one target (`default`, or `FOUNDRY_TARGET_ID` if set).
+2. **Explicit target list:** set `FOUNDRY_TARGETS_FILE` **or** `FOUNDRY_TARGETS_JSON`; both together are invalid. An explicit list does **not** need `FOUNDRY_URL`, and does not inherit the global `FOUNDRY_WRITE_ENABLED` flag.
+
+A target ID is a local routing identifier, not the Foundry world ID. With multiple configured targets, pass `target_id` for target-specific MCP tools regardless of which worlds are online. There is no mutable global selected world.
+
+## Legacy single-target Socket.IO
+
+Copy `.env.example` to `.env` and set, for example:
+
+```dotenv
+FOUNDRY_URL=http://localhost:30000
+FOUNDRY_USERNAME=Assistant
+FOUNDRY_PASSWORD=your-foundry-world-password
+FOUNDRY_WRITE_ENABLED=false
 ```
 
-### Required / conditional authentication
+With no `FOUNDRY_API_KEY` or explicit `FOUNDRY_PROVIDER`, this uses authenticated `socketio`. `FOUNDRY_USER_ID` can bypass username-to-ID lookup; it does not bypass Foundry authentication. An active world, appropriate user permissions and a reachable Socket.IO endpoint are needed.
 
-| Variable | Required when | Description |
-|----------|---------------|-------------|
-| `FOUNDRY_URL` | Always | Active Foundry world URL (e.g. `https://foundry.example.com` or `http://localhost:30000`). |
-| `FOUNDRY_USERNAME` | Socket.IO mode | Foundry user name. |
-| `FOUNDRY_PASSWORD` | Socket.IO mode | Foundry user password. |
-| `FOUNDRY_API_KEY` | Optional REST bridge | The key of the [REST bridge](#optional-rest-bridge-augment). With `FOUNDRY_REST_URL` and Socket.IO credentials it enables dual mode. |
-| `FOUNDRY_REST_URL` | Optional REST bridge | The bridge server's URL (e.g. `http://localhost:3030`), an http/https URL. Without it, a set `FOUNDRY_API_KEY` selects the deprecated REST-only mode. |
+| Setting | Purpose |
+|---|---|
+| `FOUNDRY_URL` | Server URL for legacy native/bridge targets, with HTTP(S) scheme |
+| `FOUNDRY_USERNAME`, `FOUNDRY_PASSWORD` | Foundry world account for Socket.IO |
+| `FOUNDRY_USER_ID` | Optional world user ID instead of username lookup |
+| `FOUNDRY_SOCKET_PATH` | Socket.IO path (default `/socket.io/`) |
+| `FOUNDRY_API_KEY` | **Historical** `/api/*` bridge key; with `FOUNDRY_REST_URL` and native credentials, enables read augmentation on the single Socket.IO target |
+| `FOUNDRY_REST_URL` | Historical bridge URL; a key without this URL or native credentials retains the `legacy-rest` provider |
+| `FOUNDRY_PROVIDER` | Optional explicit `socketio`, `legacy-rest`, `rest-api` or `composite` |
+| `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY`, `FOUNDRY_REST_CLIENT_ID` | Paired runtime relay configuration (separate from `FOUNDRY_API_KEY`) |
+| `FOUNDRY_REST_RUNTIME_MODE` | Relay transport: `named` (default) or `execute-js` |
+| `FOUNDRY_REST_RUNTIME_PATH` | Optional named-operation endpoint path; requires `named` |
+| `FOUNDRY_REST_EXECUTE_JS_PATH` | Optional historical execution endpoint path; selects `execute-js` |
+| `FOUNDRY_EXPECTED_WORLD_ID`, `FOUNDRY_EXPECTED_ORIGIN` | Optional destination-identity pins; world ID required for composite targets |
+| `FOUNDRY_WRITE_ENABLED` | Single-target write opt-in, default `false` |
+| `FOUNDRY_TIMEOUT`, `FOUNDRY_RETRY_ATTEMPTS`, `FOUNDRY_RETRY_DELAY` | Native/legacy transport timeouts and read retry settings |
+| `LOG_LEVEL`, `NODE_ENV` | Server logging/environment |
+| `CACHE_ENABLED`, `CACHE_TTL_SECONDS`, `CACHE_MAX_SIZE` | Legacy cache configuration; `CACHE_MAX_SIZE` must be a positive integer |
 
-### Optional
+The relay-only legacy environment can use `FOUNDRY_PROVIDER=rest-api` with its `FOUNDRY_REST_*` settings instead of a separate native server URL. `USE_REST_MODULE` is ignored; it does not enable a second transport.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FOUNDRY_USER_ID` | — | 16-char user document `_id`; an **alternative to `FOUNDRY_USERNAME`** in Socket.IO mode (bypasses username resolution). |
-| `FOUNDRY_SOCKET_PATH` | `/socket.io/` | Custom Socket.IO endpoint for reverse-proxy route prefixes. |
-| `FOUNDRY_WRITE_ENABLED` | `false` | Allow the mutating MCP tools **only** with an active authenticated Socket.IO connection and Foundry GM/owner permissions. |
-| `LOG_LEVEL` | `info` | Logging verbosity (`debug`, `info`, `warn`, `error`) |
-| `NODE_ENV` | `development` | Environment mode |
-| `FOUNDRY_TIMEOUT` | `10000` | Request timeout in ms |
-| `FOUNDRY_RETRY_ATTEMPTS` | `3` | Retry failed requests |
-| `FOUNDRY_RETRY_DELAY` | `1000` | Delay between retries in ms |
-| `CACHE_ENABLED` | `true` | Enable response caching |
-| `CACHE_TTL_SECONDS` | `300` | Cache duration in seconds |
-| `CACHE_MAX_SIZE` | — | Maximum cache entries |
+## Multiple targets
 
-## Server Settings
+Put the following in a **local, private** JSON file, for example `foundry-targets.local.json`, and set `FOUNDRY_TARGETS_FILE` to its absolute path:
 
-```env
-# Logging
-LOG_LEVEL=info  # debug, info, warn, error
-
-# Performance
-FOUNDRY_TIMEOUT=10000      # Request timeout (ms)
-FOUNDRY_RETRY_ATTEMPTS=3   # Retry failed requests
+```json
+{
+  "version": 1,
+  "targets": [
+    {
+      "id": "campaign-a",
+      "provider": {
+        "kind": "socketio",
+        "baseUrl": "https://foundry-a.example.invalid",
+        "usernameEnv": "FOUNDRY_A_USERNAME",
+        "passwordEnv": "FOUNDRY_A_PASSWORD"
+      },
+      "writeEnabled": false
+    },
+    {
+      "id": "campaign-b",
+      "provider": {
+        "kind": "socketio",
+        "baseUrl": "https://foundry-b.example.invalid",
+        "usernameEnv": "FOUNDRY_B_USERNAME",
+        "passwordEnv": "FOUNDRY_B_PASSWORD"
+      },
+      "writeEnabled": false
+    }
+  ]
+}
 ```
 
-## Security
+The `.invalid` URLs are placeholders; do not use them as live endpoints. `FOUNDRY_TARGETS_JSON` accepts the same JSON inline as an alternative to a file. Each provider may use `usernameEnv`, `passwordEnv` and `apiKeyEnv` instead of literal credentials; do not specify a literal value and an environment reference for the same field.
 
-- Limit FoundryVTT user permissions to the minimum required.
-- Use HTTPS for remote Foundry instances; ensure the reverse proxy supports WebSocket upgrades.
-- Keep Foundry passwords and optional REST keys in private environment/client settings, not in source control.
-- Keep `FOUNDRY_WRITE_ENABLED=false` until you intend to use write tools, and monitor logs.
+Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldId` / `expectedOrigin`, `writeEnabled` (default `false`) and `integrationsEnabled` (default `true`). Target IDs are unique and URL-safe. A Socket.IO provider can additionally configure `restUrl` together with `restApiKey` or `restApiKeyEnv` for historical bridge augmentation; native credentials remain required. The provider-specific options and expected identity checks are documented in [Providers and targets](providers-and-targets.md).
 
-## FoundryVTT Authentication
+## Providers and capabilities
 
-By default the MCP server connects through authenticated Socket.IO using a standard Foundry account. No Foundry module is required for the supported world-snapshot reads or Socket.IO writes. The optional [REST bridge](#optional-rest-bridge-augment) adds what only code inside Foundry can see, alongside the Socket.IO session (dual mode). See the [capability matrix — connection modes](./capabilities.md#connection-modes) for the canonical, mode-specific tool support.
+| Provider kind | Connection model | Capabilities and limits |
+|---|---|---|
+| `socketio` | Authenticated native Foundry session, optionally augmented by its historical REST bridge | World cache, read tools, native `modifyDocument` writes when permitted; bridge-provided prepared values, compendium search and diagnostics when configured |
+| `legacy-rest` | Historical `/api/*` bridge | Bridge reads, compendium and REST diagnostics; not equivalent to a Socket.IO world cache |
+| `rest-api` | Paired relay with `clientId` and authenticated runtime | Snapshot reads and named package-owned operations, or the `execute-js` opt-in; may perform target-enabled document writes through runtime APIs |
+| `composite` | Socket.IO core + relay execution | Core documents via Socket.IO, integration bindings through paired relay; remote identity must agree |
 
-### Socket.IO setup
+Capability support is **checked per target** by `src/tools/catalog.ts`. A tool can appear in discovery because one target supports it but still be unavailable when called for a different target. For exact implemented operations see [Capability matrix](capabilities.md). No automatic provider failover occurs after a failed write.
 
-1. Ensure FoundryVTT is running with an active world (not on the setup screen)
-2. Create or use an existing FoundryVTT user account with appropriate permissions
-3. Add credentials to your `.env` file
+## Optional REST bridge augment
 
-### Authentication Flow
+The historical bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api). It has a Foundry module running in a browser client and a separate Node bridge server (port `3030` by default). It needs a Gamemaster logged into the world through a browser with the module enabled. It is distinct from the ThreeHats paired relay used by `rest-api` and `composite` integration execution.
 
-The server authenticates through a four-stage flow:
+1. Install the Foundry module using `https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json`, enable it in the world, enable its REST API setting and copy its API key.
+2. Configure the repository's `bridge-server/` component with the Foundry URL, that API key and the world user it should use, then start the bridge server.
+3. Keep a Gamemaster logged into the world through a browser with the module enabled. See the bridge's [usage guide](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/usage.md#installation) for its complete installation configuration.
 
-1. Requests `/join` to obtain a session cookie.
-2. Resolves a user name to a document ID via Socket.IO `getJoinData` (unless `FOUNDRY_USER_ID` is supplied).
-3. Submits credentials to `POST /join` to authenticate the session.
-4. Opens an authenticated Socket.IO connection and requests the world snapshot using the `world` event.
+For the legacy single-target environment, keep `FOUNDRY_URL` and the native credentials pointing at Foundry, then set:
 
-This flow runs against the Foundry URL and does not require an open browser tab on the client PC.
+```dotenv
+FOUNDRY_API_KEY=your-historical-bridge-key
+FOUNDRY_REST_URL=http://localhost:3030
+```
 
-### Required permissions
+For an explicit target, set `provider.kind` to `socketio`, keep its native connection fields, and add `restUrl` plus `restApiKeyEnv` (or `restApiKey`). The bridge URL and key must be supplied together. These settings belong to that target; explicit targets do not inherit a global bridge configuration.
 
-The Foundry user needs access to the documents the tools will read. Write operations also require appropriate GM/owner permissions and `FOUNDRY_WRITE_ENABLED=true`; an active Socket.IO session is mandatory. Pack search is not part of the default world snapshot and requires the optional REST bridge.
+The bridge augments prepared actor values, dice rolling, compendium search and diagnostics. Socket.IO remains the source for native document mutations and the live world cache. A bridge read failure falls back to the native answer where one exists, or reports the unavailable capability. A transport failure pauses the bridge; a server error pauses the affected capability. Those pauses last 30 seconds and do not replay writes. Native connection startup does not depend on a successful bridge response.
 
-### Optional: REST bridge augment
+A legacy environment key without the complete combination of bridge URL and native credentials keeps the historical `legacy-rest` mode. In that mode `FOUNDRY_URL` points to the bridge, and native world-cache operations and Socket.IO writes are unavailable. `FOUNDRY_REST_RELAY_URL`, `FOUNDRY_REST_API_KEY` and `FOUNDRY_REST_CLIENT_ID` continue to configure the separate paired relay.
 
-The REST bridge is [laurigates/foundryvtt-local-rest-api](https://github.com/laurigates/foundryvtt-local-rest-api). In dual mode it adds prepared dnd5e values (AC, character max HP, save totals), Foundry's dice engine, compendium search, logs and system health to the Socket.IO session. The [capability matrix](./capabilities.md#tools-by-mode) lists what it changes per tool. Socket.IO stays primary: writes, combat, journals and live updates never go through the bridge, and a failed bridge call falls back to the Socket.IO answer.
+The historical bridge is authenticated by probing `/api/world`; a successful `/api/status` response from Foundry itself does not establish that the bridge or the API key works.
 
-It has two parts, because module code runs in the browser and cannot serve HTTP:
+## Resources and diagnostics
 
-- a **Foundry module**, which runs in a browser client and reads the game data;
-- a **bridge server** (Node.js, port `3030` by default), which serves the REST API, logs in to Foundry as its own world user, and relays each request to the module.
+Use `list_targets` and `get_target_status` to inspect remote identity, connection state, capabilities and integration availability. With multiple targets, resource URIs are qualified:
 
-The bridge answers only while a **Gamemaster is logged in through a browser** with the module enabled. Without that client, the bridge answers HTTP 500 after its `REQUEST_TIMEOUT` (5 s by default), and dual mode serves the Socket.IO answers. The MCP then skips the bridge for that capability for 30 seconds, so only the first call in each window waits; `get_health_status` shows the bridge as "Reachable, answering with errors" and lists the pauses.
+```text
+foundry://targets/campaign-a/actors
+foundry://targets/campaign-b/actors
+```
 
-**Status:** the module is released (current release v2.1.2; compatibility minimum 13, verified 14.369, maximum 14). The two bridge defects that blocked dual mode, [laurigates/foundryvtt-local-rest-api#8](https://github.com/laurigates/foundryvtt-local-rest-api/issues/8) (actor reads and search filters, so no prepared AC, max HP or save totals) and [laurigates/foundryvtt-local-rest-api#6](https://github.com/laurigates/foundryvtt-local-rest-api/issues/6) (diagnostics routing and the missing compendium route), were fixed in its [PR #4](https://github.com/laurigates/foundryvtt-local-rest-api/pull/4) and shipped in v2.1.0. Dual mode was checked by hand on 2026-11-26 against a live dnd5e world: `get_health_status`, `get_actor_details` (prepared AC and save totals), `search_compendium`, `roll_dice` (Foundry's dice engine), `get_system_health` and `get_recent_logs` all answered through the bridge. If a route misbehaves, dual mode still falls back to the Socket.IO answer or an "unavailable" label.
+Historical unqualified aliases such as `foundry://actors` are accepted only when target selection is unambiguous. Relay snapshot reads may require an explicit `refresh_world_data` after changes performed by another client.
 
-Setup (the module's [usage guide](https://github.com/laurigates/foundryvtt-local-rest-api/blob/main/docs/usage.md#installation) has the full bridge-server configuration):
+## Security and verification
 
-1. In Foundry, go to **Setup → Add-on Modules → Install Module** and paste the manifest URL `https://github.com/laurigates/foundryvtt-local-rest-api/releases/latest/download/module.json`. Enable the module in your world, turn on **Enable REST API** in its module settings and copy the generated API key.
-2. Configure the bridge server from the `bridge-server/` directory of a checkout of that repository: the Foundry URL, the API key, and the world user it logs in as. Start it and check `http://localhost:3030/api/status`.
-3. Keep a Gamemaster logged in through a browser.
-4. Add to the MCP's `.env`, alongside the Socket.IO credentials:
-   ```env
-   FOUNDRY_API_KEY=your_api_key_here
-   FOUNDRY_REST_URL=http://localhost:3030
-   ```
+- Keep passwords, keys, token files and local target JSON containing secrets out of source control. For remote Foundry, use HTTPS and correctly forward Socket.IO traffic.
+- Default to `writeEnabled: false`. A target write opt-in **and** appropriate provider capabilities and Foundry permissions are necessary. Different provider kinds have different write execution mechanisms.
+- Relay execution is limited to trusted, packaged operations; it is not a general-purpose JavaScript MCP tool. Named mode sends only an operation identifier, and the `execute-js` opt-in sends only the binding source a manifest already declares.
+- Mutation timeouts can have an **unknown outcome**; inspect the selected world before any retry. Reconnect/refresh is target-specific.
+- Validate with `just qa` and `just build`. For connection checks run `bun run test-connection` against your actual configured targets. Local fake-relay tests do not prove upstream live compatibility.
 
-`FOUNDRY_URL` keeps pointing at Foundry itself. `get_health_status` shows the mode (`Socket.IO + REST bridge (dual)`) and the bridge's state: reachable, unreachable (no answer), answering with errors (5xx), last request rejected (4xx) or unusable response, with the last error and any running pauses.
-
-**Deprecated REST-only mode.** `FOUNDRY_API_KEY` without Socket.IO credentials, or with credentials but no `FOUNDRY_REST_URL`, still selects the old REST-only mode, in which `FOUNDRY_URL` must point at the bridge. The second case is deliberate: the MCP does not guess that such a configuration meant dual mode. It has no writes, combat, journals, chat or live updates, and logs a warning at startup. Set `FOUNDRY_URL` to Foundry and `FOUNDRY_REST_URL` to the bridge to move to dual mode.
+For connection problems see [Troubleshooting](../../TROUBLESHOOTING.md) and [the target configuration guide](providers-and-targets.md).

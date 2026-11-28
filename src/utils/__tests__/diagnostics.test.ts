@@ -95,6 +95,53 @@ describe('DiagnosticSystem.testAuthentication, REST mode (#230)', () => {
   });
 });
 
+describe('DiagnosticSystem authentication stays target-scoped', () => {
+  it('checks the native connection even when compatibility settings contain another target key', async () => {
+    const provider = new FoundryClient({ baseUrl: 'http://native.test' });
+    vi.spyOn(provider, 'isConnected').mockReturnValue(true);
+    const get = vi
+      .spyOn(provider, 'get')
+      .mockRejectedValue(new Error('Native HTTP must not be probed'));
+    const connect = vi.spyOn(provider, 'connect').mockResolvedValue(undefined);
+    const system = new DiagnosticSystem(provider, {
+      url: 'http://native.test',
+      apiKey: 'stale-key',
+    });
+
+    await expect(authenticate(system)).resolves.toEqual({ valid: true });
+    expect(get).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('does not probe REST availability for a native provider without diagnostics capability', async () => {
+    const provider = new FoundryClient({ baseUrl: 'http://native.test' });
+    const get = vi.spyOn(provider, 'get').mockRejectedValue(new Error('Unexpected request'));
+
+    await expect(
+      probe(new DiagnosticSystem(provider, { url: 'http://native.test' })),
+    ).resolves.toBe(false);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('reports the configured bridge URL for a REST-only connection failure', async () => {
+    const provider = new FoundryClient({
+      baseUrl: 'http://native.test:30000',
+      apiKey: 'bridge-key',
+      restUrl: 'http://bridge.test:3030',
+    });
+    vi.spyOn(provider, 'testConnection').mockResolvedValue(false);
+    const system = new DiagnosticSystem(provider, {
+      url: 'http://native.test:30000',
+      apiKey: 'bridge-key',
+    });
+
+    const result = await system.diagnoseFeatureProblem('actors');
+
+    expect(result.suggestions).toContain('http://bridge.test:3030');
+    expect(result.suggestions).not.toContain('http://native.test:30000');
+  });
+});
+
 /**
  * A REST-mode client whose transport answers /api/world with `status`, so
  * `testConnection()` rejects through the real `connect()` → `probeRestModule`.
@@ -145,8 +192,11 @@ function rollCheck(system: InstanceType<typeof DiagnosticSystem>): Promise<boole
 }
 
 /** A REST-mode client whose `rollDice` answers with the given source. */
-function clientRolling(source: 'server' | 'local') {
-  const client = new FoundryClient({ baseUrl: 'http://localhost:30000', apiKey: 'test-api-key' });
+function clientRolling(source: 'server' | 'local', rest = true) {
+  const client = new FoundryClient({
+    baseUrl: 'http://localhost:30000',
+    ...(rest ? { apiKey: 'test-api-key' } : {}),
+  });
   vi.spyOn(client, 'rollDice').mockResolvedValue({
     formula: '1d20',
     total: 11,
@@ -169,14 +219,27 @@ describe('DiagnosticSystem.testDiceRolling, REST mode (#265)', () => {
 
 describe('DiagnosticSystem.testDiceRolling, Socket.IO mode (#265)', () => {
   it('passes on a local roll, which is the only kind this mode makes', async () => {
-    const { config } = await import('../../config/index.js');
-    const saved = config.foundry.apiKey;
-    Reflect.deleteProperty(config.foundry, 'apiKey');
-    try {
-      await expect(rollCheck(new DiagnosticSystem(clientRolling('local')))).resolves.toBe(true);
-    } finally {
-      Reflect.set(config.foundry, 'apiKey', saved);
-    }
+    const provider = clientRolling('local', false);
+    // The first/global target has a REST key; this native target must ignore it.
+    const diagnostic = new DiagnosticSystem(provider, { url: 'http://native.test' });
+    await expect(rollCheck(diagnostic)).resolves.toBe(true);
+  });
+
+  it('uses the selected provider even when a compatibility connection includes a stale key', async () => {
+    const provider = clientRolling('local', false);
+    const diagnostic = new DiagnosticSystem(provider, {
+      url: 'http://native.test',
+      apiKey: 'unused-key',
+    });
+    await expect(rollCheck(diagnostic)).resolves.toBe(true);
+  });
+
+  it('does not confuse composite native dice with standalone relay dice', async () => {
+    const provider = clientRolling('local', false);
+    vi.spyOn(provider, 'kind', 'get').mockReturnValue('composite');
+    await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(true);
+    vi.spyOn(provider, 'kind', 'get').mockReturnValue('rest-api');
+    await expect(rollCheck(new DiagnosticSystem(provider))).resolves.toBe(false);
   });
 });
 
