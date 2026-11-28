@@ -197,14 +197,29 @@ No Python interpreter is needed by targets without executable Python integration
 Dependencies are not installed automatically. The worker environment excludes
 provider credentials. Trusted integration code is not an untrusted-code sandbox.
 
-### 7. `execute-js` is an implementation detail
+### 7. Named operations are the contract; `execute-js` is compatibility
 
-The REST provider executes fixed bindings owned by integration packages with
-JSON-serialized arguments. There is no free-form JavaScript MCP tool. Bindings
-resolve runtime documents, call public APIs, and return serializable results.
+The REST provider sends **named operations** by default: `POST /mcp/operation`
+with `{ clientId, operation, args, write }`. The relay resolves the identifier, so
+no script source crosses the wire and the read-only claim holds for the transport
+itself. Core work uses `core.snapshot`, `core.modify_document` and
+`core.roll_dice`; a package operation is `<kind>.<id>.<generation>.<operation>`
+and its readiness check is the same name with a `#probe` suffix.
 
-A different provider must support the same binding/operation contract or declare
-the operation unsupported. Merely defining an `execute` method does not guarantee
+The historical `execute-js` route remains a supported transport, selected
+explicitly by `runtimeMode: 'execute-js'` or by setting `executeJsPath`. It posts
+the package-owned binding source the manifest already declares; there is still no
+free-form JavaScript MCP tool. A target cannot mix the two modes: the target
+schema and the provider constructor reject `executeJsPath` with `named` and
+`runtimePath` with `execute-js`.
+
+Neither mode falls back to the other. A relay that does not implement an
+operation fails the call; it is never downgraded to script execution. Identity is
+verified by an optional `identity` echo in the envelope, and a mismatch drops the
+bound identity instead of trusting the answer.
+
+A different provider must support the same operation contract or declare the
+operation unsupported. Merely defining an `execute` method does not guarantee
 portability. Runtime API probes and version declarations are separate checks.
 
 ### 8. Availability is per operation and per target

@@ -157,6 +157,28 @@ An externally supplied implementation of `FoundryCore` may omit the extra raw
 HTTP helpers, so an extension that uses those helpers must receive a client
 implementing them. The adapter does not manufacture unsupported transport APIs.
 
+## Relay transport: named operations by default
+
+A `rest-api` target now sends named operations to `POST /mcp/operation` instead of
+posting binding source to `/execute-js`. The body is
+`{ clientId, operation, args, write }`; core work uses `core.snapshot`,
+`core.modify_document` and `core.roll_dice`, and package operations are
+`<kind>.<id>.<generation>.<operation>` with a `#probe` readiness check.
+
+| Existing usage | Behavior on this branch |
+|---|---|
+| `rest-api` target with `relayUrl`, `apiKey`, `clientId` | Accepted, but `runtimeMode` defaults to `named`, so the relay must implement the operation contract |
+| `executeJsPath` (or `FOUNDRY_REST_EXECUTE_JS_PATH`) | Still selects the historical transport; `runtimeMode` becomes `execute-js` unless it is set explicitly |
+| `runtimeMode: 'execute-js'` | Posts the package-owned binding source to `executeJsPath`, as before |
+| `runtimeMode: 'named'` with `executeJsPath`, or `execute-js` with `runtimePath` | Rejected by the target schema and the provider constructor; there is no implicit mode switch |
+| Relay that does not know an operation | The call fails with `unsupported_operation`; it is never downgraded to script execution |
+| Envelope `identity` echo | Re-verifies world and origin per call; a mismatch drops the bound identity and the target must reconnect |
+| Core tool names, arguments and results | Unchanged; only the transport and the optional `identity` echo are new |
+
+`runtime.named` is advertised as an additional capability in named mode. It marks
+the transport and does not replace `runtime.execute`, which still gates every
+executable system/module operation.
+
 ## Deliberate boundaries
 
 - **Availability is checked per target.** Unsupported, offline, unclassified or

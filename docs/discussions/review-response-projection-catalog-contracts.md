@@ -1,8 +1,8 @@
 # Review response: projection, catalog and integration-contract hardening
 
-Status: P1–P6 are committed (`228368f`, `c3c1096`, `4280650`); the lint repair (P7) and
-the Node-only integration runtime (P8) are in the working tree. The operator owns
-commit and push.
+Status: P1–P6 are committed (`228368f`, `c3c1096`, `4280650`); the lint repair (P7),
+the Node-only integration runtime (P8) and named relay operations (P9) are in the
+working tree. The operator owns commit and push.
 
 ## Evidence policy
 
@@ -27,6 +27,8 @@ read from the repository, and are addressed in P6.
 | — | Load-dependent test timeouts | `src/integrations/__tests__/lifecycle.test.ts` | `228368f` |
 | P6 | CodeQL alerts (2 high, 1 medium) | `src/tools/handlers/{chat,journals}.ts`, `src/foundry/{world-cache,world-search}.ts`, two handler tests | `c3c1096` |
 | P7 | Lint scope widened by `66342fd` | 19 files: four `scripts/` files, `src/foundry/client.ts`, 14 test and source files | local |
+| P8 | Node-only integration runtime (step 2) | `src/integrations/{manager,manifest}.ts`, `src/config/targets.ts`, `src/sessions/session.ts`, deleted `python/` and six `adapter.py`, `scripts/smoke-integrations.js` | local |
+| P9 | Named relay operations (step 3) | `src/providers/{types,rest-api,composite}.ts`, `src/integrations/{manager,manifest}.ts`, `src/sessions/session.ts`, `src/config/targets.ts`, five test files | local |
 
 ### P1 — projection is display-only again
 
@@ -186,6 +188,41 @@ The door stays open: if a future adapter needs a Python-only library, it can be
 reintroduced as an opt-in per package, never as a mandatory entrypoint for every
 target.
 
+### P9 — named relay operations (step 3)
+
+Point 1 of the review was that the REST provider sends JavaScript to
+`/execute-js`. The provider now sends **named operations** by default:
+
+- `src/providers/types.ts` adds `RestRuntimeMode` (`named` | `execute-js`),
+  `runtimeMode` and `runtimePath`; `execute()` takes `{ readOnly, operation? }`.
+- `src/providers/rest-api.ts` splits the old `request()` into `requestScript()`
+  and `requestOperation()` over a shared `send()`. Named mode posts
+  `{ clientId, operation, args, write }` to `/mcp/operation`, so **no script
+  source crosses the wire**. Core work uses `core.snapshot`,
+  `core.modify_document` and `core.roll_dice`; snapshot and watch resolve per
+  mode, and `capabilities` adds `runtime.named`.
+- `src/integrations/manifest.ts` derives `<kind>.<id>.<generation>.<operation>`
+  and `src/integrations/manager.ts` carries it as `runtime`/`runtimeProbe` into
+  every binding and probe.
+- `src/config/targets.ts` accepts `runtimeMode`/`runtimePath`, cross-checks them
+  against `executeJsPath`, and reads `FOUNDRY_REST_RUNTIME_MODE` and
+  `FOUNDRY_REST_RUNTIME_PATH`.
+
+`execute-js` survives as an explicit opt-in — `runtimeMode: 'execute-js'` or a
+configured `executeJsPath` — because the existing relay implements that route.
+The default is `named`; there is no silent fallback in either direction, and a
+target that pairs the wrong path with the wrong mode is rejected by both the
+schema and the constructor.
+
+Identity verification moved with the transport: the injected JavaScript guard is
+gone, and the relay may echo `identity` in the envelope. A mismatch drops the
+bound identity; without an echo, identity is verified at snapshot time only.
+
+**Not verifiable end to end.** The named contract must be implemented by the
+relay, which is outside this repository. Until it ships, a default `rest-api`
+target fails fast with `unsupported_operation` instead of degrading, and the
+existing relay keeps working through the opt-in.
+
 ## What is gained
 
 1. **PF2e actors display HP and AC again** and the HP cap error is actionable.
@@ -244,9 +281,11 @@ target.
 - **Live verification** of PF2e HP/AC display and the dual-mode probe.
 - **Local lint on Windows** still needs the LF-blob export above (or
   `.gitattributes` with `eol=lf`) before it agrees with CI.
-- **Maintainer reply**: the point 2 decision (Node-only) still needs to be posted;
-  point 1 (`/execute-js`) stays deferred to step 3, where the REST relay executor
-  is replaced by named operations.
+- **Maintainer reply**: point 2 (Node-only) and point 1 (named operations, with
+  `execute-js` retained as a documented opt-in for the existing relay) both need
+  to be posted. The relay-side implementation of the named contract is still
+  outstanding upstream; until it ships, an existing relay keeps working through
+  `runtimeMode: 'execute-js'`.
 - **`smoke:pack`** was not run locally: it needs a published build, dependency
   resolution and a POSIX `chmod`. The installed-package path is therefore verified
   by `smoke:integrations` only.
@@ -257,7 +296,7 @@ target.
 |---|---|
 | `node node_modules/typescript/bin/tsc --noEmit` | exit 0 |
 | `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.scripts.json` | exit 0 |
-| `node node_modules/vitest/vitest.mjs run` | 65 files, 1204 tests, all green |
+| `node node_modules/vitest/vitest.mjs run` | 65 files, 1214 tests, all green |
 | `node scripts/integrations.mjs check` | 6 packages checked |
 | `node scripts/integrations.mjs test` | 646 tests, 0 failures |
 | `node scripts/smoke-integrations.js` | 6 packages, 258 strict schemas, 168 validated recipes |
@@ -265,7 +304,10 @@ target.
 | `node_modules/.bin/biome.exe check` (CRLF working tree) | format noise only; the LF blobs are the reference |
 
 Test count moved from 1171 to 1207 across P1–P7, then to 1204 with P8: three tests
-described the Python worker and one new test rejects a legacy `entrypoint`.
+described the Python worker and one new test rejects a legacy `entrypoint`. P9 adds
+ten: five cover the named transport (no `script` on the wire, a core write, a
+missing operation, a cross-mode path, an identity mismatch) and five the
+configuration, the environment variables and the propagated operation name.
 
 ## Note on `git status`
 

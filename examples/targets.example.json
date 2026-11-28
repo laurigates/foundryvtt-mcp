@@ -19,7 +19,8 @@
           "kind": "rest-api",
           "relayUrl": "https://relay.example.invalid",
           "apiKeyEnv": "FOUNDRY_RELAY_API_KEY",
-          "clientId": "replace-with-paired-client-a"
+          "clientId": "replace-with-paired-client-a",
+          "runtimeMode": "named"
         }
       }
     },

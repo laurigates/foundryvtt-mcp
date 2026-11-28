@@ -85,7 +85,7 @@ Each target accepts `id`, optional `label`, `provider`, optional `expectedWorldI
 |---|---|---|
 | `socketio` | Authenticated native Foundry session, optionally augmented by its historical REST bridge | World cache, read tools, native `modifyDocument` writes when permitted; bridge-provided prepared values, compendium search and diagnostics when configured |
 | `legacy-rest` | Historical `/api/*` bridge | Bridge reads, compendium and REST diagnostics; not equivalent to a Socket.IO world cache |
-| `rest-api` | Paired relay with `clientId` and authenticated runtime | Snapshot reads and package-owned JS bindings; may perform target-enabled document writes through runtime APIs |
+| `rest-api` | Paired relay with `clientId` and authenticated runtime | Snapshot reads and named package-owned operations, or the `execute-js` opt-in; may perform target-enabled document writes through runtime APIs |
 | `composite` | Socket.IO core + relay execution | Core documents via Socket.IO, integration bindings through paired relay; remote identity must agree |
 
 Capability support is **checked per target** by `src/tools/catalog.ts`. A tool can appear in discovery because one target supports it but still be unavailable when called for a different target. For exact implemented operations see [Capability matrix](capabilities.md). No automatic provider failover occurs after a failed write.
@@ -128,7 +128,7 @@ Historical unqualified aliases such as `foundry://actors` are accepted only when
 
 - Keep passwords, keys, token files and local target JSON containing secrets out of source control. For remote Foundry, use HTTPS and correctly forward Socket.IO traffic.
 - Default to `writeEnabled: false`. A target write opt-in **and** appropriate provider capabilities and Foundry permissions are necessary. Different provider kinds have different write execution mechanisms.
-- Relay execution is limited to trusted, packaged bindings; it is not a general-purpose JavaScript MCP tool.
+- Relay execution is limited to trusted, packaged operations; it is not a general-purpose JavaScript MCP tool. Named mode sends only an operation identifier, and the `execute-js` opt-in sends only the binding source a manifest already declares.
 - Mutation timeouts can have an **unknown outcome**; inspect the selected world before any retry. Reconnect/refresh is target-specific.
 - Validate with `just qa` and `just build`. For connection checks run `bun run test-connection` against your actual configured targets. Local fake-relay tests do not prove upstream live compatibility.
 

@@ -23,12 +23,12 @@ Connection modes are resolved within a target. Provider kinds have separate capa
 |---|---|---|
 | `socketio` | Authenticated native Foundry session with live world-data cache; optional historical REST augmentation | Core read/cache operations; native writes via `modifyDocument` if enabled; bridge-backed capabilities when configured |
 | `legacy-rest` | Historical `/api/*` bridge selected by a legacy environment key without a full native-plus-bridge configuration | Shared core reads, compendium search and legacy REST diagnostics; no native Socket.IO world-cache capability |
-| `rest-api` | Paired ThreeHats relay, runtime bindings and refreshed world snapshot | Core read/cache and optional target-enabled document writes through Foundry runtime APIs; runtime integration bindings |
+| `rest-api` | Paired ThreeHats relay, named runtime operations and refreshed world snapshot | Core read/cache and optional target-enabled document writes through Foundry runtime APIs; runtime integration bindings over named operations, or the `execute-js` opt-in |
 | `composite` | Native Socket.IO core plus a separately authenticated paired relay | Socket.IO core operations and relay integration execution for one identity-verified world |
 
 `FOUNDRY_API_KEY` is **not** a relay credential; `FOUNDRY_REST_API_KEY` supplies the legacy-environment relay key. Explicit targets select the provider using `provider.kind`. A composite verifies consistent world/origin/system identity; neither composite nor standalone relay silently falls back to another transport after an uncertain write. See [configuration](configuration.md) and [providers/targets](providers-and-targets.md).
 
-Capabilities used for the core include `core.read`, `core.cache`, `core.write`, `compendium.read` and `diagnostics.read`. `runtime.execute` is required for executable system/module integrations; operations may additionally depend on a specific active system or module. A write needs a target-local opt-in **and** suitable provider/runtime/Foundry permissions.
+Capabilities used for the core include `core.read`, `core.cache`, `core.write`, `compendium.read` and `diagnostics.read`. `runtime.execute` is required for executable system/module integrations; operations may additionally depend on a specific active system or module. A `rest-api` target in named mode also advertises `runtime.named`, which marks the transport and never replaces `runtime.execute`. A write needs a target-local opt-in **and** suitable provider/runtime/Foundry permissions.
 
 A `composite` is ready only when both connections are available. Its core tools
 are also withheld if the relay fails; no degraded native-only mode is provided.
